@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Book Annotate app icon">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.1)"/>
+    </linearGradient>
+    <linearGradient id="book" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0f4ab3"/>
+      <stop offset="100%" stop-color="#0b2f8c"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f9fdff"/>
+      <stop offset="100%" stop-color="#edf6ff"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#ffe89a"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="24" y="24" width="464" height="464" rx="110" fill="url(#bg)"/>
+  <rect x="28" y="28" width="456" height="456" rx="106" fill="url(#glass)" opacity="0.35"/>
+
+  <g transform="translate(0 6)">
+    <g transform="translate(64 123)">
+      <path d="M72 254 L280 154 L362 190 L170 292 Z" fill="rgba(255,255,255,0.18)"/>
+      <path d="M76 242 Q214 156 360 191 L360 272 Q220 236 76 304 Z" fill="url(#book)" stroke="#1a4db8" stroke-width="8" stroke-linejoin="round"/>
+      <path d="M76 305 Q203 250 360 286 L360 302 Q204 260 76 320 Z" fill="#0a2b6f" opacity="0.9"/>
+
+      <path d="M72 242 Q210 152 360 188 L360 281 Q216 228 72 301 Z" fill="url(#page)" stroke="#1649b4" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M72 244 Q208 165 360 189" fill="none" stroke="rgba(161,200,255,0.8)" stroke-width="10" stroke-linecap="round"/>
+      <path d="M72 258 Q205 218 360 246" fill="none" stroke="rgba(161,200,255,0.75)" stroke-width="8" stroke-linecap="round"/>
+
+      <path d="M144 228 L144 286" stroke="#8cc7ff" stroke-width="7" stroke-linecap="round"/>
+      <path d="M186 214 L186 291" stroke="#8cc7ff" stroke-width="7" stroke-linecap="round"/>
+      <path d="M228 203 L228 296" stroke="#8cc7ff" stroke-width="7" stroke-linecap="round"/>
+      <path d="M270 194 L270 301" stroke="#8cc7ff" stroke-width="7" stroke-linecap="round"/>
+
+      <path d="M112 250 Q162 234 194 248" fill="none" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+      <path d="M170 251 Q228 234 268 250" fill="none" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+      <path d="M230 255 Q286 238 326 257" fill="none" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+
+      <g transform="translate(300 32)">
+        <path d="M66 14 L132 30 L90 168 L20 154 Z" fill="url(#gold)" stroke="#f59e0b" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M32 146 L88 170 L70 208 L14 182 Z" fill="#f7c948" stroke="#f59e0b" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M18 154 L88 170 L60 238 L-10 212 Z" fill="#f59e0b" stroke="#d97706" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M68 18 L128 44 L82 176 L24 148 Z" fill="#fef3c7" opacity="0.8"/>
+      </g>
+    </g>
+
+    <g transform="translate(160 92)">
+      <rect x="0" y="0" width="120" height="94" rx="18" fill="rgba(255,255,255,0.9)" stroke="#0f172a" stroke-width="7"/>
+      <path d="M28 28 H92" stroke="#0ea5e9" stroke-width="8" stroke-linecap="round"/>
+      <path d="M22 48 H94" stroke="#0ea5e9" stroke-width="8" stroke-linecap="round"/>
+      <path d="M28 68 H72" stroke="#0ea5e9" stroke-width="8" stroke-linecap="round"/>
+      <path d="M88 52 L98 42 L108 52 L98 62 Z" fill="#0ea5e9"/>
+      <path d="M96 42 L96 62" stroke="#0f172a" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <g transform="translate(118 364)">
+    <path d="M156 0 H286 C312 0 332 20 332 46 V66 C332 92 312 112 286 112 H156 C130 112 110 92 110 66 V46 C110 20 130 0 156 0 Z" fill="#0b2f8c" stroke="#0a286f" stroke-width="8"/>
+    <path d="M150 54 H292" stroke="#f7d75f" stroke-width="12" stroke-linecap="round"/>
+    <path d="M154 82 H288" stroke="#f7d75f" stroke-width="12" stroke-linecap="round"/>
+    <path d="M136 30 L164 58" stroke="#fce7a8" stroke-width="10" stroke-linecap="round"/>
+    <path d="M216 24 H276" stroke="#fce7a8" stroke-width="10" stroke-linecap="round"/>
+    <path d="M200 50 H268" stroke="#fce7a8" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

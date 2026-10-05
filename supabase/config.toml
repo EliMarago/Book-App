@@ -1,0 +1,2 @@
+[functions.book-cover]
+verify_jwt = true
