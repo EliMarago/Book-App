@@ -40,7 +40,8 @@ export function BookCard({
       .select('*')
       .eq('book_id', book.id)
       .order('created_at', { ascending: false });
-    setNotes(data ?? []);
+    const userNotes = (data ?? []).filter((n) => !n.content.startsWith('__READ_AT__:'));
+    setNotes(userNotes);
     setLoadingNotes(false);
   };
 

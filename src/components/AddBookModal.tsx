@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Loader2, Search, BookMarked, BookPlus, Link2, ImageOff } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
-import { saveBookDate } from '@/lib/bookDates';
+import { syncBookDateToSupabase } from '@/lib/bookDates';
 
 async function fetchBookCover(title: string, author: string): Promise<string | null> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -102,7 +102,7 @@ export function AddBookModal({
         return;
       }
 
-      saveBookDate(book.id, computedReadAt);
+      await syncBookDateToSupabase(book.id, computedReadAt);
 
       const baseBook = data ?? book;
       const mergedData = {
@@ -134,7 +134,7 @@ export function AddBookModal({
     }
 
     if (data) {
-      saveBookDate(data.id, computedReadAt);
+      await syncBookDateToSupabase(data.id, computedReadAt);
 
       const mergedInsertData = {
         ...data,

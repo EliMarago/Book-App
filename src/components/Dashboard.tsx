@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BookOpen, Plus, LogOut, Library, Search, Loader2, BookMarked } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase, type Book } from '@/lib/supabase';
-import { getStoredDates, removeBookDate } from '@/lib/bookDates';
+import { getStoredDates, removeBookDate, fetchDatesFromSupabase } from '@/lib/bookDates';
 import { BookCard } from './BookCard';
 import { AddBookModal } from './AddBookModal';
 
@@ -31,10 +31,14 @@ export function Dashboard() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    const storedDates = getStoredDates();
+    const [storedLocalDates, supabaseDates] = await Promise.all([
+      getStoredDates(),
+      fetchDatesFromSupabase(),
+    ]);
+
     const booksWithDates = (data ?? []).map((b) => ({
       ...b,
-      read_at: b.read_at || storedDates[b.id] || null,
+      read_at: b.read_at || supabaseDates[b.id] || storedLocalDates[b.id] || null,
     }));
 
     setBooks(booksWithDates);
