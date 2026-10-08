@@ -252,7 +252,12 @@ export function AddBookModal({
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setStatus(opt.value)}
+                  onClick={() => {
+                    setStatus(opt.value);
+                    if (opt.value === 'completed' && !readAt) {
+                      setReadAt(new Date().toISOString().split('T')[0]);
+                    }
+                  }}
                   className={`py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
                     status === opt.value
                       ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'

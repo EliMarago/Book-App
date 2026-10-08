@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Plus, Loader2, StickyNote, X, BookMarked, Link2, ImageOff, Calendar } from 'lucide-react';
+import { Trash2, Plus, Loader2, StickyNote, X, BookMarked, Link2, ImageOff, Calendar, Flame } from 'lucide-react';
 import type { Book, Note } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
+import { syncBookDateToSupabase } from '@/lib/bookDates';
 import { StarRating } from './StarRating';
 
 const STATUS_COLORS: Record<Book['status'], string> = {
@@ -15,11 +16,13 @@ export function BookCard({
   onUpdate,
   onDelete,
   onEdit,
+  highlight = false,
 }: {
   book: Book;
   onUpdate: (book: Book) => void;
   onDelete: (id: string) => void;
   onEdit: (book: Book) => void;
+  highlight?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -87,13 +90,18 @@ export function BookCard({
   };
 
   const handleStatusChange = async (status: Book['status']) => {
+    let newReadAt = book.read_at;
+    if (status === 'completed' && !newReadAt) {
+      newReadAt = new Date().toISOString();
+      await syncBookDateToSupabase(book.id, newReadAt);
+    }
     const { data } = await supabase
       .from('books')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', book.id)
       .select()
       .single();
-    if (data) onUpdate(data);
+    if (data) onUpdate({ ...data, read_at: newReadAt });
   };
 
   const handleRatingChange = async (rating: number) => {
@@ -103,7 +111,7 @@ export function BookCard({
       .eq('id', book.id)
       .select()
       .single();
-    if (data) onUpdate(data);
+    if (data) onUpdate({ ...data, read_at: book.read_at });
   };
 
   const handleSaveCover = async () => {
@@ -115,7 +123,7 @@ export function BookCard({
       .eq('id', book.id)
       .select()
       .single();
-    if (updated) onUpdate(updated);
+    if (updated) onUpdate({ ...updated, read_at: book.read_at });
     setSavingCover(false);
     setShowCoverModal(false);
     setCoverInput('');
@@ -132,7 +140,13 @@ export function BookCard({
   };
 
   return (
-    <div className="group bg-stone-800/60 backdrop-blur-sm rounded-xl border border-stone-700 overflow-hidden transition-all hover:border-stone-600">
+    <div
+      className={`group backdrop-blur-sm rounded-xl border transition-all ${
+        highlight
+          ? 'bg-gradient-to-br from-amber-950/30 via-stone-850 to-stone-900 border-amber-500/40 shadow-lg shadow-amber-500/5 hover:border-amber-400/60 ring-1 ring-amber-500/20'
+          : 'bg-stone-800/60 border-stone-700 hover:border-stone-600'
+      } overflow-hidden`}
+    >
       <div className="flex gap-4 p-4">
         <div className="relative flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-stone-900 flex items-center justify-center shadow-lg group/cover">
           {book.cover_url ? (
@@ -152,6 +166,12 @@ export function BookCard({
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col">
+          {highlight && (
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-300 tracking-wider uppercase mb-1">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+              <span>In lettura</span>
+            </div>
+          )}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="font-serif text-lg font-semibold text-stone-100 truncate">
