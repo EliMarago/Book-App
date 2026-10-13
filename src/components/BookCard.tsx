@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Plus, Loader2, StickyNote, X, BookMarked, Link2, ImageOff, Calendar, Flame } from 'lucide-react';
+import {
+  Trash2,
+  Plus,
+  Loader2,
+  StickyNote,
+  X,
+  BookMarked,
+  Link2,
+  ImageOff,
+  Calendar,
+  Flame,
+  Sparkles,
+} from 'lucide-react';
 import type { Book, Note } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { syncBookDateToSupabase } from '@/lib/bookDates';
+import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
 
 const STATUS_COLORS: Record<Book['status'], string> = {
@@ -35,6 +48,7 @@ export function BookCard({
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [coverInput, setCoverInput] = useState('');
   const [savingCover, setSavingCover] = useState(false);
+  const [autoFetchingCover, setAutoFetchingCover] = useState(false);
 
   const loadNotes = async () => {
     setLoadingNotes(true);
@@ -134,6 +148,26 @@ export function BookCard({
     setShowCoverModal(true);
   };
 
+  const handleAutoFetchCover = async () => {
+    setAutoFetchingCover(true);
+    try {
+      const cover = await fetchBookCover(book.title, book.author);
+      if (cover) {
+        const { data: updated } = await supabase
+          .from('books')
+          .update({ cover_url: cover, updated_at: new Date().toISOString() })
+          .eq('id', book.id)
+          .select()
+          .single();
+        if (updated) onUpdate({ ...updated, read_at: book.read_at });
+      }
+    } catch (e) {
+      console.error('Errore recupero copertina:', e);
+    } finally {
+      setAutoFetchingCover(false);
+    }
+  };
+
   const handleDeleteBook = async () => {
     await supabase.from('books').delete().eq('id', book.id);
     onDelete(book.id);
@@ -160,9 +194,34 @@ export function BookCard({
               }}
             />
           ) : (
-            <BookMarked size={32} className="text-stone-600" />
+            <div className="flex flex-col items-center justify-center p-2 text-center">
+              <BookMarked size={32} className="text-stone-600 mb-1" />
+              <span className="text-[10px] text-stone-500">Nessuna copertina</span>
+            </div>
           )}
           <ImageOff size={28} className="text-stone-600 hidden" />
+
+          {!book.cover_url && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAutoFetchCover();
+              }}
+              disabled={autoFetchingCover}
+              className="absolute inset-0 bg-stone-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center opacity-0 group-hover/cover:opacity-100 transition-opacity cursor-pointer border border-amber-500/30"
+              title="Cerca copertina in automatico con titolo e autore"
+            >
+              {autoFetchingCover ? (
+                <Loader2 size={18} className="animate-spin text-amber-400 mb-1" />
+              ) : (
+                <Sparkles size={18} className="text-amber-400 mb-1" />
+              )}
+              <span className="text-[10px] text-amber-300 font-medium">
+                {autoFetchingCover ? 'Cerco...' : 'Cerca copertina'}
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col">
@@ -424,9 +483,32 @@ export function BookCard({
                 </div>
 
                 <div className="flex-1">
-                  <label className="mb-2 block text-sm font-medium text-stone-300">
-                    URL immagine
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-stone-300">
+                      URL immagine
+                    </label>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setAutoFetchingCover(true);
+                        const found = await fetchBookCover(book.title, book.author);
+                        if (found) setCoverInput(found);
+                        setAutoFetchingCover(false);
+                      }}
+                      disabled={autoFetchingCover}
+                      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-40 font-medium px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors cursor-pointer"
+                      title="Cerca automaticamente la copertina di questo libro"
+                    >
+                      {autoFetchingCover ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={12} />
+                      )}
+                      <span>
+                        {autoFetchingCover ? 'Ricerca...' : 'Cerca in automatico'}
+                      </span>
+                    </button>
+                  </div>
                   <div className="relative">
                     <Link2
                       size={18}

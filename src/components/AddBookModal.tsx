@@ -1,54 +1,106 @@
-import { useState } from 'react';
-import { X, Loader2, Search, BookMarked, BookPlus, Link2, ImageOff } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  Loader2,
+  BookMarked,
+  BookPlus,
+  Link2,
+  ImageOff,
+  Sparkles,
+  Check,
+  RefreshCw,
+} from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import { syncBookDateToSupabase } from '@/lib/bookDates';
-
-async function fetchBookCover(title: string, author: string): Promise<string | null> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const url = `${supabaseUrl}/functions/v1/book-cover`;
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      body: JSON.stringify({ title, author }),
-    });
-
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data || typeof data !== 'object') return null;
-    if (data.cover_url) return data.cover_url as string;
-    return null;
-  } catch {
-    return null;
-  }
-}
+import { fetchBookCover, searchAlternativeCovers } from '@/lib/bookCoverApi';
 
 export function AddBookModal({
   onClose,
   onAdd,
   onUpdate,
   book,
+  initialValues,
 }: {
   onClose: () => void;
   onAdd?: (book: Book) => void;
   onUpdate?: (book: Book) => void;
   book?: Book | null;
+  initialValues?: { title?: string; author?: string; status?: Book['status'] };
 }) {
   const isEditing = Boolean(book);
-  const [title, setTitle] = useState(book?.title ?? '');
-  const [author, setAuthor] = useState(book?.author ?? '');
-  const [status, setStatus] = useState<Book['status']>(book?.status ?? 'want');
+  const [title, setTitle] = useState(book?.title ?? initialValues?.title ?? '');
+  const [author, setAuthor] = useState(book?.author ?? initialValues?.author ?? '');
+  const [status, setStatus] = useState<Book['status']>(
+    book?.status ?? initialValues?.status ?? 'want'
+  );
   const [readAt, setReadAt] = useState(
     book?.read_at ? new Date(book.read_at).toISOString().split('T')[0] : ''
   );
   const [coverUrl, setCoverUrl] = useState(book?.cover_url ?? '');
+  const [coverSource, setCoverSource] = useState<'auto' | 'manual' | null>(
+    book?.cover_url ? 'manual' : null
+  );
+  const [searchingCover, setSearchingCover] = useState(false);
+  const [alternativeCovers, setAlternativeCovers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tiene traccia dell'ultima query cercata per evitare ricerche identiche
+  const lastSearchedRef = useRef<string>('');
+
+  // Ricerca automatica della copertina quando l'utente digita titolo e autore
+  useEffect(() => {
+    // Non sovrascrivere se l'utente ha modificato manualmente o se sta modificando un libro esistente
+    if (isEditing && book?.cover_url) return;
+    if (coverSource === 'manual' && coverUrl.trim()) return;
+
+    const cleanTitle = title.trim();
+    const cleanAuthor = author.trim();
+
+    if (!cleanTitle || cleanTitle.length < 2) return;
+
+    const queryKey = `${cleanTitle.toLowerCase()}::${cleanAuthor.toLowerCase()}`;
+    if (lastSearchedRef.current === queryKey) return;
+
+    const timer = setTimeout(async () => {
+      lastSearchedRef.current = queryKey;
+      setSearchingCover(true);
+      try {
+        const found = await fetchBookCover(cleanTitle, cleanAuthor);
+        if (found) {
+          setCoverUrl(found);
+          setCoverSource('auto');
+        }
+      } catch (err) {
+        console.error('Errore caricamento automatico copertina:', err);
+      } finally {
+        setSearchingCover(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl]);
+
+  // Cerca manualmente la copertina e le eventuali alternative
+  const handleManualSearchCover = async () => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return;
+
+    setSearchingCover(true);
+    try {
+      const found = await fetchBookCover(cleanTitle, author.trim());
+      if (found) {
+        setCoverUrl(found);
+        setCoverSource('auto');
+      }
+      const alternatives = await searchAlternativeCovers(cleanTitle, author.trim());
+      setAlternativeCovers(alternatives);
+    } catch (err) {
+      console.error('Errore ricerca copertina:', err);
+    } finally {
+      setSearchingCover(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +111,13 @@ export function AddBookModal({
 
     let finalCoverUrl: string | null = coverUrl.trim() || null;
 
+    // Se l'utente non ha specificato la copertina, proviamo un ultimo recupero rapido
     if (!finalCoverUrl) {
-      finalCoverUrl = await fetchBookCover(title.trim(), author.trim());
+      try {
+        finalCoverUrl = await fetchBookCover(title.trim(), author.trim());
+      } catch {
+        finalCoverUrl = null;
+      }
     }
 
     const computedReadAt = readAt
@@ -89,16 +146,11 @@ export function AddBookModal({
         .select()
         .single();
 
-      let finalData = data;
-      let finalUpdateError = updateError;
-
-
-
       setLoading(false);
 
-      if (finalUpdateError) {
-        console.error('Errore update libro:', finalUpdateError);
-        setError(`Errore aggiornamento: ${finalUpdateError.message}`);
+      if (updateError) {
+        console.error('Errore update libro:', updateError);
+        setError(`Errore aggiornamento: ${updateError.message}`);
         return;
       }
 
@@ -165,14 +217,18 @@ export function AddBookModal({
               {isEditing ? 'Modifica libro' : 'Aggiungi libro'}
             </h2>
           </div>
-          <button onClick={onClose} className="text-stone-500 hover:text-stone-300">
+          <button
+            onClick={onClose}
+            className="text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
+          >
             <X size={22} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-stone-900 flex items-center justify-center shadow-lg border border-stone-700">
+          <div className="flex gap-4 items-start">
+            {/* Box Anteprima Copertina */}
+            <div className="relative flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-stone-900 flex flex-col items-center justify-center shadow-lg border border-stone-700 group">
               {coverUrl.trim() ? (
                 <img
                   src={coverUrl.trim()}
@@ -184,59 +240,141 @@ export function AddBookModal({
                   }}
                 />
               ) : (
-                <BookMarked size={32} className="text-stone-600" />
+                <div className="flex flex-col items-center justify-center p-2 text-center">
+                  <BookMarked size={32} className="text-stone-600 mb-1" />
+                  <span className="text-[10px] text-stone-500 leading-tight">
+                    Nessuna copertina
+                  </span>
+                </div>
               )}
               <ImageOff size={28} className="text-stone-600 hidden" />
+
+              {/* Indicatore di caricamento in sovrimpressione */}
+              {searchingCover && (
+                <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center animate-in fade-in">
+                  <Loader2 size={24} className="animate-spin text-amber-400 mb-1" />
+                  <span className="text-[10px] text-amber-300 font-medium">
+                    Cerco copertina...
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-stone-300 mb-1.5">Titolo</label>
+                <label className="block text-sm font-medium text-stone-300 mb-1">
+                  Titolo *
+                </label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors"
+                  className="w-full px-3 py-2 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-sm"
                   placeholder="Es. Il nome della rosa"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-300 mb-1.5">Autore</label>
+                <label className="block text-sm font-medium text-stone-300 mb-1">
+                  Autore *
+                </label>
                 <input
                   type="text"
                   required
                   value={author}
                   onChange={(e) => setAuthor(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors"
+                  className="w-full px-3 py-2 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-sm"
                   placeholder="Es. Umberto Eco"
                 />
               </div>
+
+              {coverSource === 'auto' && coverUrl && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                  <Sparkles size={13} />
+                  <span>Copertina caricata in automatico!</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-stone-300 mb-1.5">
-              URL copertina (opzionale)
-            </label>
+          {/* Sezione URL / Ricerca Copertina */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-medium text-stone-300">
+                Copertina (automatica o personalizzata)
+              </label>
+
+              <button
+                type="button"
+                onClick={handleManualSearchCover}
+                disabled={searchingCover || !title.trim()}
+                className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-40 font-medium px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors cursor-pointer"
+                title="Cerca copertina tenendo conto del titolo e dell'autore"
+              >
+                {searchingCover ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                <span>{searchingCover ? 'Ricerca...' : 'Cerca copertina'}</span>
+              </button>
+            </div>
+
             <div className="relative">
               <Link2
-                size={18}
+                size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"
               />
               <input
                 type="url"
                 value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors"
-                placeholder="https://... (incolla qui l'URL dell'immagine)"
+                onChange={(e) => {
+                  setCoverUrl(e.target.value);
+                  setCoverSource('manual');
+                }}
+                className="w-full pl-9 pr-4 py-2 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-xs"
+                placeholder="URL copertina (rilevata in automatico o incolla URL)"
               />
             </div>
-            <p className="text-xs text-stone-500 mt-1.5">
-              Incolla l'URL diretto di un'immagine. Se lo lasci vuoto, la copertina viene cercata
-              automaticamente.
-            </p>
+
+            {/* Copertine alternative selezionabili */}
+            {alternativeCovers.length > 1 && (
+              <div className="pt-1">
+                <span className="text-[11px] text-stone-400 block mb-1">
+                  Altre copertine trovate (clicca per cambiare):
+                </span>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {alternativeCovers.map((altUrl, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setCoverUrl(altUrl);
+                        setCoverSource('manual');
+                      }}
+                      className={`relative w-11 h-15 rounded-md overflow-hidden border transition-all shrink-0 cursor-pointer ${
+                        coverUrl === altUrl
+                          ? 'border-amber-400 ring-2 ring-amber-400/50'
+                          : 'border-stone-700 opacity-60 hover:opacity-100'
+                      }`}
+                      title="Seleziona questa copertina"
+                    >
+                      <img
+                        src={altUrl}
+                        alt="Opzione copertina"
+                        className="w-full h-full object-cover"
+                      />
+                      {coverUrl === altUrl && (
+                        <div className="absolute top-0.5 right-0.5 bg-amber-500 text-stone-950 rounded-full p-0.5">
+                          <Check size={8} strokeWidth={3} />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -244,24 +382,19 @@ export function AddBookModal({
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  { value: 'want', label: 'Da leggere' },
                   { value: 'reading', label: 'In lettura' },
                   { value: 'completed', label: 'Completato' },
+                  { value: 'want', label: 'Da leggere' },
                 ] as const
               ).map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => {
-                    setStatus(opt.value);
-                    if (opt.value === 'completed' && !readAt) {
-                      setReadAt(new Date().toISOString().split('T')[0]);
-                    }
-                  }}
-                  className={`py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
+                  onClick={() => setStatus(opt.value)}
+                  className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                     status === opt.value
-                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'
-                      : 'bg-stone-900/40 text-stone-400 border-stone-700 hover:border-stone-600'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-stone-900/40 text-stone-400 border-stone-700 hover:text-stone-200'
                   }`}
                 >
                   {opt.label}
@@ -270,48 +403,39 @@ export function AddBookModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-stone-300 mb-1.5">Data di lettura</label>
-            <input
-              type="date"
-              value={readAt}
-              onChange={(e) => setReadAt(e.target.value)}
-              className="w-full px-3 py-2.5 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors"
-            />
+          {status === 'completed' && (
+            <div>
+              <label className="block text-sm font-medium text-stone-300 mb-1.5">
+                Data di completamento (opzionale)
+              </label>
+              <input
+                type="date"
+                value={readAt}
+                onChange={(e) => setReadAt(e.target.value)}
+                className="w-full px-3 py-2.5 bg-stone-900/60 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors"
+              />
+            </div>
+          )}
+
+          {error && <div className="text-red-400 text-xs py-1">{error}</div>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-stone-700 hover:bg-stone-600 text-stone-300 font-medium rounded-lg transition-colors cursor-pointer"
+            >
+              Annulla
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !title.trim() || !author.trim()}
+              className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              {loading && <Loader2 size={18} className="animate-spin" />}
+              {isEditing ? 'Salva modifiche' : 'Aggiungi'}
+            </button>
           </div>
-
-          {!coverUrl.trim() && (
-            <div className="flex items-center gap-2 text-xs text-stone-500 bg-stone-900/40 rounded-lg p-2.5 border border-stone-700">
-              <Search size={14} className="flex-shrink-0" />
-              <span>
-                Senza URL, la copertina verrà cercata automaticamente in base a titolo e autore.
-              </span>
-            </div>
-          )}
-
-          {error && (
-            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-900 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Salvataggio...
-              </>
-            ) : (
-              <>
-                <BookMarked size={18} />
-                {isEditing ? 'Salva modifiche' : 'Aggiungi al scaffale'}
-              </>
-            )}
-          </button>
         </form>
       </div>
     </div>
