@@ -12,7 +12,6 @@ import {
   Flame,
   CheckCircle2,
   ArrowRight,
-  Download,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase, type Book } from '@/lib/supabase';
@@ -20,12 +19,6 @@ import { getStoredDates, removeBookDate, fetchDatesFromSupabase } from '@/lib/bo
 import { BookCard } from './BookCard';
 import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
-import { DownloadTodoSection } from './DownloadTodoSection';
-import {
-  getDownloadTodos,
-  saveDownloadTodos,
-  type DownloadTodoItem,
-} from '@/lib/downloadTodo';
 
 type ViewTab = 'all' | 'reading' | 'completed' | 'want';
 
@@ -37,61 +30,6 @@ export function Dashboard() {
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [search, setSearch] = useState('');
-  const [downloadTodos, setDownloadTodos] = useState<DownloadTodoItem[]>([]);
-  const [isDownloadSectionOpen, setIsDownloadSectionOpen] = useState(false);
-  const [initialBookModalValues, setInitialBookModalValues] = useState<{
-    title?: string;
-    author?: string;
-    status?: Book['status'];
-  } | null>(null);
-
-  useEffect(() => {
-    setDownloadTodos(getDownloadTodos(user?.id));
-  }, [user?.id]);
-
-  const handleAddTodo = (item: Omit<DownloadTodoItem, 'id' | 'createdAt'>) => {
-    const newItem: DownloadTodoItem = {
-      ...item,
-      id:
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : String(Date.now()),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newItem, ...downloadTodos];
-    setDownloadTodos(updated);
-    saveDownloadTodos(updated, user?.id);
-  };
-
-  const handleToggleTodo = (id: string) => {
-    const updated = downloadTodos.map((t) =>
-      t.id === id ? { ...t, completed: !t.completed } : t
-    );
-    setDownloadTodos(updated);
-    saveDownloadTodos(updated, user?.id);
-  };
-
-  const handleDeleteTodo = (id: string) => {
-    const updated = downloadTodos.filter((t) => t.id !== id);
-    setDownloadTodos(updated);
-    saveDownloadTodos(updated, user?.id);
-  };
-
-  const handleClearCompletedTodos = () => {
-    const updated = downloadTodos.filter((t) => !t.completed);
-    setDownloadTodos(updated);
-    saveDownloadTodos(updated, user?.id);
-  };
-
-  const handleAddTodoToBookshelf = (item: { title: string; author?: string }) => {
-    setEditingBook(null);
-    setInitialBookModalValues({
-      title: item.title,
-      author: item.author || '',
-      status: 'want',
-    });
-    setShowAddModal(true);
-  };
 
   const loadBooks = async () => {
     setLoading(true);
@@ -183,41 +121,13 @@ export function Dashboard() {
               <p className="text-xs text-stone-500 mt-0.5">{user?.email}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsDownloadSectionOpen((prev) => !prev)}
-              className={`flex items-center gap-2 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                isDownloadSectionOpen
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
-                  : 'text-stone-300 hover:text-stone-100 hover:bg-stone-800 border-stone-700/80'
-              }`}
-              title={
-                isDownloadSectionOpen
-                  ? 'Nascondi lista da scaricare'
-                  : 'Mostra lista da scaricare'
-              }
-            >
-              <Download
-                size={16}
-                className={
-                  isDownloadSectionOpen ? 'text-amber-400' : 'text-stone-400'
-                }
-              />
-              <span className="hidden sm:inline">Da scaricare</span>
-              {downloadTodos.filter((t) => !t.completed).length > 0 && (
-                <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {downloadTodos.filter((t) => !t.completed).length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
-            >
-              <LogOut size={16} />
-              Esci
-            </button>
-          </div>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+          >
+            <LogOut size={16} />
+            Esci
+          </button>
         </div>
       </header>
 
@@ -307,18 +217,6 @@ export function Dashboard() {
             Aggiungi libro
           </button>
         </div>
-
-        {/* Sezione Nascosta To-Do: Libri da scaricare */}
-        <DownloadTodoSection
-          todos={downloadTodos}
-          onAddTodo={handleAddTodo}
-          onToggleTodo={handleToggleTodo}
-          onDeleteTodo={handleDeleteTodo}
-          onClearCompleted={handleClearCompletedTodos}
-          onAddToBookshelf={handleAddTodoToBookshelf}
-          isExpanded={isDownloadSectionOpen}
-          onToggleExpand={() => setIsDownloadSectionOpen((prev) => !prev)}
-        />
 
         {/* Tab di Navigazione tra Sezioni */}
         <div className="flex items-center gap-2 border-b border-stone-800 mb-7 pb-2 overflow-x-auto scrollbar-thin">
@@ -689,11 +587,9 @@ export function Dashboard() {
       {showAddModal && (
         <AddBookModal
           book={editingBook}
-          initialValues={initialBookModalValues || undefined}
           onClose={() => {
             setShowAddModal(false);
             setEditingBook(null);
-            setInitialBookModalValues(null);
           }}
           onAdd={handleAddBook}
           onUpdate={handleUpdateBook}
