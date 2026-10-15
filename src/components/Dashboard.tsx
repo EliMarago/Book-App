@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   BookOpen,
   Plus,
@@ -12,10 +12,12 @@ import {
   Flame,
   CheckCircle2,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase, type Book } from '@/lib/supabase';
 import { getStoredDates, removeBookDate, fetchDatesFromSupabase } from '@/lib/bookDates';
+import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
 import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
@@ -26,35 +28,90 @@ export function Dashboard() {
   const { signOut, user } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [search, setSearch] = useState('');
 
-  const loadBooks = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('books')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const loadBooks = useCallback(async (showFullLoader = false) => {
+    if (showFullLoader) {
+      setLoading(true);
+    }
+    setIsSyncing(true);
 
-    const [storedLocalDates, supabaseDates] = await Promise.all([
-      getStoredDates(),
-      fetchDatesFromSupabase(),
-    ]);
+    try {
+      // Controlla anche se ci sono nuove versioni dell'app distribuite sul server
+      checkForAppUpdate().catch(() => {});
 
-    const booksWithDates = (data ?? []).map((b) => ({
-      ...b,
-      read_at: b.read_at || supabaseDates[b.id] || storedLocalDates[b.id] || null,
-    }));
+      const { data } = await supabase
+        .from('books')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    setBooks(booksWithDates);
-    setLoading(false);
-  };
+      const [storedLocalDates, supabaseDates] = await Promise.all([
+        getStoredDates(),
+        fetchDatesFromSupabase(),
+      ]);
+
+      const booksWithDates = (data ?? []).map((b) => ({
+        ...b,
+        read_at: b.read_at || supabaseDates[b.id] || storedLocalDates[b.id] || null,
+      }));
+
+      setBooks(booksWithDates);
+      setLastSyncedAt(new Date());
+    } catch (err) {
+      console.error('Errore durante la sincronizzazione:', err);
+    } finally {
+      if (showFullLoader) {
+        setLoading(false);
+      }
+      setIsSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    loadBooks();
-  }, []);
+    loadBooks(true);
+
+    // 1. Sincronizzazione Realtime via Supabase (modifiche istantanee da qualsiasi dispositivo)
+    const channel = supabase
+      .channel('books-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'books' },
+        () => {
+          loadBooks(false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes' },
+        () => {
+          loadBooks(false);
+        }
+      )
+      .subscribe();
+
+    // 2. Ricarica quando l'utente rimette in primo piano l'app o il browser
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadBooks(false);
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('online', handleVisibilityOrFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('online', handleVisibilityOrFocus);
+    };
+  }, [loadBooks]);
 
   const handleAddBook = (book: Book) => {
     setBooks((prev) => [book, ...prev]);
@@ -121,13 +178,33 @@ export function Dashboard() {
               <p className="text-xs text-stone-500 mt-0.5">{user?.email}</p>
             </div>
           </div>
-          <button
-            onClick={signOut}
-            className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
-          >
-            <LogOut size={16} />
-            Esci
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadBooks(false)}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-300 hover:text-stone-100 bg-stone-800/80 hover:bg-stone-750 border border-stone-700/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-60"
+              title={
+                lastSyncedAt
+                  ? `Ultimo aggiornamento: ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Clicca per sincronizzare subito.`
+                  : 'Sincronizza subito con tutti i dispositivi'
+              }
+            >
+              <RefreshCw
+                size={14}
+                className={`text-amber-400 ${isSyncing ? 'animate-spin' : ''}`}
+              />
+              <span className="hidden sm:inline">
+                {isSyncing ? 'Sincronizzo...' : 'Sincronizza'}
+              </span>
+            </button>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <LogOut size={16} />
+              Esci
+            </button>
+          </div>
         </div>
       </header>
 

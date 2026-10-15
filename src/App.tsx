@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Dashboard } from '@/components/Dashboard';
+import { PwaUpdateBanner } from '@/components/PwaUpdateBanner';
 
 function AppContent() {
   const { session, loading } = useAuth();
@@ -14,7 +15,12 @@ function AppContent() {
     );
   }
 
-  return session ? <Dashboard /> : <AuthScreen />;
+  return (
+    <>
+      {session ? <Dashboard /> : <AuthScreen />}
+      <PwaUpdateBanner />
+    </>
+  );
 }
 
 export default function App() {
