@@ -34,14 +34,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
+      return {
+        error:
+          'Variabili di ambiente mancanti: crea il file .env con VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+      };
+    }
     const { error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
+    if (error) {
+      if (error.message.includes('Failed to fetch')) {
+        return {
+          error:
+            'Impossibile connettersi a Supabase (Failed to fetch). Verifica che il progetto Supabase non sia in pausa e che le credenziali nel file .env siano corrette.',
+        };
+      }
+      return { error: error.message };
+    }
     return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
+      return {
+        error:
+          'Variabili di ambiente mancanti: crea il file .env con VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY per connetterti al database.',
+      };
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
+    if (error) {
+      if (error.message.includes('Failed to fetch')) {
+        return {
+          error:
+            'Impossibile connettersi a Supabase (Failed to fetch). Verifica che il progetto su app.supabase.com non sia in pausa (Restore project) e che le credenziali nel file .env siano corrette.',
+        };
+      }
+      return { error: error.message };
+    }
     return { error: null };
   };
 

@@ -25,6 +25,7 @@ export type Book = {
   read_at: string | null;
   created_at: string;
   updated_at: string;
+  notes_count?: number;
 };
 
 export type Note = {

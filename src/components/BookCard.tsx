@@ -19,9 +19,9 @@ import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
 
 const STATUS_COLORS: Record<Book['status'], string> = {
-  reading: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  completed: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  want: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+  reading: 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-800 border-amber-500/30 light:border-amber-300',
+  completed: 'bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-800 border-emerald-500/30 light:border-emerald-300',
+  want: 'bg-sky-500/15 light:bg-sky-50 text-sky-400 light:text-sky-800 border-sky-500/30 light:border-sky-300',
 };
 
 export function BookCard({
@@ -38,8 +38,9 @@ export function BookCard({
   highlight?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<Note[] | null>(null);
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const [notesCount, setNotesCount] = useState<number>(book.notes_count ?? 0);
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -50,23 +51,54 @@ export function BookCard({
   const [savingCover, setSavingCover] = useState(false);
   const [autoFetchingCover, setAutoFetchingCover] = useState(false);
 
+  // Sincronizza il conteggio con il libro passato come prop (es. da Dashboard o aggiornamenti genitore)
+  useEffect(() => {
+    if (book.notes_count !== undefined) {
+      setNotesCount(book.notes_count);
+    }
+  }, [book.notes_count]);
+
+  // Se notes_count non è definito e le note non sono ancora state caricate, carica il conteggio in background
+  useEffect(() => {
+    if (book.notes_count === undefined && notes === null) {
+      supabase
+        .from('notes')
+        .select('id, content')
+        .eq('book_id', book.id)
+        .then(({ data }) => {
+          if (data) {
+            const count = data.filter((n) => !n.content.startsWith('__READ_AT__:')).length;
+            setNotesCount(count);
+          }
+        });
+    }
+  }, [book.id, book.notes_count, notes]);
+
   const loadNotes = async () => {
     setLoadingNotes(true);
-    const { data } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('book_id', book.id)
-      .order('created_at', { ascending: false });
-    const userNotes = (data ?? []).filter((n) => !n.content.startsWith('__READ_AT__:'));
-    setNotes(userNotes);
-    setLoadingNotes(false);
+    try {
+      const { data } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('book_id', book.id)
+        .order('created_at', { ascending: false });
+      const userNotes = (data ?? []).filter((n) => !n.content.startsWith('__READ_AT__:'));
+      setNotes(userNotes);
+      setNotesCount(userNotes.length);
+    } catch (e) {
+      console.error('Errore nel caricamento delle note:', e);
+    } finally {
+      setLoadingNotes(false);
+    }
   };
 
   useEffect(() => {
-    if (expanded && notes.length === 0 && !loadingNotes) {
+    if (expanded && notes === null && !loadingNotes) {
       loadNotes();
     }
-  }, [expanded]);
+  }, [expanded, notes, loadingNotes]);
+
+  const displayCount = notes !== null ? notes.length : notesCount;
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -77,8 +109,11 @@ export function BookCard({
       .select()
       .single();
     if (data) {
-      setNotes((prev) => [data, ...prev]);
+      const updatedNotes = [data, ...(notes ?? [])];
+      setNotes(updatedNotes);
+      setNotesCount(updatedNotes.length);
       setNewNote('');
+      onUpdate({ ...book, notes_count: updatedNotes.length });
     }
     setSavingNote(false);
   };
@@ -92,7 +127,7 @@ export function BookCard({
       .select()
       .single();
     if (data) {
-      setNotes((prev) => prev.map((n) => (n.id === id ? data : n)));
+      setNotes((prev) => (prev ?? []).map((n) => (n.id === id ? data : n)));
     }
     setEditingNoteId(null);
     setEditContent('');
@@ -100,7 +135,10 @@ export function BookCard({
 
   const handleDeleteNote = async (id: string) => {
     await supabase.from('notes').delete().eq('id', id);
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    const updatedNotes = (notes ?? []).filter((n) => n.id !== id);
+    setNotes(updatedNotes);
+    setNotesCount(updatedNotes.length);
+    onUpdate({ ...book, notes_count: updatedNotes.length });
   };
 
   const handleStatusChange = async (status: Book['status']) => {
@@ -115,7 +153,7 @@ export function BookCard({
       .eq('id', book.id)
       .select()
       .single();
-    if (data) onUpdate({ ...data, read_at: newReadAt });
+    if (data) onUpdate({ ...data, read_at: newReadAt, notes_count: displayCount });
   };
 
   const handleRatingChange = async (rating: number) => {
@@ -125,7 +163,7 @@ export function BookCard({
       .eq('id', book.id)
       .select()
       .single();
-    if (data) onUpdate({ ...data, read_at: book.read_at });
+    if (data) onUpdate({ ...data, read_at: book.read_at, notes_count: displayCount });
   };
 
   const handleSaveCover = async () => {
@@ -137,7 +175,7 @@ export function BookCard({
       .eq('id', book.id)
       .select()
       .single();
-    if (updated) onUpdate({ ...updated, read_at: book.read_at });
+    if (updated) onUpdate({ ...updated, read_at: book.read_at, notes_count: displayCount });
     setSavingCover(false);
     setShowCoverModal(false);
     setCoverInput('');
@@ -159,7 +197,7 @@ export function BookCard({
           .eq('id', book.id)
           .select()
           .single();
-        if (updated) onUpdate({ ...updated, read_at: book.read_at });
+        if (updated) onUpdate({ ...updated, read_at: book.read_at, notes_count: displayCount });
       }
     } catch (e) {
       console.error('Errore recupero copertina:', e);
@@ -177,12 +215,12 @@ export function BookCard({
     <div
       className={`group backdrop-blur-sm rounded-xl border transition-all ${
         highlight
-          ? 'bg-gradient-to-br from-amber-950/30 via-stone-850 to-stone-900 border-amber-500/40 shadow-lg shadow-amber-500/5 hover:border-amber-400/60 ring-1 ring-amber-500/20'
-          : 'bg-stone-800/60 border-stone-700 hover:border-stone-600'
+          ? 'bg-gradient-to-br from-amber-950/30 via-stone-850 to-stone-900 light:from-amber-50/70 light:via-white light:to-amber-50/30 border-amber-500/40 light:border-amber-300 shadow-lg shadow-amber-500/5 hover:border-amber-400/60 light:hover:border-amber-400 ring-1 ring-amber-500/20 light:ring-amber-300/40'
+          : 'bg-stone-800/60 light:bg-white border-stone-700 light:border-stone-200/90 hover:border-stone-600 light:hover:border-stone-300 shadow-xs'
       } overflow-hidden`}
     >
       <div className="flex gap-4 p-4">
-        <div className="relative flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-stone-900 flex items-center justify-center shadow-lg group/cover">
+        <div className="relative flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-transparent light:border-stone-200 group/cover">
           {book.cover_url ? (
             <img
               src={book.cover_url}
@@ -195,11 +233,11 @@ export function BookCard({
             />
           ) : (
             <div className="flex flex-col items-center justify-center p-2 text-center">
-              <BookMarked size={32} className="text-stone-600 mb-1" />
-              <span className="text-[10px] text-stone-500">Nessuna copertina</span>
+              <BookMarked size={32} className="text-stone-600 light:text-stone-400 mb-1" />
+              <span className="text-[10px] text-stone-500 light:text-stone-400">Nessuna copertina</span>
             </div>
           )}
-          <ImageOff size={28} className="text-stone-600 hidden" />
+          <ImageOff size={28} className="text-stone-600 light:text-stone-400 hidden" />
 
           {!book.cover_url && (
             <button
@@ -209,15 +247,15 @@ export function BookCard({
                 handleAutoFetchCover();
               }}
               disabled={autoFetchingCover}
-              className="absolute inset-0 bg-stone-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center opacity-0 group-hover/cover:opacity-100 transition-opacity cursor-pointer border border-amber-500/30"
+              className="absolute inset-0 bg-stone-950/85 light:bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center opacity-0 group-hover/cover:opacity-100 transition-opacity cursor-pointer border border-amber-500/30"
               title="Cerca copertina in automatico con titolo e autore"
             >
               {autoFetchingCover ? (
-                <Loader2 size={18} className="animate-spin text-amber-400 mb-1" />
+                <Loader2 size={18} className="animate-spin text-amber-400 light:text-amber-600 mb-1" />
               ) : (
-                <Sparkles size={18} className="text-amber-400 mb-1" />
+                <Sparkles size={18} className="text-amber-400 light:text-amber-600 mb-1" />
               )}
-              <span className="text-[10px] text-amber-300 font-medium">
+              <span className="text-[10px] text-amber-300 light:text-amber-800 font-medium">
                 {autoFetchingCover ? 'Cerco...' : 'Cerca copertina'}
               </span>
             </button>
@@ -226,22 +264,22 @@ export function BookCard({
 
         <div className="flex-1 min-w-0 flex flex-col">
           {highlight && (
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-300 tracking-wider uppercase mb-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-1">
+              <span className="w-2 h-2 rounded-full bg-amber-400 light:bg-amber-500 animate-pulse inline-block" />
               <span>In lettura</span>
             </div>
           )}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="font-serif text-lg font-semibold text-stone-100 truncate">
+              <h3 className="font-serif text-lg font-semibold text-stone-100 light:text-stone-900 truncate">
                 {book.title}
               </h3>
-              <p className="text-stone-400 text-sm mt-0.5">{book.author}</p>
+              <p className="text-stone-400 light:text-stone-600 text-sm mt-0.5">{book.author}</p>
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => onEdit(book)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-500 hover:text-amber-400 p-1"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-500 light:text-stone-400 hover:text-amber-400 light:hover:text-amber-600 p-1"
                 title="Modifica libro"
                 aria-label="Modifica libro"
               >
@@ -249,7 +287,7 @@ export function BookCard({
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-500 hover:text-red-400 p-1"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-500 light:text-stone-400 hover:text-red-400 light:hover:text-red-600 p-1"
                 title="Elimina libro"
                 aria-label="Elimina libro"
               >
@@ -268,12 +306,12 @@ export function BookCard({
               onChange={(e) => handleStatusChange(e.target.value as Book['status'])}
               className={`text-xs font-medium px-2.5 py-1 rounded-full border cursor-pointer outline-none ${STATUS_COLORS[book.status]}`}
             >
-              <option value="reading">In lettura</option>
-              <option value="completed">Completato</option>
-              <option value="want">Da leggere</option>
+              <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
+              <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Completato</option>
+              <option value="want" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Da leggere</option>
             </select>
             {book.read_at ? (
-              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2.5 py-1">
+              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2.5 py-1">
                 <Calendar size={11} />
                 {new Date(book.read_at).toLocaleDateString('it-IT', {
                   day: '2-digit',
@@ -282,42 +320,57 @@ export function BookCard({
                 })}
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-[11px] text-stone-500 bg-stone-800/60 border border-stone-700 rounded-full px-2.5 py-1">
+              <span className="flex items-center gap-1 text-[11px] text-stone-500 light:text-stone-500 bg-stone-800/60 light:bg-stone-100 border border-stone-700 light:border-stone-200 rounded-full px-2.5 py-1">
                 <Calendar size={11} />
                 Nessuna data
               </span>
             )}
             <button
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-stone-600 text-stone-300 hover:bg-stone-700/50 transition-colors"
+              className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                displayCount > 0
+                  ? 'border-amber-500/40 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100'
+                  : 'border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-700/50 light:hover:bg-stone-100'
+              } ${expanded ? 'ring-1 ring-amber-500/40 light:ring-amber-400' : ''}`}
+              title={
+                displayCount > 0
+                  ? `${displayCount} ${displayCount === 1 ? 'nota' : 'note'} (clicca per ${expanded ? 'chiudere' : 'aprire'})`
+                  : 'Note (clicca per aggiungere note)'
+              }
             >
-              <StickyNote size={14} />
-              {notes.length > 0 ? `${notes.length} note` : 'Note'}
+              <StickyNote size={14} className={displayCount > 0 ? 'text-amber-400 light:text-amber-600' : 'text-stone-400 light:text-stone-500'} />
+              <span>
+                {displayCount === 0
+                  ? 'Note'
+                  : displayCount === 1
+                  ? '1 nota'
+                  : `${displayCount} note`}
+              </span>
             </button>
           </div>
         </div>
       </div>
 
       {expanded && (
-        <div className="border-t border-stone-700 px-4 py-3 bg-stone-900/40">
+        <div className="border-t border-stone-700 light:border-stone-200 px-4 py-3 bg-stone-900/40 light:bg-stone-50/70">
           <div className="flex items-center gap-2 mb-3">
-            <StickyNote size={16} className="text-amber-400" />
-            <span className="text-sm font-medium text-stone-200">Le mie note</span>
+            <StickyNote size={16} className="text-amber-400 light:text-amber-600" />
+            <span className="text-sm font-medium text-stone-200 light:text-stone-800">Le mie note</span>
           </div>
 
           <div className="space-y-2 mb-3">
             {loadingNotes ? (
-              <div className="flex items-center gap-2 text-stone-500 text-sm">
-                <Loader2 size={16} className="animate-spin" />
-                Caricamento...
+              <div className="flex items-center gap-2 text-stone-500 light:text-stone-500 text-sm py-2">
+                <Loader2 size={16} className="animate-spin text-amber-400 light:text-amber-600" />
+                Caricamento note...
               </div>
-            ) : notes.length === 0 ? (
-              <p className="text-stone-500 text-sm italic">Nessuna nota. Aggiungi la prima!</p>
+            ) : (!notes || notes.length === 0) ? (
+              <p className="text-stone-500 light:text-stone-500 text-sm italic">Nessuna nota. Aggiungi la prima!</p>
             ) : (
               notes.map((note) => (
                 <div
                   key={note.id}
-                  className="group/note bg-stone-800/60 rounded-lg p-3 border border-stone-700"
+                  className="group/note bg-stone-800/60 light:bg-white rounded-lg p-3 border border-stone-700 light:border-stone-200 shadow-xs"
                 >
                   {editingNoteId === note.id ? (
                     <div>
@@ -325,12 +378,12 @@ export function BookCard({
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
                         rows={3}
-                        className="w-full bg-stone-900 border border-stone-600 rounded-md p-2 text-sm text-stone-100 focus:outline-none focus:border-amber-500/50 resize-none"
+                        className="w-full bg-stone-900 light:bg-white border border-stone-600 light:border-stone-300 rounded-md p-2 text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 resize-none"
                       />
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={() => handleUpdateNote(note.id)}
-                          className="text-xs px-3 py-1 bg-amber-500 text-stone-900 font-medium rounded-md hover:bg-amber-400"
+                          className="text-xs px-3 py-1 bg-amber-500 text-stone-900 font-medium rounded-md hover:bg-amber-400 cursor-pointer"
                         >
                           Salva
                         </button>
@@ -339,7 +392,7 @@ export function BookCard({
                             setEditingNoteId(null);
                             setEditContent('');
                           }}
-                          className="text-xs px-3 py-1 text-stone-400 hover:text-stone-200"
+                          className="text-xs px-3 py-1 text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 cursor-pointer"
                         >
                           Annulla
                         </button>
@@ -347,11 +400,11 @@ export function BookCard({
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-stone-200 whitespace-pre-wrap break-words">
+                      <p className="text-sm text-stone-200 light:text-stone-800 whitespace-pre-wrap break-words">
                         {note.content}
                       </p>
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-stone-500">
+                        <span className="text-xs text-stone-500 light:text-stone-400">
                           {new Date(note.created_at).toLocaleDateString('it-IT', {
                             day: 'numeric',
                             month: 'short',
@@ -364,13 +417,13 @@ export function BookCard({
                               setEditingNoteId(note.id);
                               setEditContent(note.content);
                             }}
-                            className="text-xs text-stone-400 hover:text-stone-200"
+                            className="text-xs text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 cursor-pointer"
                           >
                             Modifica
                           </button>
                           <button
                             onClick={() => handleDeleteNote(note.id)}
-                            className="text-xs text-stone-400 hover:text-red-400"
+                            className="text-xs text-stone-400 light:text-stone-600 hover:text-red-400 cursor-pointer"
                           >
                             Elimina
                           </button>
@@ -389,12 +442,12 @@ export function BookCard({
               onChange={(e) => setNewNote(e.target.value)}
               rows={2}
               placeholder="Aggiungi una nota per ricordare cosa hai letto..."
-              className="flex-1 bg-stone-900/60 border border-stone-700 rounded-lg p-2.5 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/50 resize-none"
+              className="flex-1 bg-stone-900/60 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg p-2.5 text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 resize-none shadow-xs"
             />
             <button
               onClick={handleAddNote}
               disabled={savingNote || !newNote.trim()}
-              className="self-end p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg hover:bg-amber-500/20 disabled:opacity-30 transition-colors"
+              className="self-end p-2.5 bg-amber-500/10 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 text-amber-400 light:text-amber-800 rounded-lg hover:bg-amber-500/20 light:hover:bg-amber-200/80 disabled:opacity-30 transition-colors cursor-pointer"
             >
               {savingNote ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
             </button>
@@ -404,36 +457,36 @@ export function BookCard({
 
       {showDeleteConfirm && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in"
           onClick={() => setShowDeleteConfirm(false)}
         >
           <div
-            className="bg-stone-800 rounded-xl border border-stone-700 p-6 max-w-sm w-full shadow-2xl"
+            className="bg-stone-800 light:bg-white rounded-xl border border-stone-700 light:border-stone-200 p-6 max-w-sm w-full shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-4">
-              <h3 className="font-serif text-lg font-semibold text-stone-100">Elimina libro</h3>
+              <h3 className="font-serif text-lg font-semibold text-stone-100 light:text-stone-900">Elimina libro</h3>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="text-stone-500 hover:text-stone-300"
+                className="text-stone-500 light:text-stone-400 hover:text-stone-300 light:hover:text-stone-700 cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
-            <p className="text-stone-400 text-sm mb-6">
+            <p className="text-stone-400 light:text-stone-600 text-sm mb-6 leading-relaxed">
               Vuoi davvero eliminare "{book.title}"? Verranno cancellate anche tutte le note
               associate. Questa azione non può essere annullata.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 px-4 border border-stone-600 text-stone-300 rounded-lg hover:bg-stone-700/50 transition-colors"
+                className="flex-1 py-2 px-4 border border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 rounded-lg hover:bg-stone-700/50 light:hover:bg-stone-100 transition-colors cursor-pointer"
               >
                 Annulla
               </button>
               <button
                 onClick={handleDeleteBook}
-                className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-400 text-white font-medium rounded-lg transition-colors cursor-pointer shadow-sm"
               >
                 Elimina
               </button>
@@ -444,20 +497,18 @@ export function BookCard({
 
       {showCoverModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.6)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
           onClick={() => setShowCoverModal(false)}
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-stone-700 bg-stone-800 shadow-2xl"
-            style={{ display: 'flex', maxHeight: '90vh', width: '100%', maxWidth: 440, flexDirection: 'column', overflow: 'hidden', borderRadius: 18, border: '1px solid rgba(68,64,60,1)', background: '#1c1917', boxShadow: '0 25px 80px rgba(0,0,0,0.45)' }}
+            className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-stone-700 light:border-stone-200 bg-stone-800 light:bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-shrink-0 items-center justify-between border-b border-stone-700 p-4">
-              <h3 className="font-serif text-lg font-semibold text-stone-100">Copertina</h3>
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-stone-700 light:border-stone-200 p-4">
+              <h3 className="font-serif text-lg font-semibold text-stone-100 light:text-stone-900">Copertina</h3>
               <button
                 onClick={() => setShowCoverModal(false)}
-                className="text-stone-400 transition hover:text-stone-200"
+                className="text-stone-400 light:text-stone-500 transition hover:text-stone-200 light:hover:text-stone-800 cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -465,7 +516,7 @@ export function BookCard({
 
             <div className="flex-1 overflow-y-auto p-4">
               <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="flex h-36 w-24 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-stone-700 bg-stone-900 shadow-inner">
+                <div className="flex h-36 w-24 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-stone-700 light:border-stone-200 bg-stone-900 light:bg-stone-100 shadow-inner">
                   {coverInput.trim() ? (
                     <img
                       src={coverInput.trim()}
@@ -477,14 +528,14 @@ export function BookCard({
                       }}
                     />
                   ) : (
-                    <BookMarked size={42} className="text-stone-600" />
+                    <BookMarked size={42} className="text-stone-600 light:text-stone-400" />
                   )}
-                  <ImageOff size={28} className="hidden text-stone-600" />
+                  <ImageOff size={28} className="hidden text-stone-600 light:text-stone-400" />
                 </div>
 
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-stone-300">
+                    <label className="block text-sm font-medium text-stone-300 light:text-stone-700">
                       URL immagine
                     </label>
                     <button
@@ -496,7 +547,7 @@ export function BookCard({
                         setAutoFetchingCover(false);
                       }}
                       disabled={autoFetchingCover}
-                      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-40 font-medium px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors cursor-pointer"
+                      className="flex items-center gap-1 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2 py-0.5 rounded bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer"
                       title="Cerca automaticamente la copertina di questo libro"
                     >
                       {autoFetchingCover ? (
@@ -512,35 +563,31 @@ export function BookCard({
                   <div className="relative">
                     <Link2
                       size={18}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400"
                     />
                     <input
                       type="url"
                       value={coverInput}
                       onChange={(e) => setCoverInput(e.target.value)}
-                      className="w-full rounded-lg border border-stone-700 bg-stone-900/60 py-2.5 pl-10 pr-3 text-sm text-stone-100 placeholder-stone-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                      className="w-full rounded-lg border border-stone-700 light:border-stone-300 bg-stone-900/60 light:bg-stone-50 py-2.5 pl-10 pr-3 text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
                       placeholder="https://..."
                     />
                   </div>
-                  <p className="mt-2 text-xs text-stone-500">
+                  <p className="mt-2 text-xs text-stone-500 light:text-stone-500">
                     Incolla l'URL diretto di un'immagine. Lascia vuoto per rimuovere la copertina.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div
-              className="flex flex-shrink-0 gap-3 border-t border-stone-700 bg-stone-800 p-4"
-              style={{ display: 'flex', gap: 12, borderTop: '1px solid rgba(68,64,60,1)', background: '#1c1917', padding: '1rem', flexShrink: 0 }}
-            >
+            <div className="flex flex-shrink-0 gap-3 border-t border-stone-700 light:border-stone-200 bg-stone-800 light:bg-stone-50 p-4">
               <button
                 type="button"
                 onClick={() => {
                   setShowCoverModal(false);
                   setCoverInput('');
                 }}
-                className="flex-1 cursor-pointer rounded-lg border border-stone-600 px-4 py-2.5 text-stone-300 transition hover:bg-stone-700/60"
-                style={{ flex: 1, borderRadius: 10, border: '1px solid rgba(87,83,78,1)', background: 'transparent', color: '#d6d3d1', padding: '0.8rem 1rem', fontWeight: 600, cursor: 'pointer' }}
+                className="flex-1 cursor-pointer rounded-lg border border-stone-600 light:border-stone-300 px-4 py-2.5 text-stone-300 light:text-stone-700 transition hover:bg-stone-700/60 light:hover:bg-stone-200/70 font-semibold"
               >
                 Annulla
               </button>
@@ -548,8 +595,7 @@ export function BookCard({
                 type="button"
                 onClick={handleSaveCover}
                 disabled={savingCover}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 font-medium text-stone-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-amber-500"
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, border: 'none', background: '#f59e0b', color: '#1c1917', padding: '0.8rem 1rem', fontWeight: 700, cursor: 'pointer', opacity: savingCover ? 0.6 : 1 }}
+                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 font-medium text-stone-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {savingCover && <Loader2 size={18} className="animate-spin" />}
                 {savingCover ? 'Salvataggio...' : 'Modifica'}

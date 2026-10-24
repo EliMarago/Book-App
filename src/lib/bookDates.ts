@@ -49,22 +49,39 @@ export async function syncBookDateToSupabase(bookId: string, readAt: string | nu
   }
 }
 
-export async function fetchDatesFromSupabase(): Promise<Record<string, string>> {
+export async function fetchNotesMetadataFromSupabase(): Promise<{
+  dates: Record<string, string>;
+  counts: Record<string, number>;
+}> {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('notes')
-      .select('book_id, content')
-      .like('content', '__READ_AT__:%');
+      .select('book_id, content');
 
-    const result: Record<string, string> = {};
-    if (data) {
-      for (const item of data) {
-        const dateStr = item.content.replace('__READ_AT__:', '');
-        result[item.book_id] = dateStr;
+    if (error || !data) {
+      return { dates: {}, counts: {} };
+    }
+
+    const dates: Record<string, string> = {};
+    const counts: Record<string, number> = {};
+
+    for (const item of data) {
+      if (item.content.startsWith('__READ_AT__:')) {
+        dates[item.book_id] = item.content.replace('__READ_AT__:', '');
+      } else {
+        counts[item.book_id] = (counts[item.book_id] || 0) + 1;
       }
     }
-    return result;
-  } catch {
-    return {};
+
+    return { dates, counts };
+  } catch (err) {
+    console.error('Errore nel recupero note e date da Supabase:', err);
+    return { dates: {}, counts: {} };
   }
 }
+
+export async function fetchDatesFromSupabase(): Promise<Record<string, string>> {
+  const meta = await fetchNotesMetadataFromSupabase();
+  return meta.dates;
+}
+

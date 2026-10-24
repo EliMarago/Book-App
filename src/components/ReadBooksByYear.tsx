@@ -97,14 +97,14 @@ export function ReadBooksByYear({
   // Se non ci sono libri completati
   if (books.length === 0) {
     return (
-      <div className="bg-stone-850/60 border border-stone-800 rounded-2xl p-10 text-center max-w-lg mx-auto my-8">
-        <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 text-emerald-400">
+      <div className="bg-stone-850/60 light:bg-white border border-stone-800 light:border-stone-200 rounded-2xl p-10 text-center max-w-lg mx-auto my-8 shadow-sm">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/20 light:border-emerald-200 flex items-center justify-center mx-auto mb-4 text-emerald-400 light:text-emerald-600">
           <BookCheck size={32} />
         </div>
-        <h3 className="font-serif text-xl font-bold text-stone-200 mb-2">
+        <h3 className="font-serif text-xl font-bold text-stone-200 light:text-stone-900 mb-2">
           Nessun libro completato
         </h3>
-        <p className="text-sm text-stone-400 leading-relaxed">
+        <p className="text-sm text-stone-400 light:text-stone-600 leading-relaxed">
           I libri che segni come completati verranno automaticamente archiviati qui, suddivisi per
           anno di lettura.
         </p>
@@ -115,10 +115,10 @@ export function ReadBooksByYear({
   // Se il filtro di ricerca non ha prodotto risultati
   if (filteredBooks.length === 0) {
     return (
-      <div className="text-center py-16 text-stone-400">
-        <Search size={40} className="mx-auto mb-3 text-stone-600" />
-        <p className="font-medium text-stone-300">Nessun libro letto trovato</p>
-        <p className="text-xs text-stone-500 mt-1">
+      <div className="text-center py-16 text-stone-400 light:text-stone-500">
+        <Search size={40} className="mx-auto mb-3 text-stone-600 light:text-stone-400" />
+        <p className="font-medium text-stone-300 light:text-stone-700">Nessun libro letto trovato</p>
+        <p className="text-xs text-stone-500 light:text-stone-400 mt-1">
           Nessun libro tra quelli letti corrisponde a "{searchQuery}"
         </p>
       </div>
@@ -134,22 +134,22 @@ export function ReadBooksByYear({
   return (
     <div className="space-y-6">
       {/* Intestazione Sezione Libri Letti */}
-      <div className="bg-gradient-to-r from-emerald-950/30 via-stone-850 to-stone-900 border border-emerald-500/20 rounded-2xl p-5 sm:p-6 shadow-sm">
+      <div className="bg-gradient-to-r from-emerald-950/30 via-stone-850 to-stone-900 light:from-emerald-50 light:via-stone-50 light:to-white border border-emerald-500/20 light:border-emerald-200/90 rounded-2xl p-5 sm:p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shadow-inner">
               <Trophy size={22} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-100">
+                <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-100 light:text-stone-900">
                   Libri Letti
                 </h2>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-700 border border-emerald-500/30 light:border-emerald-300">
                   {filteredBooks.length} {filteredBooks.length === 1 ? 'libro' : 'libri'}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-stone-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-stone-400 light:text-stone-600 mt-0.5">
                 Archivio cronologico suddiviso per anno di completamento
               </p>
             </div>
@@ -158,14 +158,14 @@ export function ReadBooksByYear({
           <div className="flex items-center gap-2 self-start sm:self-auto text-xs">
             <button
               onClick={expandAll}
-              className="text-stone-400 hover:text-stone-200 px-2.5 py-1 rounded-md hover:bg-stone-800 transition-colors"
+              className="text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 px-2.5 py-1 rounded-md hover:bg-stone-800 light:hover:bg-stone-200/60 transition-colors"
             >
               Espandi tutti
             </button>
-            <span className="text-stone-700">|</span>
+            <span className="text-stone-700 light:text-stone-300">|</span>
             <button
               onClick={collapseAll}
-              className="text-stone-400 hover:text-stone-200 px-2.5 py-1 rounded-md hover:bg-stone-800 transition-colors"
+              className="text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 px-2.5 py-1 rounded-md hover:bg-stone-800 light:hover:bg-stone-200/60 transition-colors"
             >
               Comprimi tutti
             </button>
@@ -173,9 +173,9 @@ export function ReadBooksByYear({
         </div>
 
         {/* Categorie / Filtro rapido per Anno */}
-        <div className="mt-5 pt-4 border-t border-stone-800 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-          <span className="text-xs font-medium text-stone-400 flex items-center gap-1.5 mr-1 flex-shrink-0">
-            <Calendar size={13} className="text-emerald-400" />
+        <div className="mt-5 pt-4 border-t border-stone-800 light:border-stone-200 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          <span className="text-xs font-medium text-stone-400 light:text-stone-600 flex items-center gap-1.5 mr-1 flex-shrink-0">
+            <Calendar size={13} className="text-emerald-400 light:text-emerald-600" />
             Filtra anno:
           </span>
           <button
@@ -183,7 +183,7 @@ export function ReadBooksByYear({
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap border ${
               selectedYear === 'all'
                 ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-sm'
-                : 'bg-stone-800/80 text-stone-400 border-stone-700 hover:text-stone-200 hover:border-stone-600'
+                : 'bg-stone-800/80 light:bg-white text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900 hover:border-stone-600 light:hover:border-stone-300'
             }`}
           >
             Tutti gli anni ({filteredBooks.length})
@@ -198,13 +198,15 @@ export function ReadBooksByYear({
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap border flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-sm'
-                    : 'bg-stone-800/80 text-stone-400 border-stone-700 hover:text-stone-200 hover:border-stone-600'
+                    : 'bg-stone-800/80 light:bg-white text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900 hover:border-stone-600 light:hover:border-stone-300'
                 }`}
               >
                 <span>{year}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    isSelected ? 'bg-stone-900/30 text-stone-950' : 'bg-stone-700/60 text-stone-300'
+                    isSelected
+                      ? 'bg-stone-900/30 text-stone-950'
+                      : 'bg-stone-700/60 light:bg-stone-100 text-stone-300 light:text-stone-700'
                   }`}
                 >
                   {count}
@@ -231,28 +233,28 @@ export function ReadBooksByYear({
           return (
             <div
               key={year}
-              className="bg-stone-850/40 border border-stone-800 rounded-2xl overflow-hidden transition-all shadow-sm"
+              className="bg-stone-850/40 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl overflow-hidden transition-all shadow-sm"
             >
               {/* Barra intestazione dell'anno */}
               <div
                 onClick={() => toggleYearCollapse(year)}
-                className="w-full px-5 py-4 flex items-center justify-between bg-stone-800/50 hover:bg-stone-800/70 border-b border-stone-800/80 cursor-pointer transition-colors select-none"
+                className="w-full px-5 py-4 flex items-center justify-between bg-stone-800/50 light:bg-stone-50/90 hover:bg-stone-800/70 light:hover:bg-stone-100/90 border-b border-stone-800/80 light:border-stone-200 cursor-pointer transition-colors select-none"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-sm">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/20 light:border-emerald-200 flex items-center justify-center text-emerald-400 light:text-emerald-700 font-bold text-sm">
                     {year === 'Senza data' ? '?' : year.slice(-2)}
                   </div>
                   <div>
                     <div className="flex items-center gap-2.5">
-                      <h3 className="font-serif text-lg font-bold text-stone-100">
+                      <h3 className="font-serif text-lg font-bold text-stone-100 light:text-stone-900">
                         {year === 'Senza data' ? 'Anno non specificato' : `Anno ${year}`}
                       </h3>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-stone-700/60 text-stone-300 border border-stone-600/50 font-medium">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-stone-700/60 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-600/50 light:border-stone-200 font-medium">
                         {yearBooks.length} {yearBooks.length === 1 ? 'libro' : 'libri'}
                       </span>
                     </div>
                     {year === 'Senza data' && (
-                      <p className="text-[11px] text-stone-500 mt-0.5">
+                      <p className="text-[11px] text-stone-500 light:text-stone-400 mt-0.5">
                         Imposta la data di lettura modificando il libro per inserirlo nel rispettivo anno
                       </p>
                     )}
@@ -261,14 +263,14 @@ export function ReadBooksByYear({
 
                 <div className="flex items-center gap-3">
                   {avgRating && (
-                    <div className="hidden sm:flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20 font-medium">
-                      <Star size={13} className="fill-amber-400" />
+                    <div className="hidden sm:flex items-center gap-1 text-xs text-amber-400 light:text-amber-700 bg-amber-500/10 light:bg-amber-50 px-2.5 py-1 rounded-full border border-amber-500/20 light:border-amber-200 font-medium">
+                      <Star size={13} className="fill-amber-400 light:fill-amber-500" />
                       <span>{avgRating} media</span>
                     </div>
                   )}
                   <button
                     type="button"
-                    className="text-stone-400 hover:text-stone-200 p-1 rounded-lg hover:bg-stone-700/50 transition-colors"
+                    className="text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-800 p-1 rounded-lg hover:bg-stone-700/50 light:hover:bg-stone-200/60 transition-colors"
                     aria-label={isCollapsed ? 'Espandi anno' : 'Comprimi anno'}
                   >
                     {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
