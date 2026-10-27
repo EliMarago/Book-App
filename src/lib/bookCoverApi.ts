@@ -209,3 +209,76 @@ export async function searchAlternativeCovers(
 
   return results;
 }
+
+// In-memory cache per evitare richieste duplicate per il conteggio pagine
+const pageCountCache = new Map<string, number | null>();
+
+/**
+ * Cerca il numero di pagine del libro interrogando Google Books e Open Library
+ */
+export async function fetchBookPageCount(
+  title: string,
+  author?: string
+): Promise<number | null> {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) return null;
+  const trimmedAuthor = author?.trim() || '';
+  const cacheKey = `${trimmedTitle.toLowerCase()}::${trimmedAuthor.toLowerCase()}`;
+
+  if (pageCountCache.has(cacheKey)) {
+    return pageCountCache.get(cacheKey) ?? null;
+  }
+
+  // 1. Prova prima con Google Books (molto affidabile sul numero di pagine)
+  try {
+    const cleanTitle = sanitizeQuery(trimmedTitle);
+    const cleanAuthor = trimmedAuthor ? sanitizeQuery(trimmedAuthor) : '';
+    const query = encodeURIComponent(
+      cleanAuthor ? `intitle:${cleanTitle} inauthor:${cleanAuthor}` : cleanTitle
+    );
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=3`;
+
+    const res = await fetchWithTimeout(url, 4000);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        for (const item of data.items) {
+          const pc = item?.volumeInfo?.pageCount;
+          if (typeof pc === 'number' && pc > 0) {
+            pageCountCache.set(cacheKey, pc);
+            return pc;
+          }
+        }
+      }
+    }
+  } catch {
+    // Continua con Open Library
+  }
+
+  // 2. Fallback su Open Library
+  try {
+    const cleanTitle = sanitizeQuery(trimmedTitle);
+    const cleanAuthor = trimmedAuthor ? sanitizeQuery(trimmedAuthor) : '';
+    const query = encodeURIComponent(`${cleanTitle} ${cleanAuthor}`.trim());
+    const url = `https://openlibrary.org/search.json?q=${query}&limit=5`;
+
+    const res = await fetchWithTimeout(url, 4500);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.docs && data.docs.length > 0) {
+        for (const doc of data.docs) {
+          const pc = doc.number_of_pages_median || doc.number_of_pages;
+          if (typeof pc === 'number' && pc > 0) {
+            pageCountCache.set(cacheKey, pc);
+            return pc;
+          }
+        }
+      }
+    }
+  } catch {
+    // nessun risultato
+  }
+
+  pageCountCache.set(cacheKey, null);
+  return null;
+}

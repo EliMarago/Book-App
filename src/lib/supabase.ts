@@ -23,6 +23,8 @@ export type Book = {
   rating: number;
   status: 'reading' | 'completed' | 'want';
   read_at: string | null;
+  pages?: number | null;
+  read_pages?: number | null;
   created_at: string;
   updated_at: string;
   notes_count?: number;

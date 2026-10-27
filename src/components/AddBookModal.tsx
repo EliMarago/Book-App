@@ -9,10 +9,12 @@ import {
   Sparkles,
   Check,
   RefreshCw,
+  Layers,
+  Flame,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
-import { syncBookDateToSupabase } from '@/lib/bookDates';
-import { fetchBookCover, searchAlternativeCovers } from '@/lib/bookCoverApi';
+import { syncBookDateToSupabase, syncBookPagesToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
+import { fetchBookCover, searchAlternativeCovers, fetchBookPageCount } from '@/lib/bookCoverApi';
 
 export function AddBookModal({
   onClose,
@@ -30,6 +32,9 @@ export function AddBookModal({
   const isEditing = Boolean(book);
   const [title, setTitle] = useState(book?.title ?? initialValues?.title ?? '');
   const [author, setAuthor] = useState(book?.author ?? initialValues?.author ?? '');
+  const [pages, setPages] = useState(book?.pages !== undefined && book?.pages !== null ? String(book.pages) : '');
+  const [readPages, setReadPages] = useState(book?.read_pages !== undefined && book?.read_pages !== null ? String(book.read_pages) : '');
+  const [autoDetectedPages, setAutoDetectedPages] = useState<number | null>(null);
   const [status, setStatus] = useState<Book['status']>(
     book?.status ?? initialValues?.status ?? 'want'
   );
@@ -66,20 +71,29 @@ export function AddBookModal({
       lastSearchedRef.current = queryKey;
       setSearchingCover(true);
       try {
-        const found = await fetchBookCover(cleanTitle, cleanAuthor);
-        if (found) {
-          setCoverUrl(found);
+        const [foundCover, foundPages] = await Promise.allSettled([
+          fetchBookCover(cleanTitle, cleanAuthor),
+          fetchBookPageCount(cleanTitle, cleanAuthor),
+        ]);
+
+        if (foundCover.status === 'fulfilled' && foundCover.value) {
+          setCoverUrl(foundCover.value);
           setCoverSource('auto');
         }
+
+        if (foundPages.status === 'fulfilled' && foundPages.value && (!pages || pages === '')) {
+          setPages(String(foundPages.value));
+          setAutoDetectedPages(foundPages.value);
+        }
       } catch (err) {
-        console.error('Errore caricamento automatico copertina:', err);
+        console.error('Errore caricamento automatico:', err);
       } finally {
         setSearchingCover(false);
       }
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl]);
+  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl, pages]);
 
   // Cerca manualmente la copertina e le eventuali alternative
   const handleManualSearchCover = async () => {
@@ -88,13 +102,21 @@ export function AddBookModal({
 
     setSearchingCover(true);
     try {
-      const found = await fetchBookCover(cleanTitle, author.trim());
-      if (found) {
-        setCoverUrl(found);
+      const [foundCover, alternatives, foundPages] = await Promise.all([
+        fetchBookCover(cleanTitle, author.trim()),
+        searchAlternativeCovers(cleanTitle, author.trim()),
+        fetchBookPageCount(cleanTitle, author.trim()),
+      ]);
+
+      if (foundCover) {
+        setCoverUrl(foundCover);
         setCoverSource('auto');
       }
-      const alternatives = await searchAlternativeCovers(cleanTitle, author.trim());
       setAlternativeCovers(alternatives);
+      if (foundPages && (!pages || pages === '')) {
+        setPages(String(foundPages));
+        setAutoDetectedPages(foundPages);
+      }
     } catch (err) {
       console.error('Errore ricerca copertina:', err);
     } finally {
@@ -124,12 +146,23 @@ export function AddBookModal({
       ? new Date(`${readAt}T12:00:00`).toISOString()
       : null;
 
+    const parsedPages = pages.trim() ? parseInt(pages.trim(), 10) : null;
+    const validPages = parsedPages && !isNaN(parsedPages) && parsedPages > 0 ? parsedPages : null;
+
+    const parsedReadPages = readPages.trim() ? parseInt(readPages.trim(), 10) : null;
+    let validReadPages = parsedReadPages !== null && !isNaN(parsedReadPages) && parsedReadPages >= 0 ? parsedReadPages : null;
+    if (status === 'completed' && validPages && (validReadPages === null || validReadPages < validPages)) {
+      validReadPages = validPages;
+    }
+
     const basePayload = {
       title: title.trim(),
       author: author.trim(),
       cover_url: finalCoverUrl,
       status,
       rating: book?.rating ?? 0,
+      pages: validPages,
+      read_pages: validReadPages,
     };
 
     if (isEditing && book) {
@@ -139,12 +172,31 @@ export function AddBookModal({
         updated_at: updatedAt,
       };
 
-      const { data, error: updateError } = await supabase
+      let updateData: any = null;
+      let updateError: any = null;
+
+      const res = await supabase
         .from('books')
         .update(updatePayload)
         .eq('id', book.id)
         .select()
         .single();
+
+      if (res.error && (res.error.message?.includes('pages') || res.error.message?.includes('read_pages'))) {
+        // Fallback nel caso le colonne 'pages' o 'read_pages' non siano ancora presenti nel DB remoto
+        const { pages: _p, read_pages: _rp, ...fallbackPayload } = updatePayload;
+        const retry = await supabase
+          .from('books')
+          .update(fallbackPayload)
+          .eq('id', book.id)
+          .select()
+          .single();
+        updateData = retry.data;
+        updateError = retry.error;
+      } else {
+        updateData = res.data;
+        updateError = res.error;
+      }
 
       setLoading(false);
 
@@ -154,9 +206,13 @@ export function AddBookModal({
         return;
       }
 
-      await syncBookDateToSupabase(book.id, computedReadAt);
+      await Promise.all([
+        syncBookDateToSupabase(book.id, computedReadAt),
+        syncBookPagesToSupabase(book.id, validPages),
+        syncBookReadPagesToSupabase(book.id, validReadPages),
+      ]);
 
-      const baseBook = data ?? book;
+      const baseBook = updateData ?? book;
       const mergedData = {
         ...baseBook,
         notes_count: book.notes_count ?? 0,
@@ -165,6 +221,8 @@ export function AddBookModal({
         cover_url: finalCoverUrl,
         status,
         read_at: computedReadAt,
+        pages: validPages,
+        read_pages: validReadPages,
         updated_at: updatedAt,
       };
       onUpdate?.(mergedData);
@@ -172,11 +230,29 @@ export function AddBookModal({
       return;
     }
 
-    const { data, error: insertError } = await supabase
+    let insertData: any = null;
+    let insertError: any = null;
+
+    const res = await supabase
       .from('books')
       .insert(basePayload)
       .select()
       .single();
+
+    if (res.error && (res.error.message?.includes('pages') || res.error.message?.includes('read_pages'))) {
+      // Fallback nel caso le colonne 'pages' o 'read_pages' non siano ancora presenti nel DB remoto
+      const { pages: _p, read_pages: _rp, ...fallbackPayload } = basePayload;
+      const retry = await supabase
+        .from('books')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+      insertData = retry.data;
+      insertError = retry.error;
+    } else {
+      insertData = res.data;
+      insertError = res.error;
+    }
 
     setLoading(false);
 
@@ -186,17 +262,23 @@ export function AddBookModal({
       return;
     }
 
-    if (data) {
-      await syncBookDateToSupabase(data.id, computedReadAt);
+    if (insertData) {
+      await Promise.all([
+        syncBookDateToSupabase(insertData.id, computedReadAt),
+        syncBookPagesToSupabase(insertData.id, validPages),
+        syncBookReadPagesToSupabase(insertData.id, validReadPages),
+      ]);
 
       const mergedInsertData = {
-        ...data,
+        ...insertData,
         notes_count: 0,
         title: title.trim(),
         author: author.trim(),
         cover_url: finalCoverUrl,
         status,
         read_at: computedReadAt,
+        pages: validPages,
+        read_pages: validReadPages,
       };
       onAdd?.(mergedInsertData);
     }
@@ -379,6 +461,32 @@ export function AddBookModal({
             )}
           </div>
 
+          {/* Campo Numero di Pagine */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-stone-300 light:text-stone-700">
+                <Layers size={15} className="text-amber-400 light:text-amber-600" />
+                <span>Numero di pagine</span>
+                <span className="text-xs text-stone-500 light:text-stone-400 font-normal">(opzionale)</span>
+              </label>
+              {autoDetectedPages && (
+                <span className="text-[11px] text-emerald-400 light:text-emerald-700 font-medium flex items-center gap-1 bg-emerald-500/10 light:bg-emerald-50 px-2 py-0.5 rounded border border-emerald-500/20 light:border-emerald-200">
+                  <Sparkles size={11} />
+                  {autoDetectedPages} rilevate online
+                </span>
+              )}
+            </div>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={pages}
+              onChange={(e) => setPages(e.target.value)}
+              className="w-full px-3 py-2.5 bg-stone-900/60 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-sm"
+              placeholder="Es. 384"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-stone-300 light:text-stone-700 mb-1.5">Stato</label>
             <div className="grid grid-cols-3 gap-2">
@@ -404,6 +512,39 @@ export function AddBookModal({
               ))}
             </div>
           </div>
+
+          {status === 'reading' && (
+            <div className="bg-amber-500/10 light:bg-amber-50/80 p-3.5 rounded-xl border border-amber-500/25 light:border-amber-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-amber-300 light:text-amber-900">
+                  <Flame size={15} className="text-amber-400 light:text-amber-600" />
+                  <span>Pagine lette finora</span>
+                </label>
+                {pages && readPages && Number(pages) > 0 && Number(readPages) > 0 && (
+                  <span className="text-xs font-semibold text-amber-400 light:text-amber-800">
+                    {Math.min(100, Math.round((Number(readPages) / Number(pages)) * 100))}%
+                  </span>
+                )}
+              </div>
+              <input
+                type="number"
+                min="0"
+                max={pages ? Number(pages) : undefined}
+                value={readPages}
+                onChange={(e) => setReadPages(e.target.value)}
+                className="w-full px-3 py-2 bg-stone-900/80 light:bg-white border border-amber-500/30 light:border-amber-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors text-sm"
+                placeholder={pages ? `Es. 120 su ${pages} pagine` : 'Es. 120'}
+              />
+              {pages && readPages && Number(pages) > 0 && (
+                <div className="w-full bg-stone-800 light:bg-stone-200 h-1.5 rounded-full overflow-hidden mt-2.5">
+                  <div
+                    className="bg-amber-400 light:bg-amber-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, (Number(readPages) / Number(pages)) * 100))}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {status === 'completed' && (
             <div>

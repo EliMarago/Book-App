@@ -8,6 +8,7 @@ import {
   BookCheck,
   Search,
   Sparkles,
+  Layers,
 } from 'lucide-react';
 import type { Book } from '@/lib/supabase';
 import { BookCard } from './BookCard';
@@ -124,6 +125,11 @@ export function ReadBooksByYear({
       </div>
     );
   }
+  // Calcolo totale pagine lette tra i libri completati
+  const totalCompletedPages = useMemo(
+    () => filteredBooks.reduce((acc, b) => acc + (b.pages || 0), 0),
+    [filteredBooks]
+  );
 
   // Anni da visualizzare in base al selettore anno
   const yearsToRender =
@@ -141,13 +147,19 @@ export function ReadBooksByYear({
               <Trophy size={22} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-100 light:text-stone-900">
                   Libri Letti
                 </h2>
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-700 border border-emerald-500/30 light:border-emerald-300">
                   {filteredBooks.length} {filteredBooks.length === 1 ? 'libro' : 'libri'}
                 </span>
+                {totalCompletedPages > 0 && (
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/15 light:bg-amber-100 text-amber-400 light:text-amber-800 border border-amber-500/30 light:border-amber-300 flex items-center gap-1">
+                    <Layers size={11} />
+                    {totalCompletedPages.toLocaleString('it-IT')} pagine complessive
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-stone-400 light:text-stone-600 mt-0.5">
                 Archivio cronologico suddiviso per anno di completamento
@@ -183,7 +195,7 @@ export function ReadBooksByYear({
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap border ${
               selectedYear === 'all'
                 ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-sm'
-                : 'bg-stone-800/80 light:bg-white text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900 hover:border-stone-600 light:hover:border-stone-300'
+                : 'bg-stone-850/80 light:bg-white text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900 hover:border-stone-600 light:hover:border-stone-300'
             }`}
           >
             Tutti gli anni ({filteredBooks.length})
@@ -198,7 +210,7 @@ export function ReadBooksByYear({
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap border flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-sm'
-                    : 'bg-stone-800/80 light:bg-white text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900 hover:border-stone-600 light:hover:border-stone-300'
+                    : 'bg-stone-850/80 light:bg-white text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900 hover:border-stone-600 light:hover:border-stone-300'
                 }`}
               >
                 <span>{year}</span>
@@ -222,6 +234,7 @@ export function ReadBooksByYear({
         {yearsToRender.map((year) => {
           const yearBooks = groupedData.groups[year];
           const isCollapsed = Boolean(collapsedYears[year]);
+          const yearPages = yearBooks.reduce((acc, b) => acc + (b.pages || 0), 0);
 
           // Calcola media voto per questo anno
           const ratedBooks = yearBooks.filter((b) => b.rating > 0);
@@ -245,13 +258,19 @@ export function ReadBooksByYear({
                     {year === 'Senza data' ? '?' : year.slice(-2)}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-serif text-lg font-bold text-stone-100 light:text-stone-900">
                         {year === 'Senza data' ? 'Anno non specificato' : `Anno ${year}`}
                       </h3>
                       <span className="text-xs px-2.5 py-0.5 rounded-full bg-stone-700/60 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-600/50 light:border-stone-200 font-medium">
                         {yearBooks.length} {yearBooks.length === 1 ? 'libro' : 'libri'}
                       </span>
+                      {yearPages > 0 && (
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-500/20 light:border-emerald-200 font-medium flex items-center gap-1">
+                          <Layers size={11} />
+                          {yearPages.toLocaleString('it-IT')} pag.
+                        </span>
+                      )}
                     </div>
                     {year === 'Senza data' && (
                       <p className="text-[11px] text-stone-500 light:text-stone-400 mt-0.5">
@@ -280,8 +299,8 @@ export function ReadBooksByYear({
 
               {/* Griglia libri dell'anno */}
               {!isCollapsed && (
-                <div className="p-4 sm:p-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-2.5 sm:p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {yearBooks.map((book) => (
                       <BookCard
                         key={book.id}

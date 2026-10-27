@@ -45,7 +45,7 @@ export function StarRating({ value, onChange, size = 24, readOnly = false }: Sta
             onMouseMove={(e) => handleMouseEnter(e, star)}
             onClick={(e) => handleClick(e, star)}
           >
-            <Star size={size} className="text-stone-300" fill="currentColor" strokeWidth={0} />
+            <Star size={size} className="text-stone-700 light:text-stone-300 transition-colors" fill="currentColor" strokeWidth={0} />
             {(isFull || isHalf) && (
               <div
                 className="absolute inset-0 overflow-hidden"

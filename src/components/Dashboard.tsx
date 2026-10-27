@@ -15,11 +15,12 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { supabase, type Book } from '@/lib/supabase';
-import { getStoredDates, removeBookDate, fetchNotesMetadataFromSupabase } from '@/lib/bookDates';
+import { getStoredDates, removeBookDate, getStoredPages, removeBookPages, getStoredReadPages, removeBookReadPages, fetchNotesMetadataFromSupabase } from '@/lib/bookDates';
 import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
 import { AddBookModal } from './AddBookModal';
@@ -54,18 +55,28 @@ export function Dashboard() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      const [storedLocalDates, notesMeta] = await Promise.all([
+      const [storedLocalDates, storedLocalPages, storedLocalReadPages, notesMeta] = await Promise.all([
         getStoredDates(),
+        getStoredPages(),
+        getStoredReadPages(),
         fetchNotesMetadataFromSupabase(),
       ]);
 
-      const booksWithDates = (data ?? []).map((b) => ({
+      const booksWithDatesAndPages = (data ?? []).map((b) => ({
         ...b,
         read_at: b.read_at || notesMeta.dates[b.id] || storedLocalDates[b.id] || null,
+        pages: b.pages !== undefined && b.pages !== null ? Number(b.pages) : (notesMeta.pages[b.id] || storedLocalPages[b.id] || null),
+        read_pages: b.read_pages !== undefined && b.read_pages !== null
+          ? Number(b.read_pages)
+          : (notesMeta.readPages[b.id] !== undefined
+              ? notesMeta.readPages[b.id]
+              : (storedLocalReadPages[b.id] !== undefined
+                  ? storedLocalReadPages[b.id]
+                  : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
         notes_count: notesMeta.counts[b.id] || 0,
       }));
 
-      setBooks(booksWithDates);
+      setBooks(booksWithDatesAndPages);
       setLastSyncedAt(new Date());
     } catch (err) {
       console.error('Errore durante la sincronizzazione:', err);
@@ -142,6 +153,8 @@ export function Dashboard() {
 
   const handleDeleteBook = (id: string) => {
     removeBookDate(id);
+    removeBookPages(id);
+    removeBookReadPages(id);
     setBooks((prev) => prev.filter((b) => b.id !== id));
   };
 
@@ -166,6 +179,12 @@ export function Dashboard() {
   const completedBooks = useMemo(
     () => books.filter((b) => b.status === 'completed' && searchFilter(b)),
     [books, search]
+  );
+
+
+  const totalPagesReading = useMemo(
+    () => books.filter((b) => b.status === 'reading').reduce((acc, b) => acc + (b.read_pages || 0), 0),
+    [books]
   );
 
   const stats = {
@@ -440,9 +459,17 @@ export function Dashboard() {
                   <p className="text-xs text-stone-400 light:text-stone-500">I libri che stai leggendo adesso</p>
                 </div>
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-amber-50 text-amber-400 light:text-amber-700 border border-amber-500/20 light:border-amber-300/60">
-                {readingBooks.length} {readingBooks.length === 1 ? 'libro' : 'libri'}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-amber-50 text-amber-400 light:text-amber-700 border border-amber-500/20 light:border-amber-300/60">
+                  {readingBooks.length} {readingBooks.length === 1 ? 'libro' : 'libri'}
+                </span>
+                {totalPagesReading > 0 && (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 light:bg-amber-100 text-amber-400 light:text-amber-800 border border-amber-500/30 light:border-amber-300 flex items-center gap-1">
+                    <Flame size={12} />
+                    {totalPagesReading.toLocaleString('it-IT')} pag. lette finora
+                  </span>
+                )}
+              </div>
             </div>
 
             {readingBooks.length === 0 ? (
@@ -463,7 +490,7 @@ export function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {readingBooks.map((book) => (
                   <BookCard
                     key={book.id}
@@ -515,7 +542,7 @@ export function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {wantBooks.map((book) => (
                   <BookCard
                     key={book.id}
@@ -575,7 +602,7 @@ export function Dashboard() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       {readingBooks.map((book) => (
                         <BookCard
                           key={book.id}
@@ -610,7 +637,7 @@ export function Dashboard() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       {wantBooks.map((book) => (
                         <BookCard
                           key={book.id}
@@ -655,7 +682,7 @@ export function Dashboard() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       {completedBooks.map((book) => (
                         <BookCard
                           key={book.id}
