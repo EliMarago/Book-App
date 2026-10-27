@@ -522,9 +522,7 @@ export function BookCard({
           {/* Copertina a proporzioni fisse (evita allungamenti e distorsioni) */}
           <div
             onClick={!book.cover_url ? handleAutoFetchCover : undefined}
-            className={`relative shrink-0 w-20 sm:w-24 ${
-              book.status === 'reading' ? 'h-28 sm:h-34' : 'h-36'
-            } rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 group/cover ${
+            className={`relative shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 group/cover ${
               !book.cover_url ? 'cursor-pointer' : ''
             }`}
             title={!book.cover_url ? 'Clicca per cercare la copertina in automatico' : undefined}
@@ -533,7 +531,7 @@ export function BookCard({
               <img
                 src={book.cover_url}
                 alt={`Copertina di ${book.title}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover/cover:scale-105"
+                className="w-full h-full object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
