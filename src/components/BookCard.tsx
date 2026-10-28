@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Trash2,
   Plus,
@@ -754,55 +755,69 @@ export function BookCard({
         </div>
       )}
 
-      {showDeleteConfirm && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
+      {showDeleteConfirm &&
+        createPortal(
           <div
-            className="bg-stone-800 light:bg-white rounded-xl border border-stone-700 light:border-stone-200 p-6 max-w-sm w-full shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-stone-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => setShowDeleteConfirm(false)}
           >
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="font-serif text-lg font-semibold text-stone-100 light:text-stone-900">Elimina libro</h3>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="text-stone-500 light:text-stone-400 hover:text-stone-300 light:hover:text-stone-700 cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <p className="text-stone-400 light:text-stone-600 text-sm mb-6 leading-relaxed">
-              Vuoi davvero eliminare "{book.title}"? Verranno cancellate anche tutte le note
-              associate. Questa azione non può essere annullata.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 px-4 border border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 rounded-lg hover:bg-stone-700/50 light:hover:bg-stone-100 transition-colors cursor-pointer"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={handleDeleteBook}
-                className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-400 text-white font-medium rounded-lg transition-colors cursor-pointer shadow-sm"
-              >
-                Elimina
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            <div
+              className="bg-stone-900 light:bg-white rounded-2xl border border-stone-800 light:border-stone-200 p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5 text-stone-100 light:text-stone-900 font-serif font-bold text-lg">
+                  <div className="w-8 h-8 rounded-lg bg-red-500/10 light:bg-red-50 border border-red-500/20 light:border-red-200 flex items-center justify-center text-red-400 light:text-red-600 shrink-0">
+                    <Trash2 size={18} />
+                  </div>
+                  <span>Elimina libro</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="text-stone-400 hover:text-stone-200 light:hover:text-stone-800 p-1 rounded-md cursor-pointer transition-colors"
+                  aria-label="Chiudi"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-      {showCoverModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
-          onClick={() => setShowCoverModal(false)}
-        >
+              <p className="text-stone-300 light:text-stone-600 text-xs sm:text-sm leading-relaxed">
+                Vuoi davvero eliminare <strong className="text-stone-100 light:text-stone-900 font-semibold">"{book.title}"</strong>?
+                Verranno cancellate anche tutte le note associate. Questa azione non può essere annullata.
+              </p>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-2.5 px-4 border border-stone-700 light:border-stone-300 text-stone-300 light:text-stone-700 font-medium text-xs sm:text-sm rounded-xl hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteBook}
+                  className="flex-1 py-2.5 px-4 bg-red-500 hover:bg-red-400 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition-all cursor-pointer shadow-md shadow-red-500/20"
+                >
+                  Elimina
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {showCoverModal &&
+        createPortal(
           <div
-            className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-stone-700 light:border-stone-200 bg-stone-800 light:bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/80 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+            onClick={() => setShowCoverModal(false)}
           >
+            <div
+              className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-stone-800 light:border-stone-200 bg-stone-900 light:bg-white shadow-2xl animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="flex flex-shrink-0 items-center justify-between border-b border-stone-700 light:border-stone-200 p-4">
               <h3 className="font-serif text-lg font-semibold text-stone-100 light:text-stone-900">Copertina</h3>
               <button
@@ -901,7 +916,8 @@ export function BookCard({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

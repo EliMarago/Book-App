@@ -16,6 +16,7 @@ import {
   Sun,
   Moon,
   Layers,
+  Database,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -25,8 +26,11 @@ import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
 import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
+import { ReadingChallenge } from './ReadingChallenge';
+import { BackupManager } from './BackupManager';
+import { useReadingGoals } from '@/hooks/useReadingGoals';
 
-type ViewTab = 'all' | 'reading' | 'completed' | 'want';
+type ViewTab = 'all' | 'reading' | 'completed' | 'want' | 'backup';
 
 export function Dashboard() {
   const { signOut, user } = useAuth();
@@ -39,6 +43,7 @@ export function Dashboard() {
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [search, setSearch] = useState('');
+  const { goals, setGoal, refreshGoals } = useReadingGoals();
 
   const loadBooks = useCallback(async (showFullLoader = false) => {
     if (showFullLoader) {
@@ -256,6 +261,9 @@ export function Dashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
+        {/* Obiettivo di lettura annuale */}
+        <ReadingChallenge books={books} goals={goals} onSetGoal={setGoal} />
+
         {/* Statistiche cliccabili che attivano direttamente le sezioni corrispondenti */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <button
@@ -427,6 +435,18 @@ export function Dashboard() {
               {stats.want}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('backup')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'backup'
+                ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border border-amber-500/40 light:border-amber-400 shadow-sm'
+                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-200/60'
+            }`}
+          >
+            <Database size={16} className="text-amber-400 light:text-amber-600" />
+            <span>Backup e Dati</span>
+          </button>
         </div>
 
         {/* Contenuto dinamico in base al tab selezionato */}
@@ -434,6 +454,18 @@ export function Dashboard() {
           <div className="flex flex-col items-center justify-center py-24 text-stone-500">
             <Loader2 size={36} className="animate-spin mb-3 text-amber-400" />
             <p>Caricamento della tua libreria...</p>
+          </div>
+        ) : activeTab === 'backup' ? (
+          /* VISTA: Sezione Backup e Dati */
+          <div className="space-y-4">
+            <BackupManager
+              books={books}
+              goals={goals}
+              onRestoreCompleted={() => {
+                loadBooks(true);
+                refreshGoals();
+              }}
+            />
           </div>
         ) : activeTab === 'completed' ? (
           /* VISTA: Libri Letti suddivisi e raggruppati per Anno */
@@ -443,6 +475,7 @@ export function Dashboard() {
             onDelete={handleDeleteBook}
             onEdit={handleOpenEditBook}
             searchQuery={search}
+            goals={goals}
           />
         ) : activeTab === 'reading' ? (
           /* VISTA: Solo libri In Lettura (In Evidenza) */
@@ -713,6 +746,7 @@ export function Dashboard() {
             )}
           </div>
         )}
+
       </main>
 
       {/* Modale Aggiungi / Modifica Libro */}

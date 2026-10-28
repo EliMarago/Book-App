@@ -9,8 +9,10 @@ import {
   Search,
   Sparkles,
   Layers,
+  Target,
 } from 'lucide-react';
 import type { Book } from '@/lib/supabase';
+import type { ReadingGoals } from '@/hooks/useReadingGoals';
 import { BookCard } from './BookCard';
 
 interface ReadBooksByYearProps {
@@ -19,6 +21,7 @@ interface ReadBooksByYearProps {
   onDelete: (id: string) => void;
   onEdit: (book: Book) => void;
   searchQuery?: string;
+  goals?: ReadingGoals;
 }
 
 export function ReadBooksByYear({
@@ -27,6 +30,7 @@ export function ReadBooksByYear({
   onDelete,
   onEdit,
   searchQuery = '',
+  goals = {},
 }: ReadBooksByYearProps) {
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [collapsedYears, setCollapsedYears] = useState<Record<string, boolean>>({});
@@ -95,6 +99,12 @@ export function ReadBooksByYear({
     setCollapsedYears(allCollapsed);
   };
 
+  // Calcolo totale pagine lette tra i libri completati
+  const totalCompletedPages = useMemo(
+    () => filteredBooks.reduce((acc, b) => acc + (b.pages || 0), 0),
+    [filteredBooks]
+  );
+
   // Se non ci sono libri completati
   if (books.length === 0) {
     return (
@@ -125,11 +135,6 @@ export function ReadBooksByYear({
       </div>
     );
   }
-  // Calcolo totale pagine lette tra i libri completati
-  const totalCompletedPages = useMemo(
-    () => filteredBooks.reduce((acc, b) => acc + (b.pages || 0), 0),
-    [filteredBooks]
-  );
 
   // Anni da visualizzare in base al selettore anno
   const yearsToRender =
@@ -269,6 +274,20 @@ export function ReadBooksByYear({
                         <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-500/20 light:border-emerald-200 font-medium flex items-center gap-1">
                           <Layers size={11} />
                           {yearPages.toLocaleString('it-IT')} pag.
+                        </span>
+                      )}
+                      {goals[year] > 0 && (
+                        <span
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1 border ${
+                            yearBooks.length >= goals[year]
+                              ? 'bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300'
+                              : 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-700 border-amber-500/30 light:border-amber-300'
+                          }`}
+                          title="Obiettivo di lettura"
+                        >
+                          <Target size={11} />
+                          {yearBooks.length}/{goals[year]} obiettivo
+                          {yearBooks.length >= goals[year] && ' ✓'}
                         </span>
                       )}
                     </div>
