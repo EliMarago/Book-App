@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 import { syncBookDateToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
 import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
+import { useToast } from './Toast';
 
 const STATUS_COLORS: Record<Book['status'], string> = {
   reading: 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-800 border-amber-500/30 light:border-amber-300',
@@ -40,6 +41,7 @@ export function BookCard({
   onEdit: (book: Book) => void;
   highlight?: boolean;
 }) {
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -190,32 +192,55 @@ export function BookCard({
     }
 
     if (res.data) onUpdate({ ...res.data, read_at: newReadAt, read_pages: newReadPages, notes_count: displayCount });
+
+    if (status === 'completed' && book.status !== 'completed') {
+      toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
+    }
   };
 
-  const handleSaveProgress = async () => {
-    const val = progressInput.trim() ? parseInt(progressInput.trim(), 10) : 0;
-    const cleanVal = !isNaN(val) && val >= 0 ? val : 0;
+  const persistReadPages = async (value: number) => {
     setSavingProgress(true);
-
     try {
       // 1. Prova aggiornamento su Supabase
       const res = await supabase
         .from('books')
-        .update({ read_pages: cleanVal, updated_at: new Date().toISOString() })
+        .update({ read_pages: value, updated_at: new Date().toISOString() })
         .eq('id', book.id)
         .select()
         .single();
 
       // 2. Sincronizza su local storage e note di backup
-      await syncBookReadPagesToSupabase(book.id, cleanVal);
+      await syncBookReadPagesToSupabase(book.id, value);
 
-      const updated = res.data ?? { ...book, read_pages: cleanVal };
-      onUpdate({ ...book, ...updated, read_pages: cleanVal, read_at: book.read_at, notes_count: displayCount });
+      const updated = res.data ?? { ...book, read_pages: value };
+      onUpdate({ ...book, ...updated, read_pages: value, read_at: book.read_at, notes_count: displayCount });
       setEditingProgress(false);
     } catch (err) {
       console.error('Errore salvataggio progresso:', err);
+      toast({ message: 'Impossibile salvare il progresso. Riprova.', type: 'error' });
     } finally {
       setSavingProgress(false);
+    }
+  };
+
+  const handleSaveProgress = async () => {
+    const val = progressInput.trim() ? parseInt(progressInput.trim(), 10) : 0;
+    const cleanVal = !isNaN(val) && val >= 0 ? val : 0;
+    await persistReadPages(cleanVal);
+  };
+
+  // Avanzamento rapido: aggiunge N pagine senza superare il totale del libro
+  const handleQuickAddPages = async (amount: number) => {
+    const current = book.read_pages || 0;
+    const max = book.pages && book.pages > 0 ? book.pages : Infinity;
+    const next = Math.min(max, current + amount);
+    if (next === current) return;
+    await persistReadPages(next);
+    if (Number.isFinite(max) && next >= max) {
+      toast({
+        message: 'Ultima pagina raggiunta! Premi "Finito" per completare il libro.',
+        type: 'info',
+      });
     }
   };
 
@@ -268,6 +293,8 @@ export function BookCard({
       read_pages: finalPages,
       notes_count: displayCount,
     });
+
+    toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
   };
 
   const handleRatingChange = async (rating: number) => {
@@ -320,8 +347,9 @@ export function BookCard({
     }
   };
 
-  const handleDeleteBook = async () => {
-    await supabase.from('books').delete().eq('id', book.id);
+  // L'eliminazione effettiva (con possibilità di "Annulla") è gestita dal genitore
+  const handleDeleteBook = () => {
+    setShowDeleteConfirm(false);
     onDelete(book.id);
   };
 
@@ -486,6 +514,29 @@ export function BookCard({
             )}
           </div>
 
+          {/* Avanzamento rapido: +10 / +25 / +50 pagine */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+            {[10, 25, 50].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleQuickAddPages(n);
+                }}
+                disabled={
+                  savingProgress ||
+                  Boolean(book.pages && book.pages > 0 && (book.read_pages || 0) >= book.pages)
+                }
+                className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-md border border-amber-500/30 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-100/70 hover:bg-amber-500/20 light:hover:bg-amber-200/70 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
+                title={`Aggiungi ${n} pagine lette`}
+              >
+                +{n} pag.
+              </button>
+            ))}
+            {savingProgress && <Loader2 size={12} className="animate-spin text-amber-400" />}
+          </div>
+
           {/* Pulsante "Finito" responsive e dinamico */}
           <div className="flex items-center justify-between pt-1 border-t border-amber-500/15 light:border-amber-200/60 mt-1 gap-1.5">
             <span className="text-[10px] text-stone-400 light:text-stone-500 truncate">
@@ -511,19 +562,19 @@ export function BookCard({
 
   return (
     <div
-      className={`group backdrop-blur-sm rounded-xl border transition-all duration-200 active:scale-[0.99] sm:active:scale-100 ${
+      className={`group backdrop-blur-sm rounded-2xl border transition-all duration-200 active:scale-[0.99] sm:active:scale-100 ${
         highlight
           ? 'bg-gradient-to-br from-amber-950/30 via-stone-850 to-stone-900 light:from-amber-50/70 light:via-white light:to-amber-50/30 border-amber-500/40 light:border-amber-300 shadow-lg shadow-amber-500/5 hover:border-amber-400/60 light:hover:border-amber-400 ring-1 ring-amber-500/20 light:ring-amber-300/40'
-          : 'bg-stone-800/60 light:bg-white border-stone-700 light:border-stone-200/90 hover:border-stone-600 light:hover:border-stone-300 hover:shadow-md shadow-xs'
+          : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:border-stone-700 light:hover:border-stone-300 hover:shadow-md shadow-xs'
       } overflow-hidden h-full flex flex-col`}
     >
-      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
+      <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
         {/* Sezione superiore: Copertina e dettagli del libro */}
         <div className="flex items-start gap-3 sm:gap-4 flex-1">
-          {/* Copertina a proporzioni fisse (evita allungamenti e distorsioni) */}
+          {/* Copertina a proporzioni fisse con effetto dorso libro */}
           <div
             onClick={!book.cover_url ? handleAutoFetchCover : undefined}
-            className={`relative shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 group/cover ${
+            className={`relative shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover ${
               !book.cover_url ? 'cursor-pointer' : ''
             }`}
             title={!book.cover_url ? 'Clicca per cercare la copertina in automatico' : undefined}
@@ -630,22 +681,16 @@ export function BookCard({
               <StarRating value={book.rating} onChange={handleRatingChange} size={18} />
             </div>
 
-            {/* Se non è in lettura: barra inferiore posizionata nella colonna di destra */}
-            {book.status !== 'reading' && (
-              <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5 sm:pt-3">
-                {renderBottomBar()}
-              </div>
-            )}
+            {/* Barra inferiore (Stato, Data, Note): sempre sul fondo della colonna destra per equilibrare la copertina */}
+            <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5 sm:pt-3">
+              {renderBottomBar()}
+            </div>
           </div>
         </div>
 
-        {/* Se è in lettura: barra azioni sopra e widget progresso sotto a tutta larghezza */}
+        {/* Se è in lettura: widget progresso a tutta larghezza in fondo alla card, separato con eleganza */}
         {book.status === 'reading' && (
-          <div className="mt-2.5 sm:mt-3 flex flex-col gap-2.5">
-            <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
-              {renderBottomBar()}
-            </div>
-
+          <div className="mt-3 pt-3 border-t border-amber-500/15 light:border-amber-200/60">
             {renderProgressWidget()}
           </div>
         )}

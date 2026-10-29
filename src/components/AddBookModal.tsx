@@ -287,32 +287,40 @@ export function AddBookModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-up"
       onClick={onClose}
     >
       <div
-        className="bg-stone-800 light:bg-white rounded-2xl border border-stone-700 light:border-stone-200 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-stone-700 light:border-stone-200 sticky top-0 bg-stone-800 light:bg-white z-10">
-          <div className="flex items-center gap-2">
-            <BookPlus size={22} className="text-amber-400 light:text-amber-600" />
-            <h2 className="font-serif text-xl font-semibold text-stone-100 light:text-stone-900">
-              {isEditing ? 'Modifica libro' : 'Aggiungi libro'}
-            </h2>
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-600">
+              <BookPlus size={20} />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900 leading-tight">
+                {isEditing ? 'Modifica libro' : 'Aggiungi libro'}
+              </h2>
+              <p className="text-xs text-stone-400 light:text-stone-500">
+                {isEditing ? 'Aggiorna i dettagli della scheda' : 'Inserisci titolo e autore nella tua libreria'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-stone-500 light:text-stone-400 hover:text-stone-300 light:hover:text-stone-700 transition-colors cursor-pointer"
+            className="text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 p-1.5 rounded-lg hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
+            aria-label="Chiudi finestra"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4.5 overflow-y-auto flex-1">
           <div className="flex gap-4 items-start">
             {/* Box Anteprima Copertina */}
-            <div className="relative flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-stone-900 light:bg-stone-100 flex flex-col items-center justify-center shadow-lg border border-stone-700 light:border-stone-200 group">
+            <div className="relative shrink-0 w-24 h-36 rounded-xl overflow-hidden bg-stone-950 light:bg-stone-100 flex flex-col items-center justify-center shadow-lg border border-stone-800 light:border-stone-200 book-spine-effect group">
               {coverUrl.trim() ? (
                 <img
                   src={coverUrl.trim()}
@@ -325,8 +333,8 @@ export function AddBookModal({
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center p-2 text-center">
-                  <BookMarked size={32} className="text-stone-600 light:text-stone-400 mb-1" />
-                  <span className="text-[10px] text-stone-500 light:text-stone-500 leading-tight">
+                  <BookMarked size={30} className="text-stone-600 light:text-stone-400 mb-1" />
+                  <span className="text-[10px] text-stone-500 light:text-stone-400 leading-tight">
                     Nessuna copertina
                   </span>
                 </div>
@@ -335,10 +343,10 @@ export function AddBookModal({
 
               {/* Indicatore di caricamento in sovrimpressione */}
               {searchingCover && (
-                <div className="absolute inset-0 bg-stone-950/80 light:bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center animate-in fade-in">
-                  <Loader2 size={24} className="animate-spin text-amber-400 light:text-amber-600 mb-1" />
+                <div className="absolute inset-0 bg-stone-950/85 light:bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center">
+                  <Loader2 size={22} className="animate-spin text-amber-400 light:text-amber-600 mb-1" />
                   <span className="text-[10px] text-amber-300 light:text-amber-700 font-medium">
-                    Cerco copertina...
+                    Cerco...
                   </span>
                 </div>
               )}
@@ -346,7 +354,7 @@ export function AddBookModal({
 
             <div className="flex-1 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-stone-300 light:text-stone-700 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1">
                   Titolo *
                 </label>
                 <input
@@ -354,13 +362,13 @@ export function AddBookModal({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-900/60 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-sm"
+                  className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
                   placeholder="Es. Il nome della rosa"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-300 light:text-stone-700 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1">
                   Autore *
                 </label>
                 <input
@@ -368,7 +376,7 @@ export function AddBookModal({
                   required
                   value={author}
                   onChange={(e) => setAuthor(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-900/60 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-sm"
+                  className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
                   placeholder="Es. Umberto Eco"
                 />
               </div>
@@ -376,7 +384,7 @@ export function AddBookModal({
               {coverSource === 'auto' && coverUrl && (
                 <div className="flex items-center gap-1.5 text-xs text-emerald-400 light:text-emerald-700 font-medium">
                   <Sparkles size={13} />
-                  <span>Copertina caricata in automatico!</span>
+                  <span>Copertina trovata in automatico!</span>
                 </div>
               )}
             </div>
@@ -393,8 +401,8 @@ export function AddBookModal({
                 type="button"
                 onClick={handleManualSearchCover}
                 disabled={searchingCover || !title.trim()}
-                className="flex items-center gap-1 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2 py-0.5 rounded bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer"
-                title="Cerca copertina tenendo conto del titolo e dell'autore"
+                className="flex items-center gap-1 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2.5 py-1 rounded-lg bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer"
+                title="Cerca copertina online"
               >
                 {searchingCover ? (
                   <Loader2 size={12} className="animate-spin" />
@@ -408,7 +416,7 @@ export function AddBookModal({
             <div className="relative">
               <Link2
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400 pointer-events-none"
               />
               <input
                 type="url"
@@ -417,16 +425,16 @@ export function AddBookModal({
                   setCoverUrl(e.target.value);
                   setCoverSource('manual');
                 }}
-                className="w-full pl-9 pr-4 py-2 bg-stone-900/60 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-xs"
-                placeholder="URL copertina (rilevata in automatico o incolla URL)"
+                className="w-full pl-9 pr-4 py-2 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors text-xs"
+                placeholder="Incolla URL copertina personalizzato..."
               />
             </div>
 
             {/* Copertine alternative selezionabili */}
             {alternativeCovers.length > 1 && (
               <div className="pt-1">
-                <span className="text-[11px] text-stone-400 light:text-stone-600 block mb-1">
-                  Altre copertine trovate (clicca per cambiare):
+                <span className="text-[11px] text-stone-400 light:text-stone-600 block mb-1 font-medium">
+                  Altre copertine trovate:
                 </span>
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {alternativeCovers.map((altUrl, idx) => (
@@ -437,10 +445,10 @@ export function AddBookModal({
                         setCoverUrl(altUrl);
                         setCoverSource('manual');
                       }}
-                      className={`relative w-11 h-15 rounded-md overflow-hidden border transition-all shrink-0 cursor-pointer ${
+                      className={`relative w-12 h-16 rounded-lg overflow-hidden border transition-all shrink-0 cursor-pointer ${
                         coverUrl === altUrl
                           ? 'border-amber-400 ring-2 ring-amber-400/50'
-                          : 'border-stone-700 light:border-stone-300 opacity-60 hover:opacity-100'
+                          : 'border-stone-800 light:border-stone-300 opacity-60 hover:opacity-100'
                       }`}
                       title="Seleziona questa copertina"
                     >
@@ -451,7 +459,7 @@ export function AddBookModal({
                       />
                       {coverUrl === altUrl && (
                         <div className="absolute top-0.5 right-0.5 bg-amber-500 text-stone-950 rounded-full p-0.5">
-                          <Check size={8} strokeWidth={3} />
+                          <Check size={9} strokeWidth={3} />
                         </div>
                       )}
                     </button>
@@ -464,15 +472,15 @@ export function AddBookModal({
           {/* Campo Numero di Pagine */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-stone-300 light:text-stone-700">
-                <Layers size={15} className="text-amber-400 light:text-amber-600" />
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700">
+                <Layers size={14} className="text-amber-400 light:text-amber-600" />
                 <span>Numero di pagine</span>
-                <span className="text-xs text-stone-500 light:text-stone-400 font-normal">(opzionale)</span>
+                <span className="text-[11px] text-stone-500 font-normal normal-case">(opzionale)</span>
               </label>
               {autoDetectedPages && (
                 <span className="text-[11px] text-emerald-400 light:text-emerald-700 font-medium flex items-center gap-1 bg-emerald-500/10 light:bg-emerald-50 px-2 py-0.5 rounded border border-emerald-500/20 light:border-emerald-200">
                   <Sparkles size={11} />
-                  {autoDetectedPages} rilevate online
+                  {autoDetectedPages} pagine rilevate
                 </span>
               )}
             </div>
@@ -482,29 +490,36 @@ export function AddBookModal({
               step="1"
               value={pages}
               onChange={(e) => setPages(e.target.value)}
-              className="w-full px-3 py-2.5 bg-stone-900/60 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors text-sm"
+              className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
               placeholder="Es. 384"
             />
           </div>
 
+          {/* Scelta Stato di Lettura */}
           <div>
-            <label className="block text-sm font-medium text-stone-300 light:text-stone-700 mb-1.5">Stato</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1.5">
+              Stato
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
+                  { value: 'want', label: 'Da leggere' },
                   { value: 'reading', label: 'In lettura' },
                   { value: 'completed', label: 'Completato' },
-                  { value: 'want', label: 'Da leggere' },
                 ] as const
               ).map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => setStatus(opt.value)}
-                  className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                  className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     status === opt.value
-                      ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/40 light:border-amber-300 font-semibold'
-                      : 'bg-stone-900/40 light:bg-stone-50 text-stone-400 light:text-stone-700 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-900'
+                      ? opt.value === 'reading'
+                        ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/50 ring-1 ring-amber-500/30'
+                        : opt.value === 'completed'
+                          ? 'bg-emerald-500/20 light:bg-emerald-100 text-emerald-400 light:text-emerald-800 border-emerald-500/50 ring-1 ring-emerald-500/30'
+                          : 'bg-sky-500/20 light:bg-sky-100 text-sky-400 light:text-sky-800 border-sky-500/50 ring-1 ring-sky-500/30'
+                      : 'bg-stone-950/40 light:bg-stone-50 text-stone-400 light:text-stone-600 border-stone-800 light:border-stone-200 hover:text-stone-200'
                   }`}
                 >
                   {opt.label}
@@ -514,14 +529,14 @@ export function AddBookModal({
           </div>
 
           {status === 'reading' && (
-            <div className="bg-amber-500/10 light:bg-amber-50/80 p-3.5 rounded-xl border border-amber-500/25 light:border-amber-200">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="flex items-center gap-1.5 text-sm font-medium text-amber-300 light:text-amber-900">
+            <div className="bg-amber-500/10 light:bg-amber-50/80 p-4 rounded-2xl border border-amber-500/25 light:border-amber-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-300 light:text-amber-900">
                   <Flame size={15} className="text-amber-400 light:text-amber-600" />
                   <span>Pagine lette finora</span>
                 </label>
                 {pages && readPages && Number(pages) > 0 && Number(readPages) > 0 && (
-                  <span className="text-xs font-semibold text-amber-400 light:text-amber-800">
+                  <span className="text-xs font-bold text-amber-400 light:text-amber-800">
                     {Math.min(100, Math.round((Number(readPages) / Number(pages)) * 100))}%
                   </span>
                 )}
@@ -532,11 +547,11 @@ export function AddBookModal({
                 max={pages ? Number(pages) : undefined}
                 value={readPages}
                 onChange={(e) => setReadPages(e.target.value)}
-                className="w-full px-3 py-2 bg-stone-900/80 light:bg-white border border-amber-500/30 light:border-amber-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors text-sm"
+                className="w-full px-3.5 py-2.5 bg-stone-950/80 light:bg-white border border-amber-500/40 light:border-amber-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
                 placeholder={pages ? `Es. 120 su ${pages} pagine` : 'Es. 120'}
               />
               {pages && readPages && Number(pages) > 0 && (
-                <div className="w-full bg-stone-800 light:bg-stone-200 h-1.5 rounded-full overflow-hidden mt-2.5">
+                <div className="w-full bg-stone-900 light:bg-stone-200 h-1.5 rounded-full overflow-hidden mt-1">
                   <div
                     className="bg-amber-400 light:bg-amber-500 h-full rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(100, Math.max(0, (Number(readPages) / Number(pages)) * 100))}%` }}
@@ -548,35 +563,39 @@ export function AddBookModal({
 
           {status === 'completed' && (
             <div>
-              <label className="block text-sm font-medium text-stone-300 light:text-stone-700 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1.5">
                 Data di completamento (opzionale)
               </label>
               <input
                 type="date"
                 value={readAt}
                 onChange={(e) => setReadAt(e.target.value)}
-                className="w-full px-3 py-2.5 bg-stone-900/60 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors"
+                className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm"
               />
             </div>
           )}
 
-          {error && <div className="text-red-400 text-xs py-1">{error}</div>}
+          {error && (
+            <div className="text-red-400 light:text-red-700 text-xs py-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              {error}
+            </div>
+          )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-3 border-t border-stone-800 light:border-stone-200">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 bg-stone-700 light:bg-stone-200 hover:bg-stone-600 light:hover:bg-stone-300 text-stone-300 light:text-stone-700 font-medium rounded-lg transition-colors cursor-pointer"
+              className="flex-1 py-3 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 font-semibold rounded-xl transition-all cursor-pointer text-sm"
             >
               Annulla
             </button>
             <button
               type="submit"
               disabled={loading || !title.trim() || !author.trim()}
-              className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
+              className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 text-stone-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-lg shadow-amber-500/20 active:scale-98 text-sm"
             >
-              {loading && <Loader2 size={18} className="animate-spin" />}
-              {isEditing ? 'Salva modifiche' : 'Aggiungi'}
+              {loading && <Loader2 size={16} className="animate-spin text-stone-950" />}
+              {isEditing ? 'Salva modifiche' : 'Aggiungi libro'}
             </button>
           </div>
         </form>

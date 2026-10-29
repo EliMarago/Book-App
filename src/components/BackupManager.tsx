@@ -292,9 +292,9 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           saveBookDate(targetBookId, b.read_at || null);
           saveBookPages(targetBookId, b.pages || null);
           saveBookReadPages(targetBookId, b.read_pages || null);
-          syncBookDateToSupabase(targetBookId, b.read_at || null).catch(() => {});
-          syncBookPagesToSupabase(targetBookId, b.pages || null).catch(() => {});
-          syncBookReadPagesToSupabase(targetBookId, b.read_pages || null).catch(() => {});
+          syncBookDateToSupabase(targetBookId, b.read_at || null).catch(() => { });
+          syncBookPagesToSupabase(targetBookId, b.pages || null).catch(() => { });
+          syncBookReadPagesToSupabase(targetBookId, b.read_pages || null).catch(() => { });
 
           // Ripristina eventuali note associate a questo libro
           if (Array.isArray(b.notes) && b.notes.length > 0) {
@@ -405,11 +405,10 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
       {/* Notifica di Esito (Successo o Errore) */}
       {notification && (
         <div
-          className={`mt-4 p-3 rounded-xl flex items-start gap-2.5 text-xs transition-all ${
-            notification.type === 'success'
+          className={`mt-4 p-3 rounded-xl flex items-start gap-2.5 text-xs transition-all ${notification.type === 'success'
               ? 'bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-200 text-emerald-300 light:text-emerald-800'
               : 'bg-red-500/10 light:bg-red-50 border border-red-500/30 light:border-red-200 text-red-300 light:text-red-800'
-          }`}
+            }`}
         >
           {notification.type === 'success' ? (
             <CheckCircle2 size={16} className="text-emerald-400 light:text-emerald-600 shrink-0 mt-0.5" />
@@ -433,14 +432,12 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           <BookOpen size={12} className="text-amber-400/80 light:text-amber-600" />
           {books.length} {books.length === 1 ? 'libro pronto per il backup' : 'libri pronti per il backup'}
         </span>
-        <span>•</span>
         <span className="inline-flex items-center gap-1.5">
           <FileJson size={12} className="text-emerald-400/80 light:text-emerald-600" />
           Formato JSON compatibile e portabile
         </span>
         {Object.keys(goals).length > 0 && (
           <>
-            <span>•</span>
             <span className="inline-flex items-center gap-1.5">
               <Target size={12} className="text-amber-400/80 light:text-amber-600" />
               Obiettivi annuali inclusi

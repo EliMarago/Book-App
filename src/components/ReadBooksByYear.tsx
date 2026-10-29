@@ -14,6 +14,7 @@ import {
 import type { Book } from '@/lib/supabase';
 import type { ReadingGoals } from '@/hooks/useReadingGoals';
 import { BookCard } from './BookCard';
+import { sortBooks, type SortKey } from '@/lib/sortBooks';
 
 interface ReadBooksByYearProps {
   books: Book[];
@@ -22,6 +23,7 @@ interface ReadBooksByYearProps {
   onEdit: (book: Book) => void;
   searchQuery?: string;
   goals?: ReadingGoals;
+  sortBy?: SortKey;
 }
 
 export function ReadBooksByYear({
@@ -31,6 +33,7 @@ export function ReadBooksByYear({
   onEdit,
   searchQuery = '',
   goals = {},
+  sortBy = 'recent',
 }: ReadBooksByYearProps) {
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [collapsedYears, setCollapsedYears] = useState<Record<string, boolean>>({});
@@ -64,13 +67,9 @@ export function ReadBooksByYear({
       groups[yearKey].push(book);
     });
 
-    // Ordina i libri all'interno di ogni anno dal più recente al meno recente
+    // Ordina i libri all'interno di ogni anno secondo il criterio scelto (default: dal più recente)
     Object.keys(groups).forEach((year) => {
-      groups[year].sort((a, b) => {
-        const dateA = a.read_at ? new Date(a.read_at).getTime() : new Date(a.created_at).getTime();
-        const dateB = b.read_at ? new Date(b.read_at).getTime() : new Date(b.created_at).getTime();
-        return dateB - dateA;
-      });
+      groups[year] = sortBooks(groups[year], sortBy);
     });
 
     // Ordina gli anni numerici in ordine decrescente, posizionando 'Senza data' alla fine
@@ -81,7 +80,7 @@ export function ReadBooksByYear({
     });
 
     return { groups, sortedYears };
-  }, [filteredBooks]);
+  }, [filteredBooks, sortBy]);
 
   const toggleYearCollapse = (year: string) => {
     setCollapsedYears((prev) => ({
@@ -156,11 +155,11 @@ export function ReadBooksByYear({
                 <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-100 light:text-stone-900">
                   Libri Letti
                 </h2>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-700 border border-emerald-500/30 light:border-emerald-300">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-700 border border-emerald-500/30 light:border-emerald-300 whitespace-nowrap shrink-0">
                   {filteredBooks.length} {filteredBooks.length === 1 ? 'libro' : 'libri'}
                 </span>
                 {totalCompletedPages > 0 && (
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/15 light:bg-amber-100 text-amber-400 light:text-amber-800 border border-amber-500/30 light:border-amber-300 flex items-center gap-1">
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/15 light:bg-amber-100 text-amber-400 light:text-amber-800 border border-amber-500/30 light:border-amber-300 flex items-center gap-1 whitespace-nowrap shrink-0">
                     <Layers size={11} />
                     {totalCompletedPages.toLocaleString('it-IT')} pagine complessive
                   </span>
@@ -267,18 +266,18 @@ export function ReadBooksByYear({
                       <h3 className="font-serif text-lg font-bold text-stone-100 light:text-stone-900">
                         {year === 'Senza data' ? 'Anno non specificato' : `Anno ${year}`}
                       </h3>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-stone-700/60 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-600/50 light:border-stone-200 font-medium">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-stone-700/60 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-600/50 light:border-stone-200 font-medium whitespace-nowrap shrink-0">
                         {yearBooks.length} {yearBooks.length === 1 ? 'libro' : 'libri'}
                       </span>
                       {yearPages > 0 && (
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-500/20 light:border-emerald-200 font-medium flex items-center gap-1">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-500/20 light:border-emerald-200 font-medium flex items-center gap-1 whitespace-nowrap shrink-0">
                           <Layers size={11} />
                           {yearPages.toLocaleString('it-IT')} pag.
                         </span>
                       )}
                       {goals[year] > 0 && (
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1 border ${
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1 border whitespace-nowrap shrink-0 ${
                             yearBooks.length >= goals[year]
                               ? 'bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300'
                               : 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-700 border-amber-500/30 light:border-amber-300'

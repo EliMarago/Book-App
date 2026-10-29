@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Target, ChevronLeft, ChevronRight, Pencil, Check, X, PartyPopper, TrendingUp, TrendingDown } from 'lucide-react';
 import type { Book } from '@/lib/supabase';
 import type { ReadingGoals } from '@/hooks/useReadingGoals';
+import { fireDoubleConfetti } from './Confetti';
 
 interface ReadingChallengeProps {
   books: Book[];
@@ -28,6 +29,21 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
   const percent = goal > 0 ? Math.min(100, Math.round((read / goal) * 100)) : 0;
   const remaining = Math.max(0, goal - read);
   const completed = goal > 0 && read >= goal;
+
+  // Coriandoli al raggiungimento dell'obiettivo: massimo due volte, poi basta
+  useEffect(() => {
+    if (!completed || goal <= 0) return;
+    const storageKey = `bookapp_rc_celebrated_${year}_${goal}`;
+    try {
+      const times = parseInt(localStorage.getItem(storageKey) || '0', 10);
+      if (times < 2) {
+        localStorage.setItem(storageKey, String(times + 1));
+        fireDoubleConfetti();
+      }
+    } catch {
+      // ignore
+    }
+  }, [completed, year, goal]);
 
   // Ritmo: quanti libri "dovresti" aver letto a oggi (solo per l'anno in corso)
   const pace = useMemo(() => {

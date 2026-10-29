@@ -1,11 +1,10 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   BookOpen,
   Plus,
   LogOut,
   Library,
   Search,
-  Loader2,
   BookMarked,
   Trophy,
   Bookmark,
@@ -16,7 +15,11 @@ import {
   Sun,
   Moon,
   Layers,
+  ArrowUpDown,
+  ChevronDown,
   Database,
+  Calendar,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -29,21 +32,92 @@ import { ReadBooksByYear } from './ReadBooksByYear';
 import { ReadingChallenge } from './ReadingChallenge';
 import { BackupManager } from './BackupManager';
 import { useReadingGoals } from '@/hooks/useReadingGoals';
+import { useToast } from './Toast';
+import { LibrarySkeleton } from './Skeletons';
+import { SORT_OPTIONS, sortBooks, getStoredSort, storeSort, type SortKey } from '@/lib/sortBooks';
 
-type ViewTab = 'all' | 'reading' | 'completed' | 'want' | 'backup';
+// Tempo a disposizione per annullare l'eliminazione di un libro
+const UNDO_DELETE_MS = 6000;
+
+type ViewTab = 'all' | 'reading' | 'completed' | 'want';
 
 export function Dashboard() {
   const { signOut, user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const [books, setBooks] = useState<Book[]>([]);
+  const { toast } = useToast();
+  const [rawBooks, setBooks] = useState<Book[]>([]);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  const pendingDeletes = useRef<Map<string, { book: Book; timer: ReturnType<typeof setTimeout> }>>(new Map());
+  const [sortBy, setSortBy] = useState<SortKey>(() => getStoredSort());
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [search, setSearch] = useState('');
   const { goals, setGoal, refreshGoals } = useReadingGoals();
+
+  // Scorrimento fluido verso la sezione selezionata
+  const scrollToSection = useCallback((tab: ViewTab) => {
+    const getTarget = (): HTMLElement | null => {
+      if (tab === 'all') {
+        return (
+          document.getElementById('search-filter-bar') ||
+          document.getElementById('section-all')
+        );
+      }
+      return (
+        document.getElementById(`section-${tab}`) ||
+        document.getElementById(`section-${tab}-in-all`) ||
+        document.getElementById('search-filter-bar')
+      );
+    };
+
+    const doScroll = (element: HTMLElement) => {
+      // Offset per tenere conto dell'header sticky (circa 58px) + margine visivo
+      const headerOffset = 70;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: 'smooth',
+      });
+    };
+
+    // Se l'elemento esiste già nel DOM ed è già attivo il tab, scrolla subito
+    const existing = getTarget();
+    if (existing && activeTab === tab) {
+      doScroll(existing);
+      return;
+    }
+
+    // Se stiamo cambiando tab, attendiamo che React aggiorni il DOM
+    setTimeout(() => {
+      const el = getTarget();
+      if (el) {
+        doScroll(el);
+      }
+    }, 60);
+  }, [activeTab]);
+
+  const handleSelectTab = useCallback(
+    (tab: ViewTab, forceScroll = false) => {
+      setActiveTab(tab);
+      if (forceScroll || window.innerWidth < 640) {
+        scrollToSection(tab);
+      }
+    },
+    [scrollToSection]
+  );
+
+  // I libri in attesa di eliminazione definitiva restano nascosti anche dopo una sincronizzazione
+  const books = useMemo(
+    () => (pendingDeleteIds.length ? rawBooks.filter((b) => !pendingDeleteIds.includes(b.id)) : rawBooks),
+    [rawBooks, pendingDeleteIds]
+  );
 
   const loadBooks = useCallback(async (showFullLoader = false) => {
     if (showFullLoader) {
@@ -137,6 +211,7 @@ export function Dashboard() {
   const handleAddBook = (book: Book) => {
     setBooks((prev) => [{ ...book, notes_count: book.notes_count ?? 0 }, ...prev]);
     setShowAddModal(false);
+    toast({ message: `"${book.title}" aggiunto alla libreria`, type: 'success' });
   };
 
   const handleOpenEditBook = (book: Book) => {
@@ -156,11 +231,69 @@ export function Dashboard() {
     setShowAddModal(false);
   };
 
+  // Eliminazione definitiva (dopo il periodo di "Annulla")
+  const finalizeDelete = useCallback(async (book: Book) => {
+    pendingDeletes.current.delete(book.id);
+    const { error } = await supabase.from('books').delete().eq('id', book.id);
+    if (error) {
+      // Se fallisce, il libro torna visibile e avvisiamo l'utente
+      setPendingDeleteIds((prev) => prev.filter((id) => id !== book.id));
+      toast({ message: `Impossibile eliminare "${book.title}". Riprova.`, type: 'error' });
+      return;
+    }
+    removeBookDate(book.id);
+    removeBookPages(book.id);
+    removeBookReadPages(book.id);
+    setBooks((prev) => prev.filter((b) => b.id !== book.id));
+    setPendingDeleteIds((prev) => prev.filter((id) => id !== book.id));
+  }, [toast]);
+
   const handleDeleteBook = (id: string) => {
-    removeBookDate(id);
-    removeBookPages(id);
-    removeBookReadPages(id);
-    setBooks((prev) => prev.filter((b) => b.id !== id));
+    const book = rawBooks.find((b) => b.id === id);
+    if (!book) return;
+
+    // 1. Nasconde subito il libro
+    setPendingDeleteIds((prev) => [...prev, id]);
+
+    // 2. Pianifica l'eliminazione definitiva
+    const timer = setTimeout(() => finalizeDelete(book), UNDO_DELETE_MS);
+    pendingDeletes.current.set(id, { book, timer });
+
+    // 3. Offre la possibilità di annullare
+    toast({
+      message: `"${book.title}" eliminato`,
+      type: 'info',
+      duration: UNDO_DELETE_MS,
+      actionLabel: 'Annulla',
+      onAction: () => {
+        const pending = pendingDeletes.current.get(id);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingDeletes.current.delete(id);
+        }
+        setPendingDeleteIds((prev) => prev.filter((x) => x !== id));
+      },
+    });
+  };
+
+  // Se l'utente esce dalla pagina o dalla Dashboard, conclude subito le eliminazioni in sospeso
+  useEffect(() => {
+    const flushPending = () => {
+      pendingDeletes.current.forEach(({ book, timer }) => {
+        clearTimeout(timer);
+        finalizeDelete(book);
+      });
+    };
+    window.addEventListener('pagehide', flushPending);
+    return () => {
+      window.removeEventListener('pagehide', flushPending);
+      flushPending();
+    };
+  }, [finalizeDelete]);
+
+  const handleSortChange = (key: SortKey) => {
+    setSortBy(key);
+    storeSort(key);
   };
 
   // Libri filtrati per ricerca globale
@@ -170,20 +303,20 @@ export function Dashboard() {
     return b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q);
   };
 
-  // Suddivisione dei libri per stato (filtrati anche per ricerca)
+  // Suddivisione dei libri per stato (filtrati per ricerca e ordinati)
   const readingBooks = useMemo(
-    () => books.filter((b) => b.status === 'reading' && searchFilter(b)),
-    [books, search]
+    () => sortBooks(books.filter((b) => b.status === 'reading' && searchFilter(b)), sortBy),
+    [books, search, sortBy]
   );
 
   const wantBooks = useMemo(
-    () => books.filter((b) => b.status === 'want' && searchFilter(b)),
-    [books, search]
+    () => sortBooks(books.filter((b) => b.status === 'want' && searchFilter(b)), sortBy),
+    [books, search, sortBy]
   );
 
   const completedBooks = useMemo(
-    () => books.filter((b) => b.status === 'completed' && searchFilter(b)),
-    [books, search]
+    () => sortBooks(books.filter((b) => b.status === 'completed' && searchFilter(b)), sortBy),
+    [books, search, sortBy]
   );
 
 
@@ -249,80 +382,87 @@ export function Dashboard() {
                 {isSyncing ? 'Sincronizzo...' : 'Sincronizza'}
               </span>
             </button>
+
             <button
               onClick={signOut}
               className="flex items-center gap-1.5 text-sm text-stone-400 light:text-stone-600 hover:text-stone-100 light:hover:text-stone-950 px-3 py-1.5 rounded-lg hover:bg-stone-800 light:hover:bg-stone-200/60 transition-colors cursor-pointer"
             >
               <LogOut size={16} />
-              Esci
+              <span className="hidden sm:inline">Esci</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-4 py-6 pb-28 sm:pb-12">
         {/* Obiettivo di lettura annuale */}
         <ReadingChallenge books={books} goals={goals} onSetGoal={setGoal} />
 
-        {/* Statistiche cliccabili che attivano direttamente le sezioni corrispondenti */}
+        {/* Selettore Primario delle Sezioni (4 Card Statistiche Interattive e Unificate) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <button
-            onClick={() => setActiveTab('all')}
-            className={`border rounded-xl p-3 text-center transition-all cursor-pointer shadow-xs ${
+            onClick={() => handleSelectTab('all')}
+            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'all'
-                ? 'border-amber-500/50 light:border-amber-500/60 ring-1 ring-amber-500/30 bg-amber-500/10 light:bg-amber-50/90 light:shadow-sm'
-                : 'bg-stone-850/60 light:bg-white border-stone-700/80 light:border-stone-200 hover:bg-stone-800/80 light:hover:bg-stone-50'
+                ? 'border-amber-500/70 light:border-amber-500 ring-2 ring-amber-500/25 bg-amber-500/10 light:bg-amber-50/90 shadow-md shadow-amber-500/10'
+                : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold text-stone-100 light:text-stone-900">{stats.total}</div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-0.5">Tutti i libri</div>
+            <div className="text-2xl font-bold font-serif text-stone-100 light:text-stone-900 flex items-center justify-center gap-1.5">
+              <span>{stats.total}</span>
+              <BookOpen size={17} className="text-amber-400 light:text-amber-600 inline opacity-80" />
+            </div>
+            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">Tutti i libri</div>
           </button>
 
           <button
-            onClick={() => setActiveTab('reading')}
-            className={`border rounded-xl p-3 text-center transition-all cursor-pointer shadow-xs ${
+            onClick={() => handleSelectTab('reading')}
+            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'reading'
-                ? 'border-amber-500/50 light:border-amber-500/60 ring-1 ring-amber-500/30 bg-amber-500/10 light:bg-amber-50/90 light:shadow-sm'
-                : 'bg-stone-850/60 light:bg-white border-stone-700/80 light:border-stone-200 hover:bg-stone-800/80 light:hover:bg-stone-50'
+                ? 'border-amber-500/70 light:border-amber-500 ring-2 ring-amber-500/25 bg-amber-500/10 light:bg-amber-50/90 shadow-md shadow-amber-500/10'
+                : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold text-amber-400 light:text-amber-700 flex items-center justify-center gap-1">
+            <div className="text-2xl font-bold font-serif text-amber-400 light:text-amber-700 flex items-center justify-center gap-1.5">
               <span>{stats.reading}</span>
-              <Flame size={16} className="text-amber-400 light:text-amber-600 inline" />
+              <Flame size={18} className="text-amber-400 light:text-amber-600 inline" />
             </div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-0.5">In lettura</div>
+            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">In lettura</div>
           </button>
 
           <button
-            onClick={() => setActiveTab('completed')}
-            className={`border rounded-xl p-3 text-center transition-all cursor-pointer shadow-xs ${
+            onClick={() => handleSelectTab('completed')}
+            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'completed'
-                ? 'border-emerald-500/50 light:border-emerald-500/60 ring-1 ring-emerald-500/30 bg-emerald-950/25 light:bg-emerald-50/90 light:shadow-sm'
-                : 'bg-stone-850/60 light:bg-white border-stone-700/80 light:border-stone-200 hover:bg-stone-800/80 light:hover:bg-stone-50'
+                ? 'border-emerald-500/70 light:border-emerald-500 ring-2 ring-emerald-500/25 bg-emerald-950/30 light:bg-emerald-50/90 shadow-md shadow-emerald-500/10'
+                : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold text-emerald-400 light:text-emerald-700 flex items-center justify-center gap-1">
+            <div className="text-2xl font-bold font-serif text-emerald-400 light:text-emerald-700 flex items-center justify-center gap-1.5">
               <span>{stats.completed}</span>
-              <Trophy size={16} className="text-emerald-400 light:text-emerald-600 inline" />
+              <Trophy size={18} className="text-emerald-400 light:text-emerald-600 inline" />
             </div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-0.5">Completati (per anno)</div>
+            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">Letti (per anno)</div>
           </button>
 
           <button
-            onClick={() => setActiveTab('want')}
-            className={`border rounded-xl p-3 text-center transition-all cursor-pointer shadow-xs ${
+            onClick={() => handleSelectTab('want')}
+            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'want'
-                ? 'border-sky-500/50 light:border-sky-500/60 ring-1 ring-sky-500/30 bg-sky-950/25 light:bg-sky-50/90 light:shadow-sm'
-                : 'bg-stone-850/60 light:bg-white border-stone-700/80 light:border-stone-200 hover:bg-stone-800/80 light:hover:bg-stone-50'
+                ? 'border-sky-500/70 light:border-sky-500 ring-2 ring-sky-500/25 bg-sky-950/30 light:bg-sky-50/90 shadow-md shadow-sky-500/10'
+                : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold text-sky-400 light:text-sky-700">{stats.want}</div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-0.5">Da leggere</div>
+            <div className="text-2xl font-bold font-serif text-sky-400 light:text-sky-700 flex items-center justify-center gap-1.5">
+              <span>{stats.want}</span>
+              <Bookmark size={17} className="text-sky-400 light:text-sky-600 inline opacity-80" />
+            </div>
+            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">Da leggere</div>
           </button>
         </div>
 
         {/* Barra Ricerca e Azione Aggiungi Libro */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div id="search-filter-bar" className="flex flex-col sm:flex-row gap-3 mb-6 scroll-mt-20">
           <div className="relative flex-1">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400" />
             <input
@@ -341,6 +481,29 @@ export function Dashboard() {
               </button>
             )}
           </div>
+          <div className="relative sm:w-52">
+            <ArrowUpDown
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 light:text-amber-600 pointer-events-none"
+            />
+            <select
+              id="sort-select"
+              value={sortBy}
+              onChange={(e) => handleSortChange(e.target.value as SortKey)}
+              aria-label="Ordina libri"
+              className="w-full appearance-none pl-9 pr-9 py-2.5 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs cursor-pointer"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value} className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none"
+            />
+          </div>
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center justify-center gap-2 py-2.5 px-5 bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-900 font-semibold rounded-lg transition-all whitespace-nowrap shadow-md shadow-amber-500/10 cursor-pointer"
@@ -350,136 +513,25 @@ export function Dashboard() {
           </button>
         </div>
 
-        {/* Tab di Navigazione tra Sezioni */}
-        <div className="flex items-center gap-2 border-b border-stone-800 light:border-stone-200 mb-7 pb-2 overflow-x-auto scrollbar-thin">
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'all'
-                ? 'bg-amber-500 text-stone-950 font-semibold shadow-sm'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-200/60'
-            }`}
-          >
-            <BookOpen size={16} />
-            <span>Tutti i libri</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'all'
-                  ? 'bg-stone-900/30 text-stone-950 font-bold'
-                  : 'bg-stone-800 light:bg-stone-200 text-stone-400 light:text-stone-700'
-              }`}
-            >
-              {stats.total}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('reading')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'reading'
-                ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border border-amber-500/40 light:border-amber-400 shadow-sm'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-200/60'
-            }`}
-          >
-            <Flame size={16} className="text-amber-400 light:text-amber-600" />
-            <span>In lettura</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'reading'
-                  ? 'bg-amber-500/30 light:bg-amber-200/80 text-amber-200 light:text-amber-900'
-                  : 'bg-stone-800 light:bg-stone-200 text-stone-400 light:text-stone-700'
-              }`}
-            >
-              {stats.reading}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('completed')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'completed'
-                ? 'bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border border-emerald-500/40 light:border-emerald-400 shadow-sm'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-200/60'
-            }`}
-          >
-            <Trophy size={16} className="text-emerald-400 light:text-emerald-600" />
-            <span>Letti per anno</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'completed'
-                  ? 'bg-emerald-500/30 light:bg-emerald-200/80 text-emerald-200 light:text-emerald-900'
-                  : 'bg-stone-800 light:bg-stone-200 text-stone-400 light:text-stone-700'
-              }`}
-            >
-              {stats.completed}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('want')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'want'
-                ? 'bg-sky-500/20 light:bg-sky-100 text-sky-300 light:text-sky-800 border border-sky-500/40 light:border-sky-400 shadow-sm'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-200/60'
-            }`}
-          >
-            <Bookmark size={16} className="text-sky-400 light:text-sky-600" />
-            <span>Da leggere</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'want'
-                  ? 'bg-sky-500/30 light:bg-sky-200/80 text-sky-200 light:text-sky-900'
-                  : 'bg-stone-800 light:bg-stone-200 text-stone-400 light:text-stone-700'
-              }`}
-            >
-              {stats.want}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('backup')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'backup'
-                ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border border-amber-500/40 light:border-amber-400 shadow-sm'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-200/60'
-            }`}
-          >
-            <Database size={16} className="text-amber-400 light:text-amber-600" />
-            <span>Backup e Dati</span>
-          </button>
-        </div>
-
-        {/* Contenuto dinamico in base al tab selezionato */}
+        {/* Contenuto dinamico in base alla sezione selezionata */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 text-stone-500">
-            <Loader2 size={36} className="animate-spin mb-3 text-amber-400" />
-            <p>Caricamento della tua libreria...</p>
-          </div>
-        ) : activeTab === 'backup' ? (
-          /* VISTA: Sezione Backup e Dati */
-          <div className="space-y-4">
-            <BackupManager
-              books={books}
-              goals={goals}
-              onRestoreCompleted={() => {
-                loadBooks(true);
-                refreshGoals();
-              }}
-            />
-          </div>
+          <LibrarySkeleton />
         ) : activeTab === 'completed' ? (
           /* VISTA: Libri Letti suddivisi e raggruppati per Anno */
-          <ReadBooksByYear
-            books={completedBooks}
-            onUpdate={handleUpdateBook}
-            onDelete={handleDeleteBook}
-            onEdit={handleOpenEditBook}
-            searchQuery={search}
-            goals={goals}
-          />
+          <div id="section-completed" className="scroll-mt-20">
+            <ReadBooksByYear
+              books={completedBooks}
+              onUpdate={handleUpdateBook}
+              onDelete={handleDeleteBook}
+              onEdit={handleOpenEditBook}
+              searchQuery={search}
+              goals={goals}
+              sortBy={sortBy}
+            />
+          </div>
         ) : activeTab === 'reading' ? (
           /* VISTA: Solo libri In Lettura (In Evidenza) */
-          <div className="space-y-4">
+          <div id="section-reading" className="space-y-4 scroll-mt-20">
             <div className="flex items-center justify-between border-b border-amber-500/20 light:border-amber-300/40 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/20 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
@@ -539,7 +591,7 @@ export function Dashboard() {
           </div>
         ) : activeTab === 'want' ? (
           /* VISTA: Solo libri Da Leggere */
-          <div className="space-y-4">
+          <div id="section-want" className="space-y-4 scroll-mt-20">
             <div className="flex items-center justify-between border-b border-stone-800 light:border-stone-200 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-sky-500/15 light:bg-sky-100 border border-sky-500/25 light:border-sky-300 flex items-center justify-center text-sky-400 light:text-sky-700">
@@ -590,7 +642,7 @@ export function Dashboard() {
           </div>
         ) : (
           /* VISTA: TUTTI I LIBRI (mostra tutti i libri: in lettura in evidenza + da leggere + completati) */
-          <div className="space-y-10">
+          <div id="section-all" className="space-y-10 scroll-mt-20">
             {books.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-stone-500 light:text-stone-400">
                 <Library size={48} className="mb-4 text-stone-700 light:text-stone-300" />
@@ -610,7 +662,7 @@ export function Dashboard() {
               <>
                 {/* 1. SEZIONE IN LETTURA (IN EVIDENZA) */}
                 {readingBooks.length > 0 && (
-                  <section className="space-y-4">
+                  <section id="section-reading-in-all" className="space-y-4 scroll-mt-20">
                     <div className="flex items-center justify-between border-b border-amber-500/20 light:border-amber-300/40 pb-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-amber-500/20 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
@@ -630,7 +682,7 @@ export function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-amber-50 text-amber-400 light:text-amber-700 border border-amber-500/20 light:border-amber-300/60">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-amber-50 text-amber-400 light:text-amber-700 border border-amber-500/20 light:border-amber-300/60 whitespace-nowrap shrink-0">
                         {readingBooks.length} {readingBooks.length === 1 ? 'libro' : 'libri'}
                       </span>
                     </div>
@@ -652,7 +704,7 @@ export function Dashboard() {
 
                 {/* 2. SEZIONE DA LEGGERE */}
                 {wantBooks.length > 0 && (
-                  <section className="space-y-4">
+                  <section id="section-want-in-all" className="space-y-4 scroll-mt-20">
                     <div className="flex items-center justify-between border-b border-stone-800 light:border-stone-200 pb-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-sky-500/15 light:bg-sky-100 border border-sky-500/25 light:border-sky-300 flex items-center justify-center text-sky-400 light:text-sky-700">
@@ -665,7 +717,7 @@ export function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-sky-50 text-sky-400 light:text-sky-700 border border-sky-500/20 light:border-sky-300/60">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-sky-50 text-sky-400 light:text-sky-700 border border-sky-500/20 light:border-sky-300/60 whitespace-nowrap shrink-0">
                         {wantBooks.length} {wantBooks.length === 1 ? 'libro' : 'libri'}
                       </span>
                     </div>
@@ -684,36 +736,58 @@ export function Dashboard() {
                   </section>
                 )}
 
-                {/* 3. SEZIONE COMPLETATI (GIÀ LETTI) - VISIBILE QUANDO CLICCHI 'TUTTI I LIBRI' */}
+                {/* 3. SEZIONE GIÀ LETTI (COMPLETATI) - VISIBILE QUANDO CLICCHI 'TUTTI I LIBRI' */}
                 {completedBooks.length > 0 && (
-                  <section className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-emerald-500/20 light:border-emerald-300/40 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700">
+                  <section id="section-completed-in-all" className="space-y-4 scroll-mt-20">
+                    {/* Intestazione Sezione Già Letti */}
+                    <div className="flex items-center justify-between border-b border-emerald-500/20 light:border-emerald-300/40 pb-3 gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0">
                           <CheckCircle2 size={18} />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900">
-                              Già Letti (Completati)
-                            </h2>
-                            <button
-                              onClick={() => setActiveTab('completed')}
-                              className="text-[11px] font-medium text-emerald-400 light:text-emerald-700 hover:text-emerald-300 light:hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
-                            >
-                              <span>Vedi divisi per anno</span>
-                              <ArrowRight size={12} />
-                            </button>
-                          </div>
-                          <p className="text-xs text-stone-400 light:text-stone-500">
+                        <div className="min-w-0">
+                          <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900 truncate">
+                            Già Letti
+                          </h2>
+                          <p className="text-xs text-stone-400 light:text-stone-500 truncate">
                             I libri che hai terminato di leggere
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-500/20 light:border-emerald-300/60">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-500/20 light:border-emerald-300/60 whitespace-nowrap shrink-0">
                         {completedBooks.length} {completedBooks.length === 1 ? 'libro' : 'libri'}
                       </span>
                     </div>
+
+                    {/* Banner Interattivo Elegante per accedere all'Archivio per Anno */}
+                    <button
+                      onClick={() => handleSelectTab('completed', true)}
+                      className="w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-stone-850/80 to-stone-850/60 light:from-emerald-50/90 light:via-stone-50 light:to-white border border-emerald-500/25 light:border-emerald-200/90 hover:border-emerald-500/45 light:hover:border-emerald-400 transition-all text-left shadow-xs hover:shadow-md hover:shadow-emerald-500/5 active:scale-[0.99] cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0 group-hover:scale-105 transition-transform">
+                          <Calendar size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-serif font-bold text-sm sm:text-base text-stone-100 light:text-stone-900">
+                              Archivio Storico per Anno
+                            </span>
+                            <span className="hidden sm:inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border border-emerald-500/30">
+                              Cronologia
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-400 light:text-stone-500 mt-0.5 truncate">
+                            Consulta tutti i libri suddivisi per anno di lettura e statistiche
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-100/90 px-3 py-1.5 rounded-xl border border-emerald-500/20 light:border-emerald-300/60 shrink-0 group-hover:bg-emerald-500/20 transition-all">
+                        <span className="whitespace-nowrap">Apri archivio</span>
+                        <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    </button>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       {completedBooks.map((book) => (
@@ -747,7 +821,88 @@ export function Dashboard() {
           </div>
         )}
 
+        {/* Footer elegante con link per la gestione dati e backup */}
+        <div className="mt-14 pt-6 border-t border-stone-800/80 light:border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 light:text-stone-400">
+          <div className="flex items-center gap-2">
+            <span className="font-serif italic text-stone-400 light:text-stone-600">Bookshelf</span>
+            <span>·</span>
+            <span>{stats.total} {stats.total === 1 ? 'libro registrato' : 'libri registrati'}</span>
+          </div>
+
+          <button
+            onClick={() => setShowBackupModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-850/80 light:bg-stone-100 hover:bg-stone-800 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Esporta o ripristina la libreria in formato JSON"
+          >
+            <Database size={13} className="text-amber-400 light:text-amber-600" />
+            <span>Gestione Backup e Dati JSON</span>
+          </button>
+        </div>
       </main>
+
+      {/* Barra di Navigazione Mobile Inferiore (Fissa in basso per uso comodo ad una mano) */}
+      <nav
+        aria-label="Navigazione rapida mobile"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 light:bg-white/95 backdrop-blur-lg border-t border-stone-800 light:border-stone-200 px-3 py-1.5 flex items-center justify-around shadow-2xl safe-area-pb"
+      >
+        <button
+          onClick={() => handleSelectTab('all', true)}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'all'
+              ? 'text-amber-400 light:text-amber-600 font-semibold'
+              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
+          }`}
+        >
+          <BookOpen size={18} />
+          <span className="text-[10px]">Tutti</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('reading', true)}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'reading'
+              ? 'text-amber-400 light:text-amber-600 font-semibold'
+              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
+          }`}
+        >
+          <Flame size={18} />
+          <span className="text-[10px]">In lettura</span>
+        </button>
+
+        {/* Pulsante Aggiungi Libro in rilievo al centro */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="-mt-5 w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 text-stone-950 flex items-center justify-center shadow-lg shadow-amber-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer border-2 border-stone-900 light:border-white"
+          title="Aggiungi nuovo libro"
+          aria-label="Aggiungi libro"
+        >
+          <Plus size={22} strokeWidth={2.5} />
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('completed', true)}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'completed'
+              ? 'text-emerald-400 light:text-emerald-600 font-semibold'
+              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
+          }`}
+        >
+          <Trophy size={18} />
+          <span className="text-[10px]">Letti</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('want', true)}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'want'
+              ? 'text-sky-400 light:text-sky-600 font-semibold'
+              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
+          }`}
+        >
+          <Bookmark size={18} />
+          <span className="text-[10px]">Da leggere</span>
+        </button>
+      </nav>
 
       {/* Modale Aggiungi / Modifica Libro */}
       {showAddModal && (
@@ -760,6 +915,53 @@ export function Dashboard() {
           onAdd={handleAddBook}
           onUpdate={handleUpdateBook}
         />
+      )}
+
+      {/* Modale Backup e Dati */}
+      {showBackupModal && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-up"
+          onClick={() => setShowBackupModal(false)}
+        >
+          <div
+            className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800/90 light:border-stone-200 max-w-2xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-600">
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900 leading-tight">
+                    Gestione Backup e Dati
+                  </h2>
+                  <p className="text-xs text-stone-400 light:text-stone-500">
+                    Esporta o ripristina la tua libreria in formato JSON
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBackupModal(false)}
+                className="text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 p-1.5 rounded-lg hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
+                aria-label="Chiudi finestra"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1">
+              <BackupManager
+                books={books}
+                goals={goals}
+                onRestoreCompleted={() => {
+                  loadBooks(true);
+                  refreshGoals();
+                  setShowBackupModal(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
