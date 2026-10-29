@@ -46,3 +46,11 @@ dev-dist/
 # Bolt & Supabase temp files
 .bolt/
 supabase/.temp/
+
+# AI Tools, Agent Skills & Local IDE Configs
+.agent/
+.agents/
+.claude/
+.codex/
+.gemini/
+.impeccable/
