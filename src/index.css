@@ -96,3 +96,76 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+/* Realistic Wooden Bookshelf Styling */
+.bookshelf-shelf {
+  position: relative;
+  background: linear-gradient(
+    to bottom,
+    #382317 0%,
+    #2a180f 45%,
+    #1c0f09 100%
+  );
+  box-shadow: 
+    inset 0 3px 6px rgba(255, 255, 255, 0.08),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.6),
+    0 12px 24px -4px rgba(0, 0, 0, 0.7);
+}
+
+.light .bookshelf-shelf,
+[data-theme='light'] .bookshelf-shelf {
+  background: linear-gradient(
+    to bottom,
+    #d8b898 0%,
+    #c49f7b 45%,
+    #a8815b 100%
+  );
+  box-shadow: 
+    inset 0 3px 6px rgba(255, 255, 255, 0.45),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 10px 20px -4px rgba(60, 40, 20, 0.22);
+}
+
+/* Shelf Top Highlight Ledge */
+.bookshelf-ledge {
+  height: 16px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.12) 0%,
+    transparent 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+}
+
+.light .bookshelf-ledge,
+[data-theme='light'] .bookshelf-ledge {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.5) 0%,
+    transparent 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.75);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Vertical Spine Text */
+.writing-vertical-rl {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+/* Brass Plaque */
+.brass-plaque {
+  background: linear-gradient(135deg, #d4af37 0%, #aa820a 50%, #795503 100%);
+  color: #1a1202;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Safe area padding bottom for iPhone swipe bar (Home Indicator) */
+.safe-area-pb {
+  padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+}
+

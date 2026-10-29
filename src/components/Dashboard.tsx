@@ -20,6 +20,7 @@ import {
   Database,
   Calendar,
   X,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -27,6 +28,7 @@ import { supabase, type Book } from '@/lib/supabase';
 import { getStoredDates, removeBookDate, getStoredPages, removeBookPages, getStoredReadPages, removeBookReadPages, fetchNotesMetadataFromSupabase } from '@/lib/bookDates';
 import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
+import { BookshelfView } from './BookshelfView';
 import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
 import { ReadingChallenge } from './ReadingChallenge';
@@ -57,6 +59,24 @@ export function Dashboard() {
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'shelf'>(() => {
+    try {
+      const saved = localStorage.getItem('bookshelf_display_mode');
+      return saved === 'shelf' ? 'shelf' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+
+  const handleViewModeChange = (mode: 'grid' | 'shelf') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('bookshelf_display_mode', mode);
+    } catch {
+      // ignore
+    }
+  };
+
   const { goals, setGoal, refreshGoals } = useReadingGoals();
 
   // Scorrimento fluido verso la sezione selezionata
@@ -394,7 +414,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 pb-28 sm:pb-12">
+      <main className="max-w-5xl mx-auto px-4 py-6 pb-36 sm:pb-14">
         {/* Obiettivo di lettura annuale */}
         <ReadingChallenge books={books} goals={goals} onSetGoal={setGoal} />
 
@@ -402,62 +422,62 @@ export function Dashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <button
             onClick={() => handleSelectTab('all')}
-            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'all'
                 ? 'border-amber-500/70 light:border-amber-500 ring-2 ring-amber-500/25 bg-amber-500/10 light:bg-amber-50/90 shadow-md shadow-amber-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold font-serif text-stone-100 light:text-stone-900 flex items-center justify-center gap-1.5">
+            <div className="text-2xl sm:text-3xl font-bold font-serif text-stone-100 light:text-stone-900 flex items-center justify-center gap-1.5">
               <span>{stats.total}</span>
-              <BookOpen size={17} className="text-amber-400 light:text-amber-600 inline opacity-80" />
+              <BookOpen size={18} className="text-amber-400 light:text-amber-600 inline opacity-85" />
             </div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">Tutti i libri</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">Tutti i libri</div>
           </button>
 
           <button
             onClick={() => handleSelectTab('reading')}
-            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'reading'
                 ? 'border-amber-500/70 light:border-amber-500 ring-2 ring-amber-500/25 bg-amber-500/10 light:bg-amber-50/90 shadow-md shadow-amber-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold font-serif text-amber-400 light:text-amber-700 flex items-center justify-center gap-1.5">
+            <div className="text-2xl sm:text-3xl font-bold font-serif text-amber-400 light:text-amber-700 flex items-center justify-center gap-1.5">
               <span>{stats.reading}</span>
-              <Flame size={18} className="text-amber-400 light:text-amber-600 inline" />
+              <Flame size={19} className="text-amber-400 light:text-amber-600 inline" />
             </div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">In lettura</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">In lettura</div>
           </button>
 
           <button
             onClick={() => handleSelectTab('completed')}
-            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'completed'
                 ? 'border-emerald-500/70 light:border-emerald-500 ring-2 ring-emerald-500/25 bg-emerald-950/30 light:bg-emerald-50/90 shadow-md shadow-emerald-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold font-serif text-emerald-400 light:text-emerald-700 flex items-center justify-center gap-1.5">
+            <div className="text-2xl sm:text-3xl font-bold font-serif text-emerald-400 light:text-emerald-700 flex items-center justify-center gap-1.5">
               <span>{stats.completed}</span>
-              <Trophy size={18} className="text-emerald-400 light:text-emerald-600 inline" />
+              <Trophy size={19} className="text-emerald-400 light:text-emerald-600 inline" />
             </div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">Letti (per anno)</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">Letti (per anno)</div>
           </button>
 
           <button
             onClick={() => handleSelectTab('want')}
-            className={`border rounded-2xl p-3.5 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'want'
                 ? 'border-sky-500/70 light:border-sky-500 ring-2 ring-sky-500/25 bg-sky-950/30 light:bg-sky-50/90 shadow-md shadow-sky-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl font-bold font-serif text-sky-400 light:text-sky-700 flex items-center justify-center gap-1.5">
+            <div className="text-2xl sm:text-3xl font-bold font-serif text-sky-400 light:text-sky-700 flex items-center justify-center gap-1.5">
               <span>{stats.want}</span>
-              <Bookmark size={17} className="text-sky-400 light:text-sky-600 inline opacity-80" />
+              <Bookmark size={18} className="text-sky-400 light:text-sky-600 inline opacity-85" />
             </div>
-            <div className="text-xs text-stone-400 light:text-stone-500 mt-1 font-medium">Da leggere</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">Da leggere</div>
           </button>
         </div>
 
@@ -470,7 +490,7 @@ export function Dashboard() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cerca per titolo o autore..."
-              className="w-full pl-10 pr-4 py-2.5 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs"
+              className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm sm:text-base placeholder-stone-400 light:placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs"
             />
             {search && (
               <button
@@ -491,7 +511,7 @@ export function Dashboard() {
               value={sortBy}
               onChange={(e) => handleSortChange(e.target.value as SortKey)}
               aria-label="Ordina libri"
-              className="w-full appearance-none pl-9 pr-9 py-2.5 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs cursor-pointer"
+              className="w-full appearance-none pl-9 pr-9 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs cursor-pointer"
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value} className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">
@@ -504,6 +524,37 @@ export function Dashboard() {
               className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none"
             />
           </div>
+
+          {/* Toggle Vista: Schede vs Scaffale */}
+          <div className="flex items-center bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-1 shrink-0 self-stretch sm:self-auto justify-center">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('grid')}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex-1 sm:flex-initial ${
+                viewMode === 'grid'
+                  ? 'bg-amber-500 text-stone-900 font-semibold shadow-xs'
+                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+              }`}
+              title="Vista a schede dettagliate"
+            >
+              <LayoutGrid size={15} />
+              <span>Schede</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('shelf')}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex-1 sm:flex-initial ${
+                viewMode === 'shelf'
+                  ? 'bg-amber-500 text-stone-900 font-semibold shadow-xs'
+                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+              }`}
+              title="Vista libreria a scaffale con libri fisici"
+            >
+              <Library size={15} />
+              <span>Scaffale</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center justify-center gap-2 py-2.5 px-5 bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-900 font-semibold rounded-lg transition-all whitespace-nowrap shadow-md shadow-amber-500/10 cursor-pointer"
@@ -513,9 +564,23 @@ export function Dashboard() {
           </button>
         </div>
 
-        {/* Contenuto dinamico in base alla sezione selezionata */}
+        {/* Contenuto dinamico in base alla modalità di visualizzazione (Schede vs Scaffale) e sezione */}
         {loading ? (
           <LibrarySkeleton />
+        ) : viewMode === 'shelf' ? (
+          <BookshelfView
+            books={books}
+            readingBooks={readingBooks}
+            completedBooks={completedBooks}
+            wantBooks={wantBooks}
+            activeTab={activeTab}
+            searchQuery={search}
+            onUpdateBook={handleUpdateBook}
+            onDeleteBook={handleDeleteBook}
+            onEditBook={handleOpenEditBook}
+            onAddBook={() => setShowAddModal(true)}
+            onSelectTab={handleSelectTab}
+          />
         ) : activeTab === 'completed' ? (
           /* VISTA: Libri Letti suddivisi e raggruppati per Anno */
           <div id="section-completed" className="scroll-mt-20">
@@ -840,68 +905,89 @@ export function Dashboard() {
         </div>
       </main>
 
-      {/* Barra di Navigazione Mobile Inferiore (Fissa in basso per uso comodo ad una mano) */}
+      {/* Barra di Navigazione Mobile Inferiore (Griglia a 5 colonne perfettamente centrata e protetta dallo swipe iPhone) */}
       <nav
         aria-label="Navigazione rapida mobile"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 light:bg-white/95 backdrop-blur-lg border-t border-stone-800 light:border-stone-200 px-3 py-1.5 flex items-center justify-around shadow-2xl safe-area-pb"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 light:bg-white/95 backdrop-blur-xl border-t border-stone-800/90 light:border-stone-200/90 px-2 pt-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] shadow-[0_-8px_24px_rgba(0,0,0,0.35)] light:shadow-[0_-8px_24px_rgba(0,0,0,0.06)]"
       >
-        <button
-          onClick={() => handleSelectTab('all', true)}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            activeTab === 'all'
-              ? 'text-amber-400 light:text-amber-600 font-semibold'
-              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
-          }`}
-        >
-          <BookOpen size={18} />
-          <span className="text-[10px]">Tutti</span>
-        </button>
+        <div className="max-w-md mx-auto grid grid-cols-5 items-center">
+          {/* Colonna 1: Tutti */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('all', true)}
+            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'all'
+                ? 'text-amber-400 light:text-amber-600 font-bold'
+                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+            }`}
+          >
+            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'all' ? 'bg-amber-500/15 light:bg-amber-100/90 shadow-xs' : ''}`}>
+              <BookOpen size={20} strokeWidth={activeTab === 'all' ? 2.4 : 2} />
+            </div>
+            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">Tutti</span>
+          </button>
 
-        <button
-          onClick={() => handleSelectTab('reading', true)}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            activeTab === 'reading'
-              ? 'text-amber-400 light:text-amber-600 font-semibold'
-              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
-          }`}
-        >
-          <Flame size={18} />
-          <span className="text-[10px]">In lettura</span>
-        </button>
+          {/* Colonna 2: In lettura */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('reading', true)}
+            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'reading'
+                ? 'text-amber-400 light:text-amber-600 font-bold'
+                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+            }`}
+          >
+            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'reading' ? 'bg-amber-500/15 light:bg-amber-100/90 shadow-xs' : ''}`}>
+              <Flame size={20} strokeWidth={activeTab === 'reading' ? 2.4 : 2} />
+            </div>
+            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">In lettura</span>
+          </button>
 
-        {/* Pulsante Aggiungi Libro in rilievo al centro */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="-mt-5 w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 text-stone-950 flex items-center justify-center shadow-lg shadow-amber-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer border-2 border-stone-900 light:border-white"
-          title="Aggiungi nuovo libro"
-          aria-label="Aggiungi libro"
-        >
-          <Plus size={22} strokeWidth={2.5} />
-        </button>
+          {/* Colonna 3: Tasto Aggiungi Libro perfettamente centrato ed elevato */}
+          <div className="flex flex-col items-center justify-center relative">
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="-mt-7 w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-350 text-stone-950 flex items-center justify-center shadow-[0_8px_24px_rgba(245,158,11,0.45)] hover:shadow-[0_10px_30px_rgba(245,158,11,0.6)] active:scale-90 hover:scale-105 transition-all cursor-pointer border-[3.5px] border-stone-900 light:border-white ring-2 ring-amber-500/25"
+              title="Aggiungi nuovo libro"
+              aria-label="Aggiungi libro"
+            >
+              <Plus size={28} strokeWidth={2.8} />
+            </button>
+          </div>
 
-        <button
-          onClick={() => handleSelectTab('completed', true)}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            activeTab === 'completed'
-              ? 'text-emerald-400 light:text-emerald-600 font-semibold'
-              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
-          }`}
-        >
-          <Trophy size={18} />
-          <span className="text-[10px]">Letti</span>
-        </button>
+          {/* Colonna 4: Letti */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('completed', true)}
+            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'completed'
+                ? 'text-emerald-400 light:text-emerald-600 font-bold'
+                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+            }`}
+          >
+            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'completed' ? 'bg-emerald-500/15 light:bg-emerald-100/90 shadow-xs' : ''}`}>
+              <Trophy size={20} strokeWidth={activeTab === 'completed' ? 2.4 : 2} />
+            </div>
+            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">Letti</span>
+          </button>
 
-        <button
-          onClick={() => handleSelectTab('want', true)}
-          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            activeTab === 'want'
-              ? 'text-sky-400 light:text-sky-600 font-semibold'
-              : 'text-stone-400 light:text-stone-500 hover:text-stone-200'
-          }`}
-        >
-          <Bookmark size={18} />
-          <span className="text-[10px]">Da leggere</span>
-        </button>
+          {/* Colonna 5: Da leggere */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('want', true)}
+            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'want'
+                ? 'text-sky-400 light:text-sky-600 font-bold'
+                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+            }`}
+          >
+            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'want' ? 'bg-sky-500/15 light:bg-sky-100/90 shadow-xs' : ''}`}>
+              <Bookmark size={20} strokeWidth={activeTab === 'want' ? 2.4 : 2} />
+            </div>
+            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">Da leggere</span>
+          </button>
+        </div>
       </nav>
 
       {/* Modale Aggiungi / Modifica Libro */}

@@ -18,9 +18,9 @@ import {
 import type { Book, Note } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { syncBookDateToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
-import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
 import { useToast } from './Toast';
+import { BookNotesModal } from './BookNotesModal';
 
 const STATUS_COLORS: Record<Book['status'], string> = {
   reading: 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-800 border-amber-500/30 light:border-amber-300',
@@ -42,14 +42,9 @@ export function BookCard({
   highlight?: boolean;
 }) {
   const { toast } = useToast();
-  const [expanded, setExpanded] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
   const [notes, setNotes] = useState<Note[] | null>(null);
-  const [loadingNotes, setLoadingNotes] = useState(false);
   const [notesCount, setNotesCount] = useState<number>(book.notes_count ?? 0);
-  const [newNote, setNewNote] = useState('');
-  const [savingNote, setSavingNote] = useState(false);
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [coverInput, setCoverInput] = useState('');
@@ -92,72 +87,7 @@ export function BookCard({
     }
   }, [book.id, book.notes_count, notes]);
 
-  const loadNotes = async () => {
-    setLoadingNotes(true);
-    try {
-      const { data } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('book_id', book.id)
-        .order('created_at', { ascending: false });
-      const userNotes = (data ?? []).filter((n) => !n.content.startsWith('__'));
-      setNotes(userNotes);
-      setNotesCount(userNotes.length);
-    } catch (e) {
-      console.error('Errore nel caricamento delle note:', e);
-    } finally {
-      setLoadingNotes(false);
-    }
-  };
-
-  useEffect(() => {
-    if (expanded && notes === null && !loadingNotes) {
-      loadNotes();
-    }
-  }, [expanded, notes, loadingNotes]);
-
   const displayCount = notes !== null ? notes.length : notesCount;
-
-  const handleAddNote = async () => {
-    if (!newNote.trim()) return;
-    setSavingNote(true);
-    const { data } = await supabase
-      .from('notes')
-      .insert({ book_id: book.id, content: newNote.trim() })
-      .select()
-      .single();
-    if (data) {
-      const updatedNotes = [data, ...(notes ?? [])];
-      setNotes(updatedNotes);
-      setNotesCount(updatedNotes.length);
-      setNewNote('');
-      onUpdate({ ...book, notes_count: updatedNotes.length });
-    }
-    setSavingNote(false);
-  };
-
-  const handleUpdateNote = async (id: string) => {
-    if (!editContent.trim()) return;
-    const { data } = await supabase
-      .from('notes')
-      .update({ content: editContent.trim(), updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    if (data) {
-      setNotes((prev) => (prev ?? []).map((n) => (n.id === id ? data : n)));
-    }
-    setEditingNoteId(null);
-    setEditContent('');
-  };
-
-  const handleDeleteNote = async (id: string) => {
-    await supabase.from('notes').delete().eq('id', id);
-    const updatedNotes = (notes ?? []).filter((n) => n.id !== id);
-    setNotes(updatedNotes);
-    setNotesCount(updatedNotes.length);
-    onUpdate({ ...book, notes_count: updatedNotes.length });
-  };
 
   const handleStatusChange = async (status: Book['status']) => {
     let newReadAt = book.read_at;
@@ -360,19 +290,20 @@ export function BookCard({
         <select
           value={book.status}
           onChange={(e) => handleStatusChange(e.target.value as Book['status'])}
-          className={`appearance-none h-6 sm:h-7 text-[10px] sm:text-xs font-medium pl-2 sm:pl-2.5 pr-5 sm:pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center ${STATUS_COLORS[book.status]}`}
+          aria-label="Stato del libro"
+          className={`appearance-none h-7 sm:h-7.5 text-xs font-semibold pl-2.5 sm:pl-3 pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
         >
           <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
           <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Completato</option>
           <option value="want" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Da leggere</option>
         </select>
-        <ChevronDown size={11} className="absolute right-1.5 sm:right-2 pointer-events-none opacity-70 shrink-0" />
+        <ChevronDown size={12} className="absolute right-2 pointer-events-none opacity-70 shrink-0" />
       </div>
 
       {/* Badge Data di lettura */}
       {book.read_at ? (
-        <span className="shrink-0 h-6 sm:h-7 inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 sm:px-2.5 whitespace-nowrap">
-          <Calendar size={11} className="shrink-0" />
+        <span className="shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2.5 sm:px-3 whitespace-nowrap">
+          <Calendar size={12} className="shrink-0" />
           <span>
             {new Date(book.read_at).toLocaleDateString('it-IT', {
               day: '2-digit',
@@ -382,27 +313,27 @@ export function BookCard({
           </span>
         </span>
       ) : (
-        <span className="shrink-0 h-6 sm:h-7 inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium text-stone-500 light:text-stone-500 bg-stone-800/60 light:bg-stone-100 border border-stone-700 light:border-stone-200 rounded-full px-2 sm:px-2.5 whitespace-nowrap">
-          <Calendar size={11} className="shrink-0" />
+        <span className="shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium text-stone-400 light:text-stone-600 bg-stone-800/60 light:bg-stone-100 border border-stone-700 light:border-stone-200 rounded-full px-2.5 sm:px-3 whitespace-nowrap">
+          <Calendar size={12} className="shrink-0" />
           <span>Nessuna data</span>
         </span>
       )}
 
       {/* Pulsante Note */}
       <button
-        onClick={() => setExpanded(!expanded)}
-        className={`shrink-0 h-6 sm:h-7 inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium px-2 sm:px-2.5 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+        onClick={() => setShowNotesModal(true)}
+        className={`shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 sm:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
           displayCount > 0
             ? 'border-amber-500/40 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100'
             : 'border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-700/50 light:hover:bg-stone-100'
-        } ${expanded ? 'ring-1 ring-amber-500/40 light:ring-amber-400' : ''}`}
+        } ${showNotesModal ? 'ring-1 ring-amber-500/40 light:ring-amber-400' : ''}`}
         title={
           displayCount > 0
-            ? `${displayCount} ${displayCount === 1 ? 'nota' : 'note'} (clicca per ${expanded ? 'chiudere' : 'aprire'})`
-            : 'Note (clicca per aggiungere note)'
+            ? `${displayCount} ${displayCount === 1 ? 'nota' : 'note'} (clicca per visualizzare o scrivere)`
+            : 'Note (clicca per scrivere citazioni o riflessioni)'
         }
       >
-        <StickyNote size={11} className={`shrink-0 ${displayCount > 0 ? 'text-amber-400 light:text-amber-600' : 'text-stone-400 light:text-stone-500'}`} />
+        <StickyNote size={12} className={`shrink-0 ${displayCount > 0 ? 'text-amber-400 light:text-amber-600' : 'text-stone-400 light:text-stone-500'}`} />
         <span>
           {displayCount === 0
             ? 'Note'
@@ -528,18 +459,18 @@ export function BookCard({
                   savingProgress ||
                   Boolean(book.pages && book.pages > 0 && (book.read_pages || 0) >= book.pages)
                 }
-                className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-md border border-amber-500/30 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-100/70 hover:bg-amber-500/20 light:hover:bg-amber-200/70 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
+                className="text-xs font-semibold px-2.5 py-1 rounded-md border border-amber-500/30 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-100/70 hover:bg-amber-500/20 light:hover:bg-amber-200/70 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
                 title={`Aggiungi ${n} pagine lette`}
               >
                 +{n} pag.
               </button>
             ))}
-            {savingProgress && <Loader2 size={12} className="animate-spin text-amber-400" />}
+            {savingProgress && <Loader2 size={13} className="animate-spin text-amber-400" />}
           </div>
 
           {/* Pulsante "Finito" responsive e dinamico */}
-          <div className="flex items-center justify-between pt-1 border-t border-amber-500/15 light:border-amber-200/60 mt-1 gap-1.5">
-            <span className="text-[10px] text-stone-400 light:text-stone-500 truncate">
+          <div className="flex items-center justify-between pt-1.5 border-t border-amber-500/15 light:border-amber-200/60 mt-1 gap-2">
+            <span className="text-xs text-stone-400 light:text-stone-500 truncate">
               Hai finito il libro?
             </span>
             <button
@@ -548,10 +479,10 @@ export function BookCard({
                 e.stopPropagation();
                 handleMarkAsFinished();
               }}
-              className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 light:hover:bg-emerald-200 border border-emerald-500/30 light:border-emerald-300 px-2 py-0.5 rounded-md transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 light:hover:bg-emerald-200 border border-emerald-500/30 light:border-emerald-300 px-3 py-1 rounded-md transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
               title="Ho finito di leggere tutto il libro! Segna come Completato"
             >
-              <CheckCircle2 size={11} className="text-emerald-400 light:text-emerald-600 shrink-0" />
+              <CheckCircle2 size={13} className="text-emerald-400 light:text-emerald-600 shrink-0" />
               <span>Finito</span>
             </button>
           </div>
@@ -696,108 +627,19 @@ export function BookCard({
         )}
       </div>
 
-      {expanded && (
-        <div className="border-t border-stone-700 light:border-stone-200 px-4 py-3 bg-stone-900/40 light:bg-stone-50/70">
-          <div className="flex items-center gap-2 mb-3">
-            <StickyNote size={16} className="text-amber-400 light:text-amber-600" />
-            <span className="text-sm font-medium text-stone-200 light:text-stone-800">Le mie note</span>
-          </div>
-
-          <div className="space-y-2 mb-3">
-            {loadingNotes ? (
-              <div className="flex items-center gap-2 text-stone-500 light:text-stone-500 text-sm py-2">
-                <Loader2 size={16} className="animate-spin text-amber-400 light:text-amber-600" />
-                Caricamento note...
-              </div>
-            ) : (!notes || notes.length === 0) ? (
-              <p className="text-stone-500 light:text-stone-500 text-sm italic">Nessuna nota. Aggiungi la prima!</p>
-            ) : (
-              notes.map((note) => (
-                <div
-                  key={note.id}
-                  className="group/note bg-stone-800/60 light:bg-white rounded-lg p-3 border border-stone-700 light:border-stone-200 shadow-xs"
-                >
-                  {editingNoteId === note.id ? (
-                    <div>
-                      <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        rows={3}
-                        className="w-full bg-stone-900 light:bg-white border border-stone-600 light:border-stone-300 rounded-md p-2 text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 resize-none"
-                      />
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => handleUpdateNote(note.id)}
-                          className="text-xs px-3 py-1 bg-amber-500 text-stone-900 font-medium rounded-md hover:bg-amber-400 cursor-pointer"
-                        >
-                          Salva
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingNoteId(null);
-                            setEditContent('');
-                          }}
-                          className="text-xs px-3 py-1 text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 cursor-pointer"
-                        >
-                          Annulla
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-sm text-stone-200 light:text-stone-800 whitespace-pre-wrap break-words">
-                        {note.content}
-                      </p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-stone-500 light:text-stone-400">
-                          {new Date(note.created_at).toLocaleDateString('it-IT', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        <div className="flex gap-2 opacity-80 sm:opacity-0 sm:group-hover/note:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => {
-                              setEditingNoteId(note.id);
-                              setEditContent(note.content);
-                            }}
-                            className="text-xs text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 cursor-pointer"
-                          >
-                            Modifica
-                          </button>
-                          <button
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="text-xs text-stone-400 light:text-stone-600 hover:text-red-400 cursor-pointer"
-                          >
-                            Elimina
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              rows={2}
-              placeholder="Aggiungi una nota per ricordare cosa hai letto..."
-              className="flex-1 bg-stone-900/60 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg p-2.5 text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/50 resize-none shadow-xs"
-            />
-            <button
-              onClick={handleAddNote}
-              disabled={savingNote || !newNote.trim()}
-              className="self-end p-2.5 bg-amber-500/10 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 text-amber-400 light:text-amber-800 rounded-lg hover:bg-amber-500/20 light:hover:bg-amber-200/80 disabled:opacity-30 transition-colors cursor-pointer"
-            >
-              {savingNote ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
-            </button>
-          </div>
-        </div>
+      {/* Modale spaziosa e funzionale per gestione note del libro */}
+      {showNotesModal && (
+        <BookNotesModal
+          book={book}
+          onClose={() => setShowNotesModal(false)}
+          onUpdateBook={(updated) => {
+            onUpdate(updated);
+            if (updated.notes_count !== undefined) {
+              setNotesCount(updated.notes_count);
+            }
+          }}
+          initialNotes={notes}
+        />
       )}
 
       {showDeleteConfirm &&
