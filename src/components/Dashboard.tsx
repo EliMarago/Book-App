@@ -81,13 +81,16 @@ export function Dashboard() {
 
   // Scorrimento fluido verso la sezione selezionata
   const scrollToSection = useCallback((tab: ViewTab) => {
+    // Se l'utente seleziona "Tutti", riporta la vista in cima alla pagina principale
+    if (tab === 'all') {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+      return;
+    }
+
     const getTarget = (): HTMLElement | null => {
-      if (tab === 'all') {
-        return (
-          document.getElementById('search-filter-bar') ||
-          document.getElementById('section-all')
-        );
-      }
       return (
         document.getElementById(`section-${tab}`) ||
         document.getElementById(`section-${tab}-in-all`) ||
@@ -96,8 +99,8 @@ export function Dashboard() {
     };
 
     const doScroll = (element: HTMLElement) => {
-      // Offset per tenere conto dell'header sticky (circa 58px) + margine visivo
-      const headerOffset = 70;
+      // Offset per tenere conto dell'header sticky (circa 65px) + margine visivo
+      const headerOffset = 75;
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
@@ -123,14 +126,32 @@ export function Dashboard() {
     }, 60);
   }, [activeTab]);
 
+  // Feedback tattile stile Apple Taptic Engine su dispositivi supportati
+  const triggerHaptic = useCallback(() => {
+    try {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(8);
+      }
+    } catch {}
+  }, []);
+
   const handleSelectTab = useCallback(
     (tab: ViewTab, forceScroll = false) => {
+      triggerHaptic();
+      // Se l'utente clicca dalla barra di navigazione inferiore sul tab già attivo, torna sempre in cima alla pagina
+      if (forceScroll && activeTab === tab) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       setActiveTab(tab);
-      if (forceScroll || window.innerWidth < 640) {
+
+      // Scorrimento automatico solo se richiesto esplicitamente dalla barra inferiore
+      if (forceScroll) {
         scrollToSection(tab);
       }
     },
-    [scrollToSection]
+    [activeTab, scrollToSection, triggerHaptic]
   );
 
   // I libri in attesa di eliminazione definitiva restano nascosti anche dopo una sincronizzazione
@@ -355,7 +376,7 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-stone-850 to-stone-900 light:from-[#fcfbfa] light:via-[#f7f4ed] light:to-[#fcfbfa] text-stone-100 light:text-stone-900 transition-colors duration-200">
       {/* Header principale */}
-      <header className="sticky top-0 z-30 bg-stone-900/80 light:bg-[#fcfbfa]/85 backdrop-blur-md border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200">
+      <header className="sticky top-0 z-30 bg-stone-900/80 light:bg-[#fcfbfa]/85 backdrop-blur-md border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/10 light:bg-amber-500/15 border border-amber-500/20 light:border-amber-500/30 text-amber-400 light:text-amber-600">
@@ -905,54 +926,53 @@ export function Dashboard() {
         </div>
       </main>
 
-      {/* Barra di Navigazione Mobile Inferiore (Griglia a 5 colonne perfettamente centrata e protetta dallo swipe iPhone) */}
+      {/* Barra di Navigazione Mobile Inferiore - Design Ufficiale Stile Apple iOS Tab Bar */}
       <nav
         aria-label="Navigazione rapida mobile"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 light:bg-white/95 backdrop-blur-xl border-t border-stone-800/90 light:border-stone-200/90 px-2 pt-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] shadow-[0_-8px_24px_rgba(0,0,0,0.35)] light:shadow-[0_-8px_24px_rgba(0,0,0,0.06)]"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#161618]/82 light:bg-[#f9f9fb]/92 backdrop-blur-2xl -webkit-backdrop-blur-2xl border-t border-black/10 light:border-black/[0.08] dark:border-white/[0.08] px-2 pt-1 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.35rem))] shadow-[0_-1px_3px_rgba(0,0,0,0.06)]"
       >
-        <div className="max-w-md mx-auto grid grid-cols-5 items-center">
+        <div className="max-w-md mx-auto grid grid-cols-5 items-end">
           {/* Colonna 1: Tutti */}
           <button
             type="button"
             onClick={() => handleSelectTab('all', true)}
-            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center justify-center py-1 transition-transform cursor-pointer active:scale-90 select-none ${
               activeTab === 'all'
-                ? 'text-amber-400 light:text-amber-600 font-bold'
-                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+                ? 'text-amber-500 light:text-amber-600 font-semibold'
+                : 'text-[#98989f] light:text-[#8e8e93] hover:text-stone-300 light:hover:text-stone-700'
             }`}
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'all' ? 'bg-amber-500/15 light:bg-amber-100/90 shadow-xs' : ''}`}>
-              <BookOpen size={20} strokeWidth={activeTab === 'all' ? 2.4 : 2} />
-            </div>
-            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">Tutti</span>
+            <BookOpen size={21} strokeWidth={activeTab === 'all' ? 2.4 : 1.9} className="transition-transform" />
+            <span className="text-[10px] tracking-[-0.01em] mt-[3px] leading-tight whitespace-nowrap">Tutti</span>
           </button>
 
           {/* Colonna 2: In lettura */}
           <button
             type="button"
             onClick={() => handleSelectTab('reading', true)}
-            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center justify-center py-1 transition-transform cursor-pointer active:scale-90 select-none ${
               activeTab === 'reading'
-                ? 'text-amber-400 light:text-amber-600 font-bold'
-                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+                ? 'text-amber-500 light:text-amber-600 font-semibold'
+                : 'text-[#98989f] light:text-[#8e8e93] hover:text-stone-300 light:hover:text-stone-700'
             }`}
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'reading' ? 'bg-amber-500/15 light:bg-amber-100/90 shadow-xs' : ''}`}>
-              <Flame size={20} strokeWidth={activeTab === 'reading' ? 2.4 : 2} />
-            </div>
-            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">In lettura</span>
+            <Flame size={21} strokeWidth={activeTab === 'reading' ? 2.4 : 1.9} className="transition-transform" />
+            <span className="text-[10px] tracking-[-0.01em] mt-[3px] leading-tight whitespace-nowrap">In lettura</span>
           </button>
 
-          {/* Colonna 3: Tasto Aggiungi Libro perfettamente centrato ed elevato */}
-          <div className="flex flex-col items-center justify-center relative">
+          {/* Colonna 3: Tasto Aggiungi Libro (Stile Apple Floating Action Button con intaglio e ombra volumetrica) */}
+          <div className="flex flex-col items-center justify-center relative -top-3.5">
             <button
               type="button"
-              onClick={() => setShowAddModal(true)}
-              className="-mt-7 w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-350 text-stone-950 flex items-center justify-center shadow-[0_8px_24px_rgba(245,158,11,0.45)] hover:shadow-[0_10px_30px_rgba(245,158,11,0.6)] active:scale-90 hover:scale-105 transition-all cursor-pointer border-[3.5px] border-stone-900 light:border-white ring-2 ring-amber-500/25"
+              onClick={() => {
+                triggerHaptic();
+                setShowAddModal(true);
+              }}
+              className="w-[52px] h-[52px] rounded-full bg-gradient-to-b from-[#fbb034] via-[#f59e0b] to-[#d97706] text-stone-950 flex items-center justify-center shadow-[0_6px_20px_rgba(245,158,11,0.45),inset_0_1px_1px_rgba(255,255,255,0.45)] ring-[3.5px] ring-[#161618] light:ring-[#f9f9fb] active:scale-90 active:brightness-95 transition-all cursor-pointer"
               title="Aggiungi nuovo libro"
               aria-label="Aggiungi libro"
             >
-              <Plus size={28} strokeWidth={2.8} />
+              <Plus size={26} strokeWidth={2.7} />
             </button>
           </div>
 
@@ -960,32 +980,28 @@ export function Dashboard() {
           <button
             type="button"
             onClick={() => handleSelectTab('completed', true)}
-            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center justify-center py-1 transition-transform cursor-pointer active:scale-90 select-none ${
               activeTab === 'completed'
-                ? 'text-emerald-400 light:text-emerald-600 font-bold'
-                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+                ? 'text-amber-500 light:text-amber-600 font-semibold'
+                : 'text-[#98989f] light:text-[#8e8e93] hover:text-stone-300 light:hover:text-stone-700'
             }`}
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'completed' ? 'bg-emerald-500/15 light:bg-emerald-100/90 shadow-xs' : ''}`}>
-              <Trophy size={20} strokeWidth={activeTab === 'completed' ? 2.4 : 2} />
-            </div>
-            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">Letti</span>
+            <Trophy size={21} strokeWidth={activeTab === 'completed' ? 2.4 : 1.9} className="transition-transform" />
+            <span className="text-[10px] tracking-[-0.01em] mt-[3px] leading-tight whitespace-nowrap">Letti</span>
           </button>
 
           {/* Colonna 5: Da leggere */}
           <button
             type="button"
             onClick={() => handleSelectTab('want', true)}
-            className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center justify-center py-1 transition-transform cursor-pointer active:scale-90 select-none ${
               activeTab === 'want'
-                ? 'text-sky-400 light:text-sky-600 font-bold'
-                : 'text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-900'
+                ? 'text-amber-500 light:text-amber-600 font-semibold'
+                : 'text-[#98989f] light:text-[#8e8e93] hover:text-stone-300 light:hover:text-stone-700'
             }`}
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeTab === 'want' ? 'bg-sky-500/15 light:bg-sky-100/90 shadow-xs' : ''}`}>
-              <Bookmark size={20} strokeWidth={activeTab === 'want' ? 2.4 : 2} />
-            </div>
-            <span className="text-[10.5px] leading-none font-medium whitespace-nowrap">Da leggere</span>
+            <Bookmark size={21} strokeWidth={activeTab === 'want' ? 2.4 : 1.9} className="transition-transform" />
+            <span className="text-[10px] tracking-[-0.01em] mt-[3px] leading-tight whitespace-nowrap">Da leggere</span>
           </button>
         </div>
       </nav>
