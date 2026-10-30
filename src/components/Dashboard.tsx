@@ -29,6 +29,7 @@ import { getStoredDates, removeBookDate, getStoredPages, removeBookPages, getSto
 import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
 import { BookshelfView } from './BookshelfView';
+import { BookDetailModal } from './BookDetailModal';
 import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
 import { ReadingChallenge } from './ReadingChallenge';
@@ -57,6 +58,7 @@ export function Dashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'shelf'>(() => {
@@ -440,70 +442,70 @@ export function Dashboard() {
         <ReadingChallenge books={books} goals={goals} onSetGoal={setGoal} />
 
         {/* Selettore Primario delle Sezioni (4 Card Statistiche Interattive e Unificate) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
           <button
             onClick={() => handleSelectTab('all')}
-            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-2.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'all'
                 ? 'border-amber-500/70 light:border-amber-500 ring-2 ring-amber-500/25 bg-amber-500/10 light:bg-amber-50/90 shadow-md shadow-amber-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl sm:text-3xl font-bold font-serif text-stone-100 light:text-stone-900 flex items-center justify-center gap-1.5">
+            <div className="text-xl sm:text-3xl font-bold font-serif tabular-nums text-stone-100 light:text-stone-900 flex items-center justify-center gap-1.5">
               <span>{stats.total}</span>
-              <BookOpen size={18} className="text-amber-400 light:text-amber-600 inline opacity-85" />
+              <BookOpen size={17} className="text-amber-400 light:text-amber-600 inline opacity-85" />
             </div>
-            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">Tutti i libri</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-0.5 sm:mt-1 font-semibold tracking-normal">Tutti i libri</div>
           </button>
 
           <button
             onClick={() => handleSelectTab('reading')}
-            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-2.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'reading'
                 ? 'border-amber-500/70 light:border-amber-500 ring-2 ring-amber-500/25 bg-amber-500/10 light:bg-amber-50/90 shadow-md shadow-amber-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl sm:text-3xl font-bold font-serif text-amber-400 light:text-amber-700 flex items-center justify-center gap-1.5">
+            <div className="text-xl sm:text-3xl font-bold font-serif tabular-nums text-amber-400 light:text-amber-700 flex items-center justify-center gap-1.5">
               <span>{stats.reading}</span>
-              <Flame size={19} className="text-amber-400 light:text-amber-600 inline" />
+              <Flame size={18} className="text-amber-400 light:text-amber-600 inline" />
             </div>
-            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">In lettura</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-0.5 sm:mt-1 font-semibold tracking-normal">In lettura</div>
           </button>
 
           <button
             onClick={() => handleSelectTab('completed')}
-            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-2.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'completed'
                 ? 'border-emerald-500/70 light:border-emerald-500 ring-2 ring-emerald-500/25 bg-emerald-950/30 light:bg-emerald-50/90 shadow-md shadow-emerald-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl sm:text-3xl font-bold font-serif text-emerald-400 light:text-emerald-700 flex items-center justify-center gap-1.5">
+            <div className="text-xl sm:text-3xl font-bold font-serif tabular-nums text-emerald-400 light:text-emerald-700 flex items-center justify-center gap-1.5">
               <span>{stats.completed}</span>
-              <Trophy size={19} className="text-emerald-400 light:text-emerald-600 inline" />
+              <Trophy size={18} className="text-emerald-400 light:text-emerald-600 inline" />
             </div>
-            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">Letti (per anno)</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-0.5 sm:mt-1 font-semibold tracking-normal">Letti (per anno)</div>
           </button>
 
           <button
             onClick={() => handleSelectTab('want')}
-            className={`border rounded-2xl p-3.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
+            className={`border rounded-2xl p-2.5 sm:p-4 text-center transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:scale-98 ${
               activeTab === 'want'
                 ? 'border-sky-500/70 light:border-sky-500 ring-2 ring-sky-500/25 bg-sky-950/30 light:bg-sky-50/90 shadow-md shadow-sky-500/10'
                 : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:bg-stone-800/90 light:hover:bg-stone-50 shadow-xs'
             }`}
           >
-            <div className="text-2xl sm:text-3xl font-bold font-serif text-sky-400 light:text-sky-700 flex items-center justify-center gap-1.5">
+            <div className="text-xl sm:text-3xl font-bold font-serif tabular-nums text-sky-400 light:text-sky-700 flex items-center justify-center gap-1.5">
               <span>{stats.want}</span>
-              <Bookmark size={18} className="text-sky-400 light:text-sky-600 inline opacity-85" />
+              <Bookmark size={17} className="text-sky-400 light:text-sky-600 inline opacity-85" />
             </div>
-            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-1 font-semibold tracking-normal">Da leggere</div>
+            <div className="text-xs sm:text-sm text-stone-300 light:text-stone-600 mt-0.5 sm:mt-1 font-semibold tracking-normal">Da leggere</div>
           </button>
         </div>
 
         {/* Barra Ricerca e Azione Aggiungi Libro */}
-        <div id="search-filter-bar" className="flex flex-col sm:flex-row gap-3 mb-6 scroll-mt-20">
+        <div id="search-filter-bar" className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mb-5 sm:mb-6 scroll-mt-20">
           <div className="relative flex-1">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400" />
             <input
@@ -578,7 +580,7 @@ export function Dashboard() {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 py-2.5 px-5 bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-900 font-semibold rounded-lg transition-all whitespace-nowrap shadow-md shadow-amber-500/10 cursor-pointer"
+            className="hidden sm:flex items-center justify-center gap-2 py-2.5 px-5 bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-900 font-semibold rounded-lg transition-all whitespace-nowrap shadow-md shadow-amber-500/10 cursor-pointer"
           >
             <Plus size={20} />
             Aggiungi libro
@@ -610,6 +612,7 @@ export function Dashboard() {
               onUpdate={handleUpdateBook}
               onDelete={handleDeleteBook}
               onEdit={handleOpenEditBook}
+              onInspect={setInspectingBook}
               searchQuery={search}
               goals={goals}
               sortBy={sortBy}
@@ -669,6 +672,7 @@ export function Dashboard() {
                     onUpdate={handleUpdateBook}
                     onDelete={handleDeleteBook}
                     onEdit={handleOpenEditBook}
+                    onInspect={setInspectingBook}
                     highlight={true}
                   />
                 ))}
@@ -721,6 +725,7 @@ export function Dashboard() {
                     onUpdate={handleUpdateBook}
                     onDelete={handleDeleteBook}
                     onEdit={handleOpenEditBook}
+                    onInspect={setInspectingBook}
                   />
                 ))}
               </div>
@@ -781,6 +786,7 @@ export function Dashboard() {
                           onUpdate={handleUpdateBook}
                           onDelete={handleDeleteBook}
                           onEdit={handleOpenEditBook}
+                          onInspect={setInspectingBook}
                           highlight={true}
                         />
                       ))}
@@ -816,6 +822,7 @@ export function Dashboard() {
                           onUpdate={handleUpdateBook}
                           onDelete={handleDeleteBook}
                           onEdit={handleOpenEditBook}
+                          onInspect={setInspectingBook}
                         />
                       ))}
                     </div>
@@ -883,6 +890,7 @@ export function Dashboard() {
                           onUpdate={handleUpdateBook}
                           onDelete={handleDeleteBook}
                           onEdit={handleOpenEditBook}
+                          onInspect={setInspectingBook}
                         />
                       ))}
                     </div>
@@ -1006,6 +1014,26 @@ export function Dashboard() {
         </div>
       </nav>
 
+      {/* Scheda Libro Completa (aperta dalla vista a schede) */}
+      {inspectingBook && (
+        <BookDetailModal
+          book={inspectingBook}
+          onClose={() => setInspectingBook(null)}
+          onUpdateBook={(updated) => {
+            handleUpdateBook(updated);
+            setInspectingBook(updated);
+          }}
+          onEditBook={(book) => {
+            setInspectingBook(null);
+            handleOpenEditBook(book);
+          }}
+          onDeleteBook={(id) => {
+            setInspectingBook(null);
+            handleDeleteBook(id);
+          }}
+        />
+      )}
+
       {/* Modale Aggiungi / Modifica Libro */}
       {showAddModal && (
         <AddBookModal
@@ -1022,8 +1050,14 @@ export function Dashboard() {
       {/* Modale Backup e Dati */}
       {showBackupModal && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Gestione Backup e Dati"
           className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-up"
           onClick={() => setShowBackupModal(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowBackupModal(false);
+          }}
         >
           <div
             className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800/90 light:border-stone-200 max-w-2xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"

@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Trash2,
-  Plus,
   Loader2,
   StickyNote,
-  X,
   BookMarked,
-  Link2,
+  BookOpen,
+  Pencil,
   ImageOff,
   Calendar,
   Flame,
@@ -18,6 +16,7 @@ import {
 import type { Book, Note } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { syncBookDateToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
+import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
 import { useToast } from './Toast';
 import { BookNotesModal } from './BookNotesModal';
@@ -25,7 +24,7 @@ import { BookNotesModal } from './BookNotesModal';
 const STATUS_COLORS: Record<Book['status'], string> = {
   reading: 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-800 border-amber-500/30 light:border-amber-300',
   completed: 'bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-800 border-emerald-500/30 light:border-emerald-300',
-  want: 'bg-sky-500/15 light:bg-sky-50 text-sky-400 light:text-sky-800 border-sky-500/30 light:border-sky-300',
+  want: 'bg-sky-500/15 light:bg-sky-50 text-sky-400 light:text-sky-800 border-sky-500/30 light:border-amber-300',
 };
 
 export function BookCard({
@@ -33,22 +32,20 @@ export function BookCard({
   onUpdate,
   onDelete,
   onEdit,
+  onInspect,
   highlight = false,
 }: {
   book: Book;
   onUpdate: (book: Book) => void;
   onDelete: (id: string) => void;
   onEdit: (book: Book) => void;
+  onInspect?: (book: Book) => void;
   highlight?: boolean;
 }) {
   const { toast } = useToast();
   const [showNotesModal, setShowNotesModal] = useState(false);
-  const [notes, setNotes] = useState<Note[] | null>(null);
+  const [notes] = useState<Note[] | null>(null);
   const [notesCount, setNotesCount] = useState<number>(book.notes_count ?? 0);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showCoverModal, setShowCoverModal] = useState(false);
-  const [coverInput, setCoverInput] = useState('');
-  const [savingCover, setSavingCover] = useState(false);
   const [autoFetchingCover, setAutoFetchingCover] = useState(false);
 
   // Stato per l'aggiornamento rapido dell'avanzamento pagine
@@ -101,8 +98,11 @@ export function BookCard({
         newReadPages = book.pages;
         await syncBookReadPagesToSupabase(book.id, newReadPages);
       }
+    } else if (book.status === 'completed') {
+      newReadAt = null;
+      await syncBookDateToSupabase(book.id, null);
     }
-    const updatePayload: any = { status, updated_at: new Date().toISOString() };
+    const updatePayload: any = { status, read_at: newReadAt, updated_at: new Date().toISOString() };
     if (newReadPages !== undefined) updatePayload.read_pages = newReadPages;
 
     let res = await supabase
@@ -112,7 +112,7 @@ export function BookCard({
       .select()
       .single();
 
-    if (res.error && res.error.message?.includes('read_pages')) {
+    if (res.error && (res.error.message?.includes('read_pages') || res.error.message?.includes('read_at'))) {
       res = await supabase
         .from('books')
         .update({ status, updated_at: new Date().toISOString() })
@@ -237,26 +237,6 @@ export function BookCard({
     if (data) onUpdate({ ...data, read_at: book.read_at, notes_count: displayCount });
   };
 
-  const handleSaveCover = async () => {
-    setSavingCover(true);
-    const url = coverInput.trim() || null;
-    const { data: updated } = await supabase
-      .from('books')
-      .update({ cover_url: url, updated_at: new Date().toISOString() })
-      .eq('id', book.id)
-      .select()
-      .single();
-    if (updated) onUpdate({ ...updated, read_at: book.read_at, notes_count: displayCount });
-    setSavingCover(false);
-    setShowCoverModal(false);
-    setCoverInput('');
-  };
-
-  const openCoverModal = () => {
-    setCoverInput(book.cover_url ?? '');
-    setShowCoverModal(true);
-  };
-
   const handleAutoFetchCover = async () => {
     setAutoFetchingCover(true);
     try {
@@ -275,12 +255,6 @@ export function BookCard({
     } finally {
       setAutoFetchingCover(false);
     }
-  };
-
-  // L'eliminazione effettiva (con possibilità di "Annulla") è gestita dal genitore
-  const handleDeleteBook = () => {
-    setShowDeleteConfirm(false);
-    onDelete(book.id);
   };
 
   const renderBottomBar = () => (
@@ -312,15 +286,24 @@ export function BookCard({
             })}
           </span>
         </span>
-      ) : (
-        <span className="shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium text-stone-400 light:text-stone-600 bg-stone-800/60 light:bg-stone-100 border border-stone-700 light:border-stone-200 rounded-full px-2.5 sm:px-3 whitespace-nowrap">
-          <Calendar size={12} className="shrink-0" />
-          <span>Nessuna data</span>
-        </span>
+      ) : null}
+
+      {/* Pulsante Scheda / Trama */}
+      {onInspect && (
+        <button
+          type="button"
+          onClick={() => onInspect(book)}
+          className="shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 sm:px-3 rounded-full border border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:border-amber-500/40 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+          title="Apri Scheda Libro e trama"
+        >
+          <BookOpen size={12} className="shrink-0 text-amber-400 light:text-amber-600" />
+          <span>Scheda</span>
+        </button>
       )}
 
       {/* Pulsante Note */}
       <button
+        type="button"
         onClick={() => setShowNotesModal(true)}
         className={`shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 sm:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
           displayCount > 0
@@ -427,10 +410,13 @@ export function BookCard({
                       : 'Imposta pagina letta'}
                 </span>
               </span>
-              <span className="text-stone-400 light:text-stone-500 text-[10px] group-hover/progress:text-amber-300 light:group-hover/progress:text-amber-700 transition-colors font-semibold shrink-0">
-                {book.pages && book.pages > 0
-                  ? `${Math.min(100, Math.round(((book.read_pages || 0) / book.pages) * 100))}%`
-                  : 'Modifica'}
+              <span className="text-stone-400 light:text-stone-500 text-[10px] group-hover/progress:text-amber-300 light:group-hover/progress:text-amber-700 transition-colors font-semibold shrink-0 inline-flex items-center gap-1">
+                <span>
+                  {book.pages && book.pages > 0
+                    ? `${Math.min(100, Math.round(((book.read_pages || 0) / book.pages) * 100))}%`
+                    : 'Modifica'}
+                </span>
+                <Pencil size={10} className="opacity-70 group-hover/progress:opacity-100" />
               </span>
             </div>
             {book.pages && book.pages > 0 && (
@@ -504,17 +490,21 @@ export function BookCard({
         <div className="flex items-start gap-3 sm:gap-4 flex-1">
           {/* Copertina a proporzioni fisse con effetto dorso libro */}
           <div
-            onClick={!book.cover_url ? handleAutoFetchCover : undefined}
-            className={`relative shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover ${
-              !book.cover_url ? 'cursor-pointer' : ''
-            }`}
-            title={!book.cover_url ? 'Clicca per cercare la copertina in automatico' : undefined}
+            onClick={() => {
+              if (book.cover_url && onInspect) {
+                onInspect(book);
+              } else if (!book.cover_url) {
+                handleAutoFetchCover();
+              }
+            }}
+            className="relative shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover cursor-pointer"
+            title={book.cover_url ? 'Clicca per aprire la Scheda Libro e la trama' : 'Clicca per cercare la copertina in automatico'}
           >
             {book.cover_url ? (
               <img
                 src={book.cover_url}
                 alt={`Copertina di ${book.title}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-300 group-hover/cover:scale-105"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -571,8 +561,11 @@ export function BookCard({
               <div className="flex items-start justify-between gap-1.5">
                 <div className="min-w-0 flex-1">
                   <h3
-                    className="font-serif text-base sm:text-lg font-semibold text-stone-100 light:text-stone-900 leading-snug break-words line-clamp-2"
-                    title={book.title}
+                    onClick={() => onInspect?.(book)}
+                    className={`font-serif text-base sm:text-lg font-semibold text-stone-100 light:text-stone-900 leading-snug break-words line-clamp-2 ${
+                      onInspect ? 'cursor-pointer hover:text-amber-400 light:hover:text-amber-700 transition-colors' : ''
+                    }`}
+                    title={onInspect ? `${book.title} — Clicca per aprire la Scheda Libro` : book.title}
                   >
                     {book.title}
                   </h3>
@@ -589,20 +582,22 @@ export function BookCard({
                 {/* Pulsanti azioni rapidi */}
                 <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mr-1">
                   <button
+                    type="button"
                     onClick={() => onEdit(book)}
-                    className="opacity-75 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-amber-400 light:hover:text-amber-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90"
+                    className="opacity-75 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-amber-400 light:hover:text-amber-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
                     title="Modifica libro"
                     aria-label="Modifica libro"
                   >
-                    <BookMarked size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    <Pencil size={15} className="sm:w-4 sm:h-4" />
                   </button>
                   <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="opacity-75 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-red-400 light:hover:text-red-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90"
+                    type="button"
+                    onClick={() => onDelete(book.id)}
+                    className="opacity-75 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-red-400 light:hover:text-red-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
                     title="Elimina libro"
                     aria-label="Elimina libro"
                   >
-                    <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    <Trash2 size={15} className="sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </div>
@@ -612,7 +607,7 @@ export function BookCard({
               <StarRating value={book.rating} onChange={handleRatingChange} size={18} />
             </div>
 
-            {/* Barra inferiore (Stato, Data, Note): sempre sul fondo della colonna destra per equilibrare la copertina */}
+            {/* Barra inferiore (Stato, Data, Scheda, Note): sempre sul fondo della colonna destra per equilibrare la copertina */}
             <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5 sm:pt-3">
               {renderBottomBar()}
             </div>
@@ -640,171 +635,6 @@ export function BookCard({
           }}
           initialNotes={notes}
         />
-      )}
-
-      {showDeleteConfirm &&
-        createPortal(
-          <div
-            className="fixed inset-0 bg-stone-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-            onClick={() => setShowDeleteConfirm(false)}
-          >
-            <div
-              className="bg-stone-900 light:bg-white rounded-2xl border border-stone-800 light:border-stone-200 p-5 sm:p-6 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2.5 text-stone-100 light:text-stone-900 font-serif font-bold text-lg">
-                  <div className="w-8 h-8 rounded-lg bg-red-500/10 light:bg-red-50 border border-red-500/20 light:border-red-200 flex items-center justify-center text-red-400 light:text-red-600 shrink-0">
-                    <Trash2 size={18} />
-                  </div>
-                  <span>Elimina libro</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="text-stone-400 hover:text-stone-200 light:hover:text-stone-800 p-1 rounded-md cursor-pointer transition-colors"
-                  aria-label="Chiudi"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <p className="text-stone-300 light:text-stone-600 text-xs sm:text-sm leading-relaxed">
-                Vuoi davvero eliminare <strong className="text-stone-100 light:text-stone-900 font-semibold">"{book.title}"</strong>?
-                Verranno cancellate anche tutte le note associate. Questa azione non può essere annullata.
-              </p>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-2.5 px-4 border border-stone-700 light:border-stone-300 text-stone-300 light:text-stone-700 font-medium text-xs sm:text-sm rounded-xl hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteBook}
-                  className="flex-1 py-2.5 px-4 bg-red-500 hover:bg-red-400 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition-all cursor-pointer shadow-md shadow-red-500/20"
-                >
-                  Elimina
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
-      {showCoverModal &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/80 backdrop-blur-xs p-4 animate-in fade-in duration-200"
-            onClick={() => setShowCoverModal(false)}
-          >
-            <div
-              className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-stone-800 light:border-stone-200 bg-stone-900 light:bg-white shadow-2xl animate-in zoom-in-95 duration-150"
-              onClick={(e) => e.stopPropagation()}
-            >
-            <div className="flex flex-shrink-0 items-center justify-between border-b border-stone-700 light:border-stone-200 p-4">
-              <h3 className="font-serif text-lg font-semibold text-stone-100 light:text-stone-900">Copertina</h3>
-              <button
-                onClick={() => setShowCoverModal(false)}
-                className="text-stone-400 light:text-stone-500 transition hover:text-stone-200 light:hover:text-stone-800 cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="flex h-36 w-24 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-stone-700 light:border-stone-200 bg-stone-900 light:bg-stone-100 shadow-inner">
-                  {coverInput.trim() ? (
-                    <img
-                      src={coverInput.trim()}
-                      alt="Anteprima"
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : (
-                    <BookMarked size={42} className="text-stone-600 light:text-stone-400" />
-                  )}
-                  <ImageOff size={28} className="hidden text-stone-600 light:text-stone-400" />
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-stone-300 light:text-stone-700">
-                      URL immagine
-                    </label>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setAutoFetchingCover(true);
-                        const found = await fetchBookCover(book.title, book.author);
-                        if (found) setCoverInput(found);
-                        setAutoFetchingCover(false);
-                      }}
-                      disabled={autoFetchingCover}
-                      className="flex items-center gap-1 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2 py-0.5 rounded bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer"
-                      title="Cerca automaticamente la copertina di questo libro"
-                    >
-                      {autoFetchingCover ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <Sparkles size={12} />
-                      )}
-                      <span>
-                        {autoFetchingCover ? 'Ricerca...' : 'Cerca in automatico'}
-                      </span>
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <Link2
-                      size={18}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400"
-                    />
-                    <input
-                      type="url"
-                      value={coverInput}
-                      onChange={(e) => setCoverInput(e.target.value)}
-                      className="w-full rounded-lg border border-stone-700 light:border-stone-300 bg-stone-900/60 light:bg-stone-50 py-2.5 pl-10 pr-3 text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-stone-500 light:text-stone-500">
-                    Incolla l'URL diretto di un'immagine. Lascia vuoto per rimuovere la copertina.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-shrink-0 gap-3 border-t border-stone-700 light:border-stone-200 bg-stone-800 light:bg-stone-50 p-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCoverModal(false);
-                  setCoverInput('');
-                }}
-                className="flex-1 cursor-pointer rounded-lg border border-stone-600 light:border-stone-300 px-4 py-2.5 text-stone-300 light:text-stone-700 transition hover:bg-stone-700/60 light:hover:bg-stone-200/70 font-semibold"
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCover}
-                disabled={savingCover}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 font-medium text-stone-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingCover && <Loader2 size={18} className="animate-spin" />}
-                {savingCover ? 'Salvataggio...' : 'Modifica'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
       )}
     </div>
   );

@@ -7,7 +7,6 @@ import {
   Star,
   BookCheck,
   Search,
-  Sparkles,
   Layers,
   Target,
 } from 'lucide-react';
@@ -21,6 +20,7 @@ interface ReadBooksByYearProps {
   onUpdate: (book: Book) => void;
   onDelete: (id: string) => void;
   onEdit: (book: Book) => void;
+  onInspect?: (book: Book) => void;
   searchQuery?: string;
   goals?: ReadingGoals;
   sortBy?: SortKey;
@@ -31,6 +31,7 @@ export function ReadBooksByYear({
   onUpdate,
   onDelete,
   onEdit,
+  onInspect,
   searchQuery = '',
   goals = {},
   sortBy = 'recent',
@@ -254,8 +255,17 @@ export function ReadBooksByYear({
             >
               {/* Barra intestazione dell'anno */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={!isCollapsed}
                 onClick={() => toggleYearCollapse(year)}
-                className="w-full px-5 py-4 flex items-center justify-between bg-stone-800/50 light:bg-stone-50/90 hover:bg-stone-800/70 light:hover:bg-stone-100/90 border-b border-stone-800/80 light:border-stone-200 cursor-pointer transition-colors select-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleYearCollapse(year);
+                  }
+                }}
+                className="w-full px-5 py-4 flex items-center justify-between bg-stone-800/50 light:bg-stone-50/90 hover:bg-stone-800/70 light:hover:bg-stone-100/90 border-b border-stone-800/80 light:border-stone-200 cursor-pointer transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/20 light:border-emerald-200 flex items-center justify-center text-emerald-400 light:text-emerald-700 font-bold text-sm">
@@ -326,6 +336,7 @@ export function ReadBooksByYear({
                         onUpdate={onUpdate}
                         onDelete={onDelete}
                         onEdit={onEdit}
+                        onInspect={onInspect}
                       />
                     ))}
                   </div>

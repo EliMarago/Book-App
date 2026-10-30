@@ -903,3 +903,82 @@ export async function fetchBookDetails(
 
   return merged;
 }
+
+export interface BookSuggestion {
+  id: string;
+  title: string;
+  author: string;
+  coverUrl: string | null;
+  pages: number | null;
+  publishedYear: string | null;
+}
+
+/**
+ * Ricerca suggerimenti di autocompletamento libri (Titolo, Autore, Copertina, Pagine)
+ * interrogando Google Books (preferenza lingua italiana) per compilazione istantanea 1-tap.
+ */
+export async function searchBookSuggestions(query: string): Promise<BookSuggestion[]> {
+  const clean = sanitizeQuery(query);
+  if (!clean || clean.length < 2) return [];
+
+  try {
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(clean)}&langRestrict=it&maxResults=6`;
+    const res = await fetchWithTimeout(url, 3500);
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    if (!data.items || !Array.isArray(data.items)) return [];
+
+    const seen = new Set<string>();
+    const results: BookSuggestion[] = [];
+
+    for (const item of data.items) {
+      const info = item?.volumeInfo;
+      if (!info || !info.title) continue;
+
+      const title = String(info.title).trim();
+      const author =
+        Array.isArray(info.authors) && info.authors.length > 0
+          ? String(info.authors[0]).trim()
+          : '';
+      if (!title || !author) continue;
+
+      const dedupKey = `${title.toLowerCase()}::${author.toLowerCase()}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+
+      const imageLinks = info.imageLinks;
+      let coverUrl: string | null = null;
+      if (imageLinks) {
+        const raw =
+          imageLinks.extraLarge ||
+          imageLinks.large ||
+          imageLinks.medium ||
+          imageLinks.thumbnail ||
+          imageLinks.smallThumbnail;
+        if (raw) {
+          coverUrl = raw.replace('http://', 'https://').replace('&edge=curl', '');
+        }
+      }
+
+      const pages =
+        typeof info.pageCount === 'number' && info.pageCount > 0 ? info.pageCount : null;
+      const publishedYear = info.publishedDate ? String(info.publishedDate).slice(0, 4) : null;
+
+      results.push({
+        id: item.id || dedupKey,
+        title,
+        author,
+        coverUrl,
+        pages,
+        publishedYear,
+      });
+
+      if (results.length >= 5) break;
+    }
+
+    return results;
+  } catch {
+    return [];
+  }
+}

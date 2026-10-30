@@ -14,7 +14,13 @@ import {
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import { syncBookDateToSupabase, syncBookPagesToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
-import { fetchBookCover, searchAlternativeCovers, fetchBookPageCount } from '@/lib/bookCoverApi';
+import {
+  fetchBookCover,
+  searchAlternativeCovers,
+  fetchBookPageCount,
+  searchBookSuggestions,
+  type BookSuggestion,
+} from '@/lib/bookCoverApi';
 
 export function AddBookModal({
   onClose,
@@ -47,20 +53,82 @@ export function AddBookModal({
   );
   const [searchingCover, setSearchingCover] = useState(false);
   const [alternativeCovers, setAlternativeCovers] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<BookSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Tiene traccia dell'ultima query cercata per evitare ricerche identiche
   const lastSearchedRef = useRef<string>('');
+  const justSelectedSuggestionRef = useRef(false);
 
-  // Blocca lo scroll del body quando la modale è aperta per una navigazione mobile fluida
+  // Blocca lo scroll del body e gestisce il tasto Escape quando la modale è aperta
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [onClose]);
+
+  // Autocompletamento suggerimenti libri mentre l'utente digita il titolo
+  useEffect(() => {
+    if (isEditing) return;
+    if (justSelectedSuggestionRef.current) {
+      justSelectedSuggestionRef.current = false;
+      return;
+    }
+
+    const q = title.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchBookSuggestions(q);
+        if (isMounted) {
+          setSuggestions(results);
+          setShowSuggestions(results.length > 0);
+        }
+      } catch {
+        if (isMounted) setSuggestions([]);
+      }
+    }, 320);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [title, isEditing]);
+
+  const handleSelectSuggestion = (item: BookSuggestion) => {
+    justSelectedSuggestionRef.current = true;
+    setTitle(item.title);
+    if (item.author) setAuthor(item.author);
+    if (item.pages && item.pages > 0) {
+      setPages(String(item.pages));
+      setAutoDetectedPages(item.pages);
+    }
+    if (item.coverUrl) {
+      setCoverUrl(item.coverUrl);
+      setCoverSource('auto');
+      lastSearchedRef.current = `${item.title.toLowerCase()}::${item.author.toLowerCase()}`;
+    }
+    setShowSuggestions(false);
+  };
 
   // Ricerca automatica della copertina quando l'utente digita titolo e autore
   useEffect(() => {
@@ -300,6 +368,9 @@ export function AddBookModal({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isEditing ? 'Modifica libro' : 'Aggiungi libro'}
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-up"
       onClick={onClose}
     >
@@ -365,8 +436,8 @@ export function AddBookModal({
               )}
             </div>
 
-            <div className="flex-1 space-y-3">
-              <div>
+            <div className="flex-1 space-y-3 min-w-0">
+              <div className="relative">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1">
                   Titolo *
                 </label>
@@ -375,9 +446,66 @@ export function AddBookModal({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  onFocus={() => {
+                    if (!isEditing && suggestions.length > 0) setShowSuggestions(true);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowSuggestions(false), 180);
+                  }}
                   className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
                   placeholder="Es. Il nome della rosa"
                 />
+
+                {/* Menu a tendina suggerimenti rapidi in tempo reale */}
+                {!isEditing && showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-stone-900 light:bg-white border border-stone-700 light:border-stone-200 rounded-2xl shadow-2xl overflow-hidden divide-y divide-stone-800/80 light:divide-stone-100 max-h-60 overflow-y-auto">
+                    <div className="px-3 py-1.5 bg-stone-850/90 light:bg-stone-50 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-amber-400 light:text-amber-700">
+                      <span className="flex items-center gap-1">
+                        <Sparkles size={10} />
+                        Suggerimenti dal catalogo
+                      </span>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setShowSuggestions(false);
+                        }}
+                        className="text-stone-400 hover:text-stone-200 light:hover:text-stone-800 cursor-pointer"
+                      >
+                        Chiudi
+                      </button>
+                    </div>
+                    {suggestions.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectSuggestion(item);
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2.5 text-left hover:bg-stone-800/90 light:hover:bg-amber-50/70 transition-colors cursor-pointer"
+                      >
+                        <div className="w-8 h-12 rounded bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          {item.coverUrl ? (
+                            <img src={item.coverUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <BookMarked size={13} className="text-stone-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-serif font-semibold text-xs sm:text-sm text-stone-100 light:text-stone-900 truncate">
+                            {item.title}
+                          </div>
+                          <div className="text-[11px] text-stone-400 light:text-stone-600 truncate">
+                            {item.author || 'Autore sconosciuto'}
+                            {item.publishedYear ? ` · ${item.publishedYear}` : ''}
+                            {item.pages ? ` · ${item.pages} pag.` : ''}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

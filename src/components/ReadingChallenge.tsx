@@ -102,7 +102,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             {goal > 0 ? (
               <>
-                <span className="text-lg sm:text-xl font-bold text-stone-100 light:text-stone-900 leading-none">{percent}%</span>
+                <span className="text-lg sm:text-xl font-bold tabular-nums text-stone-100 light:text-stone-900 leading-none">{percent}%</span>
                 <span className="text-[9px] sm:text-[10px] text-stone-400 light:text-stone-500 mt-0.5">completato</span>
               </>
             ) : (
@@ -115,7 +115,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <h2 id="reading-challenge-title" className="font-serif text-base sm:text-lg font-bold text-stone-100 light:text-stone-900 truncate">
-              Reading Challenge {year}
+              Sfida di Lettura {year}
             </h2>
             <div className="flex items-center shrink-0 -mr-1">
               <button
