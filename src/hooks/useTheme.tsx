@@ -53,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Aggiorna anche il meta theme-color per la barra del browser / PWA
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === 'light' ? '#faf8f5' : '#111827');
+      metaThemeColor.setAttribute('content', theme === 'light' ? '#fcfbfa' : '#1c1917');
     }
   }, [theme]);
 

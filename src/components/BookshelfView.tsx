@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Library,
@@ -6,7 +6,6 @@ import {
   Flame,
   Trophy,
   Bookmark,
-  Star,
   Plus,
   StickyNote,
   Edit,
@@ -17,13 +16,19 @@ import {
   X,
   Sparkles,
   BookMarked,
-  ImageOff,
-  Eye,
+  FileText,
+  RefreshCw,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Building2,
+  Hash,
 } from 'lucide-react';
-import type { Book } from '@/lib/supabase';
+import { supabase, type Book } from '@/lib/supabase';
 import { StarRating } from './StarRating';
 import { BookNotesModal } from './BookNotesModal';
-import { syncBookDateToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
+import { syncBookDateToSupabase, syncBookReadPagesToSupabase, syncBookPagesToSupabase } from '@/lib/bookDates';
+import { fetchBookDetails, type BookDetails } from '@/lib/bookCoverApi';
 
 // Palette predefinita per i dorsi dei libri quando non c'è una copertina
 const SPINE_PALETTES = [
@@ -231,8 +236,57 @@ export function BookshelfView({
   // Modale per le note
   const [notesModalBook, setNotesModalBook] = useState<Book | null>(null);
 
-  // Aggiornamento rapido pagine
-  const [quickPagesInput, setQuickPagesInput] = useState<string>('');
+  // Dettagli e trama del libro recuperati via API quando si apre la Scheda Libro
+  const [bookDetails, setBookDetails] = useState<BookDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [plotExpanded, setPlotExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!inspectingBook) {
+      setBookDetails(null);
+      setPlotExpanded(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingDetails(true);
+    setPlotExpanded(false);
+
+    fetchBookDetails(inspectingBook.title, inspectingBook.author)
+      .then(async (details) => {
+        if (!isMounted) return;
+        setBookDetails(details);
+
+        // Se il libro non aveva il numero di pagine salvato ma l'API lo ha trovato, aggiorniamolo silenziosamente
+        if ((!inspectingBook.pages || inspectingBook.pages <= 0) && details.pageCount && details.pageCount > 0) {
+          await syncBookPagesToSupabase(inspectingBook.id, details.pageCount);
+          const updated = { ...inspectingBook, pages: details.pageCount };
+          onUpdateBook(updated);
+          setInspectingBook(updated);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setBookDetails(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDetails(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [inspectingBook?.id, inspectingBook?.title, inspectingBook?.author]);
+
+  const handleRefreshDetails = async () => {
+    if (!inspectingBook || loadingDetails) return;
+    setLoadingDetails(true);
+    try {
+      const details = await fetchBookDetails(inspectingBook.title, inspectingBook.author, true);
+      setBookDetails(details);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   // Raggruppamento dei ripiani dello scaffale
   const shelfSections = useMemo(() => {
@@ -241,10 +295,11 @@ export function BookshelfView({
       return [
         {
           id: 'search-results',
+          shelfLabel: 'Ricerca',
           title: `Risultati per "${searchQuery}"`,
           icon: Library,
           books,
-          accent: 'amber',
+          accent: 'amber' as const,
         },
       ];
     }
@@ -253,10 +308,11 @@ export function BookshelfView({
       return [
         {
           id: 'reading',
-          title: 'Ripiano: Attualmente In Lettura',
+          shelfLabel: 'Ripiano',
+          title: 'Attualmente In Lettura',
           icon: Flame,
           books: readingBooks,
-          accent: 'amber',
+          accent: 'amber' as const,
         },
       ];
     }
@@ -265,10 +321,11 @@ export function BookshelfView({
       return [
         {
           id: 'want',
-          title: 'Ripiano: Prossime Letture (Da Leggere)',
+          shelfLabel: 'Ripiano',
+          title: 'Prossime Letture (Da Leggere)',
           icon: Bookmark,
           books: wantBooks,
-          accent: 'sky',
+          accent: 'sky' as const,
         },
       ];
     }
@@ -292,29 +349,39 @@ export function BookshelfView({
         return [
           {
             id: 'completed-empty',
-            title: 'Ripiano: Libri Già Letti',
+            shelfLabel: 'Ripiano',
+            title: 'Libri Già Letti',
             icon: Trophy,
             books: [],
-            accent: 'emerald',
+            accent: 'emerald' as const,
           },
         ];
       }
 
       return sortedYears.map((year) => ({
         id: `completed-${year}`,
-        title: year === 'Senza data' ? 'Ripiano: Letti (Data non specificata)' : `Ripiano: Anno ${year}`,
+        shelfLabel: 'Ripiano',
+        title: year === 'Senza data' ? 'Letti (Data non specificata)' : `Anno ${year}`,
         icon: Trophy,
         books: byYear[year],
-        accent: 'emerald',
+        accent: 'emerald' as const,
       }));
     }
 
     // Default: 'all' -> mostra ripiani divisi per stato
-    const sections = [];
+    const sections: Array<{
+      id: string;
+      shelfLabel: string;
+      title: string;
+      icon: typeof Flame;
+      books: Book[];
+      accent: 'amber' | 'sky' | 'emerald';
+    }> = [];
     if (readingBooks.length > 0) {
       sections.push({
         id: 'reading',
-        title: 'Ripiano I: Attualmente In Lettura',
+        shelfLabel: 'Ripiano I',
+        title: 'Attualmente In Lettura',
         icon: Flame,
         books: readingBooks,
         accent: 'amber',
@@ -323,7 +390,8 @@ export function BookshelfView({
     if (wantBooks.length > 0) {
       sections.push({
         id: 'want',
-        title: 'Ripiano II: Prossime Letture',
+        shelfLabel: 'Ripiano II',
+        title: 'Prossime Letture',
         icon: Bookmark,
         books: wantBooks,
         accent: 'sky',
@@ -332,7 +400,8 @@ export function BookshelfView({
     if (completedBooks.length > 0) {
       sections.push({
         id: 'completed',
-        title: 'Ripiano III: Libri Completati',
+        shelfLabel: 'Ripiano III',
+        title: 'Libri Completati',
         icon: Trophy,
         books: completedBooks,
         accent: 'emerald',
@@ -342,6 +411,7 @@ export function BookshelfView({
     if (sections.length === 0) {
       sections.push({
         id: 'empty-shelf',
+        shelfLabel: 'Ripiano',
         title: 'La tua Libreria',
         icon: Library,
         books: [],
@@ -352,11 +422,15 @@ export function BookshelfView({
     return sections;
   }, [activeTab, books, readingBooks, completedBooks, wantBooks, searchQuery]);
 
-  // Gestione avanzamento rapido pagine nell'inspect
+  // Gestione avanzamento rapido pagine nella Scheda Libro
   const handleQuickAddPages = async (book: Book, added: number) => {
     const current = book.read_pages || 0;
     const max = book.pages || 999999;
     const next = Math.min(max, current + added);
+    await supabase
+      .from('books')
+      .update({ read_pages: next, updated_at: new Date().toISOString() })
+      .eq('id', book.id);
     await syncBookReadPagesToSupabase(book.id, next);
     const updated = { ...book, read_pages: next };
     onUpdateBook(updated);
@@ -365,18 +439,39 @@ export function BookshelfView({
 
   const handleMarkAsFinished = async (book: Book) => {
     const now = new Date().toISOString();
+    const finalPages = book.pages ?? book.read_pages ?? null;
     await syncBookDateToSupabase(book.id, now);
-    if (book.pages) {
-      await syncBookReadPagesToSupabase(book.id, book.pages);
+    if (finalPages) {
+      await syncBookReadPagesToSupabase(book.id, finalPages);
     }
+    await supabase
+      .from('books')
+      .update({ status: 'completed', read_at: now, updated_at: now })
+      .eq('id', book.id);
     const updated: Book = {
       ...book,
       status: 'completed',
       read_at: now,
-      read_pages: book.pages ?? book.read_pages,
+      read_pages: finalPages,
     };
     onUpdateBook(updated);
-    setInspectingBook(null);
+    setInspectingBook(updated);
+  };
+
+  const handleStatusChangeInSheet = async (book: Book, newStatus: Book['status']) => {
+    if (book.status === newStatus) return;
+    if (newStatus === 'completed') {
+      await handleMarkAsFinished(book);
+      return;
+    }
+    const now = new Date().toISOString();
+    await supabase
+      .from('books')
+      .update({ status: newStatus, updated_at: now })
+      .eq('id', book.id);
+    const updated: Book = { ...book, status: newStatus, updated_at: now };
+    onUpdateBook(updated);
+    setInspectingBook(updated);
   };
 
   return (
@@ -460,17 +555,38 @@ export function BookshelfView({
           <div className="space-y-12 sm:space-y-16 relative z-10">
             {shelfSections.map((section) => {
               const SectionIcon = section.icon;
+              const accentBadge =
+                section.accent === 'emerald'
+                  ? 'bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300'
+                  : section.accent === 'sky'
+                    ? 'bg-sky-500/15 light:bg-sky-100 text-sky-400 light:text-sky-700 border-sky-500/30 light:border-sky-300'
+                    : 'bg-amber-500/15 light:bg-amber-100 text-amber-400 light:text-amber-700 border-amber-500/30 light:border-amber-300';
 
               return (
                 <div key={section.id} className="relative">
-                  {/* Targa in ottone / Intestazione del ripiano */}
-                  <div className="flex items-center justify-between mb-4 px-2">
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full brass-plaque text-xs font-serif font-bold tracking-wide shadow-md">
-                      <SectionIcon size={13} className="shrink-0" />
-                      <span>{section.title}</span>
+                  {/* Intestazione del ripiano coerente con i font e il design dell'app */}
+                  <div className="flex items-center justify-between gap-2 mb-4 px-2 pb-2.5 border-b border-stone-800/80 light:border-stone-300/70">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${accentBadge}`}
+                      >
+                        <SectionIcon size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${accentBadge}`}
+                          >
+                            {section.shelfLabel}
+                          </span>
+                          <h3 className="font-serif text-base sm:text-lg font-bold text-stone-100 light:text-stone-900 truncate">
+                            {section.title}
+                          </h3>
+                        </div>
+                      </div>
                     </div>
 
-                    <span className="text-[11px] font-medium text-stone-400 light:text-stone-600">
+                    <span className="text-xs font-sans font-semibold px-2.5 py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
                       {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
                     </span>
                   </div>
@@ -509,18 +625,18 @@ export function BookshelfView({
                                 <div
                                   className={`w-full h-full bg-gradient-to-br ${spine.bg} p-3 flex flex-col justify-between border ${spine.border} relative overflow-hidden`}
                                 >
-                                  <div className="text-[9px] uppercase tracking-widest text-amber-200/60 font-serif">
-                                    Bookshelf Edition
+                                  <div className="text-[9px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
+                                    Bookshelf
                                   </div>
                                   <div className="my-auto text-center px-1">
                                     <h4 className="font-serif font-bold text-xs sm:text-sm text-amber-100 leading-snug line-clamp-3">
                                       {book.title}
                                     </h4>
-                                    <p className="text-[10px] text-amber-200/80 mt-1 font-serif italic truncate">
+                                    <p className="text-[10px] text-amber-200/80 mt-1 font-sans truncate">
                                       {book.author}
                                     </p>
                                   </div>
-                                  <div className="flex items-center justify-between text-[9px] text-amber-300/70 border-t border-amber-500/20 pt-1">
+                                  <div className="flex items-center justify-between text-[9px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
                                     <BookMarked size={12} />
                                     {book.pages && <span>{book.pages}p</span>}
                                   </div>
@@ -574,7 +690,7 @@ export function BookshelfView({
                               <p className="font-serif text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-1 group-hover:text-amber-400 transition-colors">
                                 {book.title}
                               </p>
-                              <p className="text-[11px] sm:text-xs text-stone-400 light:text-stone-600 truncate mt-0.5">
+                              <p className="font-sans text-[11px] sm:text-xs text-stone-400 light:text-stone-600 truncate mt-0.5">
                                 {book.author}
                               </p>
                             </div>
@@ -589,14 +705,19 @@ export function BookshelfView({
                         const dynamicSpine = book.cover_url ? coverColors.get(book.cover_url) : null;
                         const spine = getBookSpineStyle(book.id, book.title);
 
-                        // Calcola spessore del dorso in base alle pagine
-                        let spineWidth = 'w-9 sm:w-11';
+                        // Calcola spessore del dorso in base alle pagine (classi valide Tailwind v3)
+                        let spineWidth = 'w-10 sm:w-11';
                         if (book.pages && book.pages > 600) spineWidth = 'w-14 sm:w-16';
-                        else if (book.pages && book.pages > 350) spineWidth = 'w-11 sm:w-13';
-                        else if (book.pages && book.pages < 150) spineWidth = 'w-8 sm:w-9';
+                        else if (book.pages && book.pages > 350) spineWidth = 'w-11 sm:w-12';
+                        else if (book.pages && book.pages < 150) spineWidth = 'w-9 sm:w-10';
 
-                        // Altezza variabile realistica
-                        const heights = ['h-52 sm:h-60', 'h-48 sm:h-56', 'h-50 sm:h-58', 'h-54 sm:h-64'];
+                        // Altezza variabile realistica ma uniforme (usando valori validi sia su mobile che desktop)
+                        const heights = [
+                          'h-52 sm:h-60',
+                          'h-[200px] sm:h-[232px]',
+                          'h-[214px] sm:h-[246px]',
+                          'h-56 sm:h-64',
+                        ];
                         const spineHeight = heights[Math.abs(book.id.charCodeAt(0)) % heights.length];
 
                         return (
@@ -665,7 +786,7 @@ export function BookshelfView({
                                 />
                               )}
                               <span
-                                className={`text-[8px] font-mono truncate max-w-full ${
+                                className={`text-[9px] font-sans font-medium truncate max-w-full ${
                                   dynamicSpine?.isLight ? 'text-stone-700 font-semibold' : 'text-stone-300/80'
                                 }`}
                               >
@@ -698,21 +819,45 @@ export function BookshelfView({
         )}
       </div>
 
-      {/* MODALE DI ISPEZIONE DETTAGLIATA DEL LIBRO (QUANDO CLICCHI UN LIBRO DALLO SCAFFALE) */}
+      {/* SCHEDA LIBRO COMPLETA (QUANDO SI APRE UN LIBRO DALLO SCAFFALE) */}
       {inspectingBook && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5"
+          className="fixed inset-0 bg-stone-950/85 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2.5 sm:p-5"
           onClick={() => setInspectingBook(null)}
         >
           <div
-            className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800 light:border-stone-200 max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-scale-in my-auto"
+            className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800 light:border-stone-200 max-w-xl w-full max-h-[90dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-scale-in my-auto overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header del libro con copertina e info rapide */}
-            <div className="flex items-start justify-between gap-3 p-4 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
-              <div className="flex items-start gap-3 min-w-0">
-                {/* Copertina con effetto dorso */}
-                <div className="w-14 sm:w-16 h-20 sm:h-24 rounded-lg bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-300 overflow-hidden shrink-0 shadow-md relative book-spine-effect">
+            {/* Header Editoriale della Scheda Libro */}
+            <div className="relative p-4 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white overflow-hidden">
+              {/* Sfondo atmosferico sfumato derivato dalla copertina */}
+              {inspectingBook.cover_url && (
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-15 light:opacity-10 blur-2xl scale-125 pointer-events-none"
+                  style={{ backgroundImage: `url(${inspectingBook.cover_url})` }}
+                />
+              )}
+
+              {/* Top Bar della Scheda: Badge "Scheda Libro" + Pulsante Chiudi */}
+              <div className="relative z-10 flex items-center justify-between mb-3.5">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 text-[11px] font-sans font-bold uppercase tracking-wider text-amber-400 light:text-amber-800">
+                  <BookOpen size={12} />
+                  <span>Scheda Libro</span>
+                </div>
+
+                <button
+                  onClick={() => setInspectingBook(null)}
+                  className="p-1.5 rounded-xl text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors shrink-0 cursor-pointer"
+                  aria-label="Chiudi scheda libro"
+                >
+                  <X size={19} />
+                </button>
+              </div>
+
+              {/* Copertina 3D + Info Principali */}
+              <div className="relative z-10 flex items-start gap-4">
+                <div className="w-20 sm:w-24 aspect-[2/3] rounded-xl bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-300 overflow-hidden shrink-0 shadow-xl relative book-spine-effect">
                   {inspectingBook.cover_url ? (
                     <img
                       src={inspectingBook.cover_url}
@@ -720,75 +865,223 @@ export function BookshelfView({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-stone-850 light:bg-stone-100">
-                      <BookMarked size={18} className="text-stone-500 mb-1" />
-                      <span className="text-[9px] text-stone-400">Nessuna copertina</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-stone-850 light:bg-stone-100">
+                      <BookMarked size={22} className="text-stone-500 mb-1" />
+                      <span className="text-[10px] text-stone-400 leading-tight">Nessuna copertina</span>
                     </div>
                   )}
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-serif font-bold text-base sm:text-lg text-stone-100 light:text-stone-900 leading-snug line-clamp-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <h3 className="font-serif font-bold text-lg sm:text-xl text-stone-100 light:text-stone-900 leading-snug">
                     {inspectingBook.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-stone-400 light:text-stone-600 mt-0.5 truncate">
+                  {bookDetails?.subtitle && (
+                    <p className="text-xs text-stone-400 light:text-stone-500 italic line-clamp-1">
+                      {bookDetails.subtitle}
+                    </p>
+                  )}
+                  <p className="text-sm font-semibold text-amber-400 light:text-amber-700">
                     {inspectingBook.author}
                   </p>
 
-                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                        inspectingBook.status === 'reading'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                          : inspectingBook.status === 'completed'
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                            : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                      }`}
-                    >
-                      {inspectingBook.status === 'reading'
-                        ? 'In lettura'
-                        : inspectingBook.status === 'completed'
-                          ? 'Completato'
-                          : 'Da leggere'}
-                    </span>
+                  {/* Metadati editoriali (Pagine, Anno, Editore, Generi) */}
+                  <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                    {(inspectingBook.pages || bookDetails?.pageCount) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200">
+                        <Layers size={11} className="text-amber-400 light:text-amber-600" />
+                        <span>{inspectingBook.pages || bookDetails?.pageCount} pag.</span>
+                      </span>
+                    )}
 
-                    {inspectingBook.pages && inspectingBook.pages > 0 && (
-                      <span className="text-xs text-stone-400 light:text-stone-500">
-                        {inspectingBook.pages} pagine
+                    {bookDetails?.publishedDate && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200">
+                        <Calendar size={11} className="text-amber-400 light:text-amber-600" />
+                        <span>{bookDetails.publishedDate}</span>
+                      </span>
+                    )}
+
+                    {bookDetails?.publisher && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 max-w-[160px] truncate">
+                        <Building2 size={11} className="text-amber-400 light:text-amber-600 shrink-0" />
+                        <span className="truncate">{bookDetails.publisher}</span>
+                      </span>
+                    )}
+
+                    {bookDetails?.isbn && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-500 border border-stone-700/60 light:border-stone-200">
+                        <Hash size={10} />
+                        <span>{bookDetails.isbn}</span>
                       </span>
                     )}
                   </div>
+
+                  {/* Categorie / Generi letterari */}
+                  {bookDetails?.categories && bookDetails.categories.length > 0 && (
+                    <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                      {bookDetails.categories.map((cat, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200"
+                        >
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Contenuto scrollabile della Scheda Libro */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+              {/* 1. SEZIONE TRAMA E SINOSSI (COLLEGATA ALL'API) */}
+              <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-4 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
+                      <FileText size={13} />
+                    </div>
+                    <h4 className="font-serif font-bold text-sm sm:text-base text-stone-100 light:text-stone-900">
+                      Trama del libro
+                    </h4>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {bookDetails?.source && bookDetails.description && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-200/80 text-stone-400 light:text-stone-600 border border-stone-700 light:border-stone-300">
+                        da {bookDetails.source}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleRefreshDetails}
+                      disabled={loadingDetails}
+                      className="p-1 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 light:hover:bg-stone-200/70 transition-colors cursor-pointer disabled:opacity-40"
+                      title="Aggiorna trama da catalogo online"
+                    >
+                      <RefreshCw size={13} className={loadingDetails ? 'animate-spin text-amber-400' : ''} />
+                    </button>
+                  </div>
+                </div>
+
+                {loadingDetails ? (
+                  <div className="py-4 space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs text-amber-400 light:text-amber-700 font-medium">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Ricerca della trama in corso...</span>
+                    </div>
+                    <div className="space-y-2 animate-pulse">
+                      <div className="h-3 bg-stone-800 light:bg-stone-200 rounded w-full" />
+                      <div className="h-3 bg-stone-800 light:bg-stone-200 rounded w-11/12" />
+                      <div className="h-3 bg-stone-800 light:bg-stone-200 rounded w-4/5" />
+                    </div>
+                  </div>
+                ) : bookDetails?.description ? (
+                  <div>
+                    <p
+                      className={`text-xs sm:text-sm text-stone-200 light:text-stone-700 leading-relaxed whitespace-pre-line ${
+                        !plotExpanded && bookDetails.description.length > 360 ? 'line-clamp-5' : ''
+                      }`}
+                    >
+                      {bookDetails.description}
+                    </p>
+                    {bookDetails.description.length > 360 && (
+                      <button
+                        type="button"
+                        onClick={() => setPlotExpanded((prev) => !prev)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 light:text-amber-700 hover:text-amber-300 cursor-pointer"
+                      >
+                        {plotExpanded ? (
+                          <>
+                            <span>Mostra meno</span>
+                            <ChevronUp size={14} />
+                          </>
+                        ) : (
+                          <>
+                            <span>Leggi tutta la trama</span>
+                            <ChevronDown size={14} />
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-2 text-xs text-stone-400 light:text-stone-500 flex items-center justify-between gap-2">
+                    <span>
+                      Trama non trovata nei cataloghi per questo titolo. Verifica che titolo e autore siano scritti correttamente.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRefreshDetails}
+                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-800 light:bg-stone-200 text-stone-200 light:text-stone-800 font-medium hover:bg-stone-750 cursor-pointer"
+                    >
+                      <Sparkles size={11} className="text-amber-400" />
+                      <span>Riprova</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. STATO DI LETTURA E VALUTAZIONE PERSONALE */}
+              <div className="bg-stone-850/60 light:bg-stone-50/70 border border-stone-800 light:border-stone-200 rounded-2xl p-4 space-y-3.5">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 pb-3 border-b border-stone-800/80 light:border-stone-200/80">
+                  <span className="text-xs font-semibold text-stone-300 light:text-stone-700">
+                    Stato nella tua libreria:
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { value: 'want', label: 'Da leggere' },
+                        { value: 'reading', label: 'In lettura' },
+                        { value: 'completed', label: 'Completato' },
+                      ] as const
+                    ).map((opt) => {
+                      const active = inspectingBook.status === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => handleStatusChangeInSheet(inspectingBook, opt.value)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                            active
+                              ? opt.value === 'reading'
+                                ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/40'
+                                : opt.value === 'completed'
+                                  ? 'bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border-emerald-500/40'
+                                  : 'bg-sky-500/20 light:bg-sky-100 text-sky-300 light:text-sky-800 border-sky-500/40'
+                              : 'bg-stone-900/70 light:bg-white text-stone-400 light:text-stone-600 border-stone-750 light:border-stone-200 hover:text-stone-200'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Valutazione con stelle */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-stone-300 light:text-stone-700 font-semibold">
+                    La tua valutazione:
+                  </span>
+                  <StarRating
+                    value={inspectingBook.rating}
+                    onChange={async (newRating) => {
+                      const updated = { ...inspectingBook, rating: newRating };
+                      onUpdateBook(updated);
+                      setInspectingBook(updated);
+                      await supabase
+                        .from('books')
+                        .update({ rating: newRating, updated_at: new Date().toISOString() })
+                        .eq('id', inspectingBook.id);
+                    }}
+                    size={20}
+                  />
                 </div>
               </div>
 
-              <button
-                onClick={() => setInspectingBook(null)}
-                className="p-1.5 rounded-xl text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors shrink-0 cursor-pointer"
-                aria-label="Chiudi"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Contenuto scrollabile */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
-              {/* Valutazione con stelle */}
-              <div className="flex items-center justify-between py-2 border-b border-stone-800/80 light:border-stone-200/80">
-                <span className="text-xs text-stone-400 light:text-stone-600 font-medium">
-                  La tua valutazione:
-                </span>
-                <StarRating
-                  value={inspectingBook.rating}
-                  onChange={async (newRating) => {
-                    const updated = { ...inspectingBook, rating: newRating };
-                    onUpdateBook(updated);
-                    setInspectingBook(updated);
-                  }}
-                  size={20}
-                />
-              </div>
-
-              {/* Sezione avanzamento se in lettura */}
+              {/* 3. SEZIONE AVANZAMENTO SE IN LETTURA */}
               {inspectingBook.status === 'reading' && (
                 <div className="bg-amber-500/10 light:bg-amber-50 border border-amber-500/20 light:border-amber-200 rounded-2xl p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
@@ -815,13 +1108,13 @@ export function BookshelfView({
 
                   <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-stone-400">Avanza:</span>
+                      <span className="text-[11px] text-stone-400 light:text-stone-600">Avanza:</span>
                       {[10, 25, 50].map((num) => (
                         <button
                           key={num}
                           type="button"
                           onClick={() => handleQuickAddPages(inspectingBook, num)}
-                          className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/30 cursor-pointer active:scale-95"
+                          className="text-xs px-2.5 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 font-semibold border border-amber-500/30 cursor-pointer active:scale-95"
                         >
                           +{num}
                         </button>
@@ -831,10 +1124,10 @@ export function BookshelfView({
                     <button
                       type="button"
                       onClick={() => handleMarkAsFinished(inspectingBook)}
-                      className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+                      className="flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
                     >
                       <CheckCircle2 size={13} />
-                      <span>Finito</span>
+                      <span>Segna come Finito</span>
                     </button>
                   </div>
                 </div>
@@ -842,8 +1135,8 @@ export function BookshelfView({
 
               {/* Data di lettura se completato */}
               {inspectingBook.status === 'completed' && inspectingBook.read_at && (
-                <div className="flex items-center gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-2.5 rounded-xl border border-stone-800 light:border-stone-200">
-                  <Calendar size={14} className="text-emerald-400" />
+                <div className="flex items-center gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-3 rounded-xl border border-stone-800 light:border-stone-200">
+                  <Calendar size={14} className="text-emerald-400 light:text-emerald-600 shrink-0" />
                   <span>
                     Completato il{' '}
                     <strong className="text-stone-200 light:text-stone-800">
@@ -865,25 +1158,26 @@ export function BookshelfView({
                 onClick={() => {
                   setNotesModalBook(inspectingBook);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-800 light:bg-stone-100 hover:bg-stone-750 text-stone-200 light:text-stone-800 text-xs font-semibold border border-stone-700 light:border-stone-300 transition-colors cursor-pointer shadow-xs active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/15 light:bg-amber-50 hover:bg-amber-500/25 light:hover:bg-amber-100 text-amber-300 light:text-amber-800 text-xs font-semibold border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer shadow-xs active:scale-95"
               >
                 <StickyNote size={14} className="text-amber-400 light:text-amber-600" />
                 <span>
-                  Note ({inspectingBook.notes_count || 0})
+                  Note e Citazioni ({inspectingBook.notes_count || 0})
                 </span>
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
                     onEditBook(inspectingBook);
                     setInspectingBook(null);
                   }}
-                  className="p-2 rounded-xl text-stone-400 hover:text-amber-400 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-700 bg-stone-800/80 light:bg-stone-100 hover:bg-stone-800 light:hover:bg-stone-200 border border-stone-700/70 light:border-stone-300 transition-colors cursor-pointer"
                   title="Modifica libro"
                 >
-                  <Edit size={16} />
+                  <Edit size={14} />
+                  <span>Modifica</span>
                 </button>
                 <button
                   type="button"
@@ -893,6 +1187,7 @@ export function BookshelfView({
                   }}
                   className="p-2 rounded-xl text-stone-400 hover:text-red-400 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
                   title="Elimina libro"
+                  aria-label="Elimina libro"
                 >
                   <Trash2 size={16} />
                 </button>

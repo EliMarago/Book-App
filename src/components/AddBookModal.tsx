@@ -53,6 +53,15 @@ export function AddBookModal({
   // Tiene traccia dell'ultima query cercata per evitare ricerche identiche
   const lastSearchedRef = useRef<string>('');
 
+  // Blocca lo scroll del body quando la modale è aperta per una navigazione mobile fluida
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   // Ricerca automatica della copertina quando l'utente digita titolo e autore
   useEffect(() => {
     // Non sovrascrivere se l'utente ha modificato manualmente o se sta modificando un libro esistente
@@ -127,6 +136,10 @@ export function AddBookModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !author.trim()) return;
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
 
     setLoading(true);
     setError(null);
@@ -291,7 +304,7 @@ export function AddBookModal({
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
+        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl max-h-[88dvh] sm:max-h-[92vh] flex flex-col overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">

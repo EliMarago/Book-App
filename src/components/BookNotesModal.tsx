@@ -190,6 +190,15 @@ export function BookNotesModal({
     }
   }, [initialNotes, loadNotes]);
 
+  // Blocca lo scroll del body quando la modale è aperta per una navigazione mobile fluida
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   // Gestione tasto Escape per chiudere la modale
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -208,6 +217,12 @@ export function BookNotesModal({
   // Gestione aggiunta nuova nota
   const handleAddNote = async () => {
     if (!newText.trim() || savingNote) return;
+
+    // Chiudi fluidamente la tastiera mobile ed evita lo zoom residuo della vista su iOS
+    textareaRef.current?.blur();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
 
     setSavingNote(true);
     try {
@@ -254,6 +269,10 @@ export function BookNotesModal({
   // Salva modifica nota
   const handleSaveEdit = async (id: string) => {
     if (!editText.trim() || savingEdit) return;
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
 
     setSavingEdit(true);
     try {
@@ -343,15 +362,15 @@ export function BookNotesModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 animate-fade-up"
+      className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2.5 sm:p-5 animate-fade-up"
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800 light:border-stone-200 max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800 light:border-stone-200 max-w-2xl w-full max-h-[88dvh] sm:max-h-[92vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER MODALE */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900/90 light:bg-white/95 backdrop-blur-xs">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
           <div className="flex items-center gap-3 min-w-0">
             {/* Miniatura copertina */}
             <div className="w-10 h-14 rounded-lg bg-stone-800 light:bg-stone-100 border border-stone-700/80 light:border-stone-300 overflow-hidden shrink-0 shadow-sm relative book-spine-effect">
@@ -445,7 +464,7 @@ export function BookNotesModal({
                   value={pageInput}
                   onChange={(e) => setPageInput(e.target.value)}
                   placeholder={book.pages ? `es. ${Math.min(book.pages, 1)}` : 'es. 42'}
-                  className="w-20 px-2 py-1 text-xs bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50"
+                  className="w-20 px-2.5 py-1 text-base sm:text-xs bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50"
                 />
                 {book.pages && book.pages > 0 && (
                   <span className="text-xs text-stone-500">/ {book.pages}</span>
@@ -473,7 +492,7 @@ export function BookNotesModal({
                       ? 'Riassumi i punti salienti del capitolo o del libro...'
                       : 'Scrivi le tue riflessioni, pensieri o appunti su questo libro...'
                 }
-                className="w-full bg-stone-900/90 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-3.5 text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all leading-relaxed shadow-inner"
+                className="w-full bg-stone-900/90 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-3.5 text-base sm:text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all leading-relaxed shadow-inner"
               />
             </div>
 
@@ -637,7 +656,7 @@ export function BookNotesModal({
                               value={editPage}
                               onChange={(e) => setEditPage(e.target.value)}
                               placeholder="es. 42"
-                              className="w-16 px-2 py-0.5 text-xs bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded text-stone-100 light:text-stone-900 outline-none"
+                              className="w-20 px-2 py-0.5 text-base sm:text-xs bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded text-stone-100 light:text-stone-900 outline-none"
                             />
                           </div>
 
@@ -645,7 +664,7 @@ export function BookNotesModal({
                             value={editText}
                             onChange={(e) => setEditText(e.target.value)}
                             rows={4}
-                            className="w-full bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-3 text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/60 leading-relaxed"
+                            className="w-full bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-3 text-base sm:text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/60 leading-relaxed"
                           />
 
                           <div className="flex items-center justify-end gap-2">

@@ -99,8 +99,8 @@ export function Dashboard() {
     };
 
     const doScroll = (element: HTMLElement) => {
-      // Offset per tenere conto dell'header sticky (circa 65px) + margine visivo
-      const headerOffset = 75;
+      // Su mobile l'header scorre liberamente con la pagina, su desktop è sticky
+      const headerOffset = window.innerWidth < 640 ? 16 : 75;
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
@@ -375,9 +375,9 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-stone-850 to-stone-900 light:from-[#fcfbfa] light:via-[#f7f4ed] light:to-[#fcfbfa] text-stone-100 light:text-stone-900 transition-colors duration-200">
-      {/* Header principale */}
-      <header className="sticky top-0 z-30 bg-stone-900/80 light:bg-[#fcfbfa]/85 backdrop-blur-md border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      {/* Header principale: su mobile scorre naturalmente senza bloccare la vista né applicare blur */}
+      <header className="relative sm:sticky sm:top-0 z-30 bg-stone-900 light:bg-[#fcfbfa] sm:bg-stone-900/90 sm:light:bg-[#fcfbfa]/90 sm:backdrop-blur-md border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[max(0.75rem,calc(env(safe-area-inset-top,0px)+0.5rem))] sm:pt-0">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/10 light:bg-amber-500/15 border border-amber-500/20 light:border-amber-500/30 text-amber-400 light:text-amber-600">
               <BookOpen size={20} />

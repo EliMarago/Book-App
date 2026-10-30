@@ -24,6 +24,7 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     -webkit-overflow-scrolling: touch;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -31,7 +32,26 @@
     color: var(--text-primary);
     min-height: 100vh;
     min-height: 100dvh;
+    overflow-x: hidden;
     transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  /* Evita lo zoom automatico di iOS Safari durante la digitazione nei campi di testo */
+  @media screen and (max-width: 640px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
   }
 
   ::selection {
@@ -155,14 +175,6 @@
   writing-mode: vertical-rl;
   text-orientation: mixed;
   transform: rotate(180deg);
-}
-
-/* Brass Plaque */
-.brass-plaque {
-  background: linear-gradient(135deg, #d4af37 0%, #aa820a 50%, #795503 100%);
-  color: #1a1202;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 /* Safe area padding bottom for iPhone swipe bar (Home Indicator) */
