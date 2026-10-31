@@ -371,20 +371,20 @@ export function AddBookModal({
       role="dialog"
       aria-modal="true"
       aria-label={isEditing ? 'Modifica libro' : 'Aggiungi libro'}
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-up"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-up"
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl max-h-[88dvh] sm:max-h-[92vh] flex flex-col overflow-hidden overscroll-contain"
+        className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl max-h-[82dvh] sm:max-h-[90vh] flex flex-col overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+        <div className="flex items-center justify-between px-4 py-3.5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-600">
               <BookPlus size={20} />
             </div>
             <div>
-              <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900 leading-tight">
+              <h2 className="font-serif text-lg sm:text-xl font-bold text-stone-100 light:text-stone-900 leading-tight">
                 {isEditing ? 'Modifica libro' : 'Aggiungi libro'}
               </h2>
               <p className="text-xs text-stone-400 light:text-stone-500">
@@ -394,10 +394,10 @@ export function AddBookModal({
           </div>
           <button
             onClick={onClose}
-            className="text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 p-1.5 rounded-lg hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-full bg-stone-800/90 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-200 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-900 hover:bg-stone-750 light:hover:bg-stone-200 transition-colors cursor-pointer shrink-0 active:scale-95"
             aria-label="Chiudi finestra"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 

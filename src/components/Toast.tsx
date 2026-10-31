@@ -134,7 +134,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none"
+        className="fixed inset-x-0 bottom-20 sm:bottom-0 z-[60] flex flex-col items-center gap-2 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none"
       >
         {items.map((item) => (
           <ToastView key={item.id} item={item} onDismiss={dismiss} />

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BookOpen,
   Flame,
   Calendar,
   Layers,
@@ -50,6 +49,21 @@ export function BookDetailModal({
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [plotExpanded, setPlotExpanded] = useState(false);
   const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleHeaderTouchStart = (e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0]?.clientY ?? null;
+  };
+
+  const handleHeaderTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartYRef.current === null) return;
+    const endY = e.changedTouches[0]?.clientY ?? touchStartYRef.current;
+    const deltaY = endY - touchStartYRef.current;
+    touchStartYRef.current = null;
+    if (deltaY > 55) {
+      onClose();
+    }
+  };
 
   // Sincronizza se il libro cambia esternamente
   useEffect(() => {
@@ -190,15 +204,22 @@ export function BookDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="book-detail-title"
-        className="fixed inset-0 bg-stone-950/85 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2.5 sm:p-5"
+        className="fixed inset-0 bg-stone-950/85 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-5"
         onClick={onClose}
       >
         <div
-          className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800 light:border-stone-200 max-w-xl w-full max-h-[90dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-scale-in my-auto overscroll-contain"
+          className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-xl w-full max-h-[82dvh] sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden animate-scale-in overscroll-contain"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header Editoriale della Scheda Libro */}
-          <div className="relative p-4 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white overflow-hidden">
+          {/* Header Editoriale Compatto della Scheda Libro (con supporto swipe-down da mobile) */}
+          <div
+            onTouchStart={handleHeaderTouchStart}
+            onTouchEnd={handleHeaderTouchEnd}
+            className="relative px-3.5 pt-2.5 pb-3.5 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white overflow-hidden"
+          >
+            {/* Indicatore visivo di trascinamento verso il basso su mobile */}
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-2.5 sm:hidden" />
+
             {/* Sfondo atmosferico sfumato derivato dalla copertina */}
             {book.cover_url && (
               <div
@@ -207,26 +228,9 @@ export function BookDetailModal({
               />
             )}
 
-            {/* Top Bar della Scheda: Badge "Scheda Libro" + Pulsante Chiudi */}
-            <div className="relative z-10 flex items-center justify-between mb-3.5">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 text-[11px] font-sans font-bold uppercase tracking-wider text-amber-400 light:text-amber-800">
-                <BookOpen size={12} />
-                <span>Scheda Libro</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-xl text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors shrink-0 cursor-pointer"
-                aria-label="Chiudi scheda libro"
-              >
-                <X size={19} />
-              </button>
-            </div>
-
-            {/* Copertina 3D + Info Principali */}
-            <div className="relative z-10 flex items-start gap-4">
-              <div className="w-20 sm:w-24 aspect-[2/3] rounded-xl bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-300 overflow-hidden shrink-0 shadow-xl relative book-spine-effect">
+            {/* Copertina 3D + Info Principali + Pulsante Chiudi prominente */}
+            <div className="relative z-10 flex items-start gap-3 sm:gap-4">
+              <div className="w-16 sm:w-20 md:w-24 aspect-[2/3] rounded-xl bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-300 overflow-hidden shrink-0 shadow-xl relative book-spine-effect">
                 {book.cover_url ? (
                   <img
                     src={book.cover_url}
@@ -234,56 +238,70 @@ export function BookDetailModal({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-stone-850 light:bg-stone-100">
-                    <BookMarked size={22} className="text-stone-500 mb-1" />
-                    <span className="text-[10px] text-stone-400 leading-tight">
-                      Nessuna copertina
+                  <div className="w-full h-full flex flex-col items-center justify-center p-1.5 text-center bg-stone-850 light:bg-stone-100">
+                    <BookMarked size={18} className="text-stone-500 mb-0.5" />
+                    <span className="text-[9px] text-stone-400 leading-tight">
+                      No cover
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <h3
-                  id="book-detail-title"
-                  className="font-serif font-bold text-lg sm:text-xl text-stone-100 light:text-stone-900 leading-snug"
-                >
-                  {book.title}
-                </h3>
-                {bookDetails?.subtitle && (
-                  <p className="text-xs text-stone-400 light:text-stone-500 italic line-clamp-1">
-                    {bookDetails.subtitle}
-                  </p>
-                )}
-                <p className="text-sm font-semibold text-amber-400 light:text-amber-700">
-                  {book.author}
-                </p>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3
+                      id="book-detail-title"
+                      className="font-serif font-bold text-base sm:text-xl text-stone-100 light:text-stone-900 leading-snug line-clamp-2"
+                    >
+                      {book.title}
+                    </h3>
+                    {bookDetails?.subtitle && (
+                      <p className="text-[11px] sm:text-xs text-stone-400 light:text-stone-500 italic line-clamp-1 mt-0.5">
+                        {bookDetails.subtitle}
+                      </p>
+                    )}
+                    <p className="text-xs sm:text-sm font-semibold text-amber-400 light:text-amber-700 mt-0.5 truncate">
+                      {book.author}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-9 h-9 rounded-full bg-stone-800/90 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-200 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-950 hover:bg-stone-750 light:hover:bg-stone-200 transition-all shrink-0 cursor-pointer active:scale-95 shadow-sm"
+                    aria-label="Chiudi scheda libro"
+                    title="Chiudi scheda libro"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
 
                 {/* Metadati editoriali (Pagine, Anno, Editore, ISBN) */}
-                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                <div className="flex items-center gap-1 pt-0.5 flex-wrap">
                   {(book.pages || bookDetails?.pageCount) && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
-                      <Layers size={11} className="text-amber-400 light:text-amber-600" />
+                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
+                      <Layers size={10} className="text-amber-400 light:text-amber-600" />
                       <span>{book.pages || bookDetails?.pageCount} pag.</span>
                     </span>
                   )}
 
                   {bookDetails?.publishedDate && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
-                      <Calendar size={11} className="text-amber-400 light:text-amber-600" />
+                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
+                      <Calendar size={10} className="text-amber-400 light:text-amber-600" />
                       <span>{bookDetails.publishedDate}</span>
                     </span>
                   )}
 
                   {bookDetails?.publisher && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 max-w-[160px] truncate">
-                      <Building2 size={11} className="text-amber-400 light:text-amber-600 shrink-0" />
+                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 max-w-[140px] truncate">
+                      <Building2 size={10} className="text-amber-400 light:text-amber-600 shrink-0" />
                       <span className="truncate">{bookDetails.publisher}</span>
                     </span>
                   )}
 
                   {bookDetails?.isbn && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-500 border border-stone-700/60 light:border-stone-200 tabular-nums">
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-500 border border-stone-700/60 light:border-stone-200 tabular-nums">
                       <Hash size={10} />
                       <span>{bookDetails.isbn}</span>
                     </span>
@@ -292,7 +310,7 @@ export function BookDetailModal({
 
                 {/* Categorie / Generi letterari in italiano */}
                 {bookDetails?.categories && bookDetails.categories.length > 0 && (
-                  <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                  <div className="flex items-center gap-1 pt-0.5 flex-wrap">
                     {bookDetails.categories.map((cat, idx) => (
                       <span
                         key={idx}
@@ -308,9 +326,61 @@ export function BookDetailModal({
           </div>
 
           {/* Contenuto scrollabile della Scheda Libro */}
-          <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
-            {/* 1. SEZIONE TRAMA E SINOSSI (SOLO IN ITALIANO) */}
-            <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-4 space-y-2.5 shadow-xs">
+          <div className="p-3.5 sm:p-5 overflow-y-auto space-y-3 sm:space-y-4 flex-1">
+            {/* 1. SEZIONE AVANZAMENTO RAPIDO SE IN LETTURA */}
+            {book.status === 'reading' && (
+              <div className="bg-amber-500/10 light:bg-amber-50 border border-amber-500/20 light:border-amber-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-amber-300 light:text-amber-800 flex items-center gap-1">
+                    <Flame size={13} />
+                    Progresso di lettura:
+                  </span>
+                  <span className="font-bold text-amber-300 light:text-amber-800 tabular-nums">
+                    {book.read_pages || 0}
+                    {book.pages ? ` / ${book.pages} pag.` : ' pag.'}
+                  </span>
+                </div>
+
+                {book.pages && book.pages > 0 && (
+                  <div className="w-full bg-stone-800 light:bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-amber-400 h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-0.5 flex-wrap gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] text-stone-400 light:text-stone-600">Avanza:</span>
+                    {[10, 25, 50].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => handleQuickAddPages(num)}
+                        className="text-[11px] px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 font-semibold border border-amber-500/30 cursor-pointer active:scale-95 tabular-nums"
+                      >
+                        +{num}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleMarkAsFinished}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+                  >
+                    <CheckCircle2 size={12} />
+                    <span>Finito</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 2. SEZIONE TRAMA E SINOSSI (SOLO IN ITALIANO) */}
+            <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-3.5 sm:p-4 space-y-2 shadow-xs">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
@@ -344,31 +414,33 @@ export function BookDetailModal({
               </div>
 
               {loadingDetails ? (
-                <div className="py-4 space-y-2.5">
+                <div className="py-3 space-y-2">
                   <div className="flex items-center gap-2 text-xs text-amber-400 light:text-amber-700 font-medium">
                     <Loader2 size={14} className="animate-spin" />
                     <span>Ricerca della trama in italiano...</span>
                   </div>
-                  <div className="space-y-2 animate-pulse">
-                    <div className="h-3 bg-stone-800 light:bg-stone-200 rounded w-full" />
-                    <div className="h-3 bg-stone-800 light:bg-stone-200 rounded w-11/12" />
-                    <div className="h-3 bg-stone-800 light:bg-stone-200 rounded w-4/5" />
+                  <div className="space-y-1.5 animate-pulse">
+                    <div className="h-2.5 bg-stone-800 light:bg-stone-200 rounded w-full" />
+                    <div className="h-2.5 bg-stone-800 light:bg-stone-200 rounded w-11/12" />
+                    <div className="h-2.5 bg-stone-800 light:bg-stone-200 rounded w-4/5" />
                   </div>
                 </div>
               ) : bookDetails?.description ? (
                 <div>
                   <p
                     className={`text-xs sm:text-sm text-stone-200 light:text-stone-700 leading-relaxed whitespace-pre-line ${
-                      !plotExpanded && bookDetails.description.length > 360 ? 'line-clamp-5' : ''
+                      !plotExpanded && bookDetails.description.length > 260
+                        ? 'line-clamp-4 sm:line-clamp-5'
+                        : ''
                     }`}
                   >
                     {bookDetails.description}
                   </p>
-                  {bookDetails.description.length > 360 && (
+                  {bookDetails.description.length > 260 && (
                     <button
                       type="button"
                       onClick={() => setPlotExpanded((prev) => !prev)}
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 light:text-amber-700 hover:text-amber-300 cursor-pointer"
+                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 light:text-amber-700 hover:text-amber-300 cursor-pointer"
                     >
                       {plotExpanded ? (
                         <>
@@ -385,7 +457,7 @@ export function BookDetailModal({
                   )}
                 </div>
               ) : (
-                <div className="py-2 text-xs text-stone-400 light:text-stone-500 flex items-center justify-between gap-2">
+                <div className="py-1.5 text-xs text-stone-400 light:text-stone-500 flex items-center justify-between gap-2">
                   <span>
                     Trama in italiano non trovata nei cataloghi per questo titolo. Verifica che titolo e autore siano scritti correttamente.
                   </span>
@@ -401,9 +473,9 @@ export function BookDetailModal({
               )}
             </div>
 
-            {/* 2. STATO DI LETTURA E VALUTAZIONE PERSONALE */}
-            <div className="bg-stone-850/60 light:bg-stone-50/70 border border-stone-800 light:border-stone-200 rounded-2xl p-4 space-y-3.5">
-              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 pb-3 border-b border-stone-800/80 light:border-stone-200/80">
+            {/* 3. STATO DI LETTURA E VALUTAZIONE PERSONALE */}
+            <div className="bg-stone-850/60 light:bg-stone-50/70 border border-stone-800 light:border-stone-200 rounded-2xl p-3 sm:p-4 space-y-2.5">
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 pb-2.5 border-b border-stone-800/80 light:border-stone-200/80">
                 <span className="text-xs font-semibold text-stone-300 light:text-stone-700">
                   Stato nella tua libreria:
                 </span>
@@ -421,7 +493,7 @@ export function BookDetailModal({
                         key={opt.value}
                         type="button"
                         onClick={() => handleStatusChange(opt.value)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
                           active
                             ? opt.value === 'reading'
                               ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/40'
@@ -454,66 +526,14 @@ export function BookDetailModal({
                       .update({ rating: newRating, updated_at: new Date().toISOString() })
                       .eq('id', book.id);
                   }}
-                  size={20}
+                  size={19}
                 />
               </div>
             </div>
 
-            {/* 3. SEZIONE AVANZAMENTO SE IN LETTURA */}
-            {book.status === 'reading' && (
-              <div className="bg-amber-500/10 light:bg-amber-50 border border-amber-500/20 light:border-amber-200 rounded-2xl p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-amber-300 light:text-amber-800 flex items-center gap-1">
-                    <Flame size={14} />
-                    Progresso di lettura:
-                  </span>
-                  <span className="font-bold text-amber-300 light:text-amber-800 tabular-nums">
-                    {book.read_pages || 0}
-                    {book.pages ? ` / ${book.pages} pag.` : ' pag.'}
-                  </span>
-                </div>
-
-                {book.pages && book.pages > 0 && (
-                  <div className="w-full bg-stone-800 light:bg-stone-200 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-amber-400 h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-stone-400 light:text-stone-600">Avanza:</span>
-                    {[10, 25, 50].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => handleQuickAddPages(num)}
-                        className="text-xs px-2.5 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 font-semibold border border-amber-500/30 cursor-pointer active:scale-95 tabular-nums"
-                      >
-                        +{num}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleMarkAsFinished}
-                    className="flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
-                  >
-                    <CheckCircle2 size={13} />
-                    <span>Segna come Finito</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Data di lettura se completato */}
             {book.status === 'completed' && book.read_at && (
-              <div className="flex items-center gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-3 rounded-xl border border-stone-800 light:border-stone-200">
+              <div className="flex items-center gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-2.5 sm:p-3 rounded-xl border border-stone-800 light:border-stone-200">
                 <Calendar size={14} className="text-emerald-400 light:text-emerald-600 shrink-0" />
                 <span>
                   Completato il{' '}
@@ -530,13 +550,13 @@ export function BookDetailModal({
           </div>
 
           {/* Footer con azioni del libro: Note, Modifica, Elimina */}
-          <div className="flex items-center justify-between gap-2 p-4 sm:p-5 border-t border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+          <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] sm:p-4 border-t border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
             <button
               type="button"
               onClick={() => setNotesModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/15 light:bg-amber-50 hover:bg-amber-500/25 light:hover:bg-amber-100 text-amber-300 light:text-amber-800 text-xs font-semibold border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer shadow-xs active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/15 light:bg-amber-50 hover:bg-amber-500/25 light:hover:bg-amber-100 text-amber-300 light:text-amber-800 text-xs font-semibold border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer shadow-xs active:scale-95"
             >
-              <StickyNote size={14} className="text-amber-400 light:text-amber-600" />
+              <StickyNote size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
               <span>Note e Citazioni ({book.notes_count || 0})</span>
             </button>
 
@@ -550,7 +570,7 @@ export function BookDetailModal({
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-700 bg-stone-800/80 light:bg-stone-100 hover:bg-stone-800 light:hover:bg-stone-200 border border-stone-700/70 light:border-stone-300 transition-colors cursor-pointer"
                 title="Modifica libro"
               >
-                <Pencil size={14} />
+                <Pencil size={13} />
                 <span>Modifica</span>
               </button>
               <button
@@ -563,7 +583,7 @@ export function BookDetailModal({
                 title="Elimina libro"
                 aria-label="Elimina libro"
               >
-                <Trash2 size={16} />
+                <Trash2 size={15} />
               </button>
             </div>
           </div>

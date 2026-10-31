@@ -220,7 +220,7 @@ export function ReadBooksByYear({
               >
                 <span>{year}</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full tabular-nums ${
                     isSelected
                       ? 'bg-stone-900/30 text-stone-950'
                       : 'bg-stone-700/60 light:bg-stone-100 text-stone-300 light:text-stone-700'

@@ -19,7 +19,7 @@ export function PwaUpdateBanner() {
   return (
     <aside
       aria-label="Notifica di aggiornamento applicazione"
-      className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md animate-in fade-in slide-in-from-bottom-5 duration-300"
+      className="fixed bottom-24 sm:bottom-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md animate-in fade-in slide-in-from-bottom-5 duration-300"
     >
       <div className="bg-stone-900/95 backdrop-blur-md border border-amber-500/40 rounded-2xl p-4 shadow-2xl shadow-black/60 flex items-center justify-between gap-3 text-stone-100">
         <div className="flex items-center gap-3 min-w-0">

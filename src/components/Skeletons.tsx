@@ -7,7 +7,7 @@ export function BookCardSkeleton({ delay = 0 }: { delay?: number }) {
       aria-hidden="true"
     >
       <div className="flex items-start gap-3 sm:gap-4">
-        <div className="shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg bg-stone-700/60 light:bg-stone-200" />
+        <div className="shrink-0 w-20 lg:w-24 aspect-[2/3] rounded-lg bg-stone-700/60 light:bg-stone-200" />
         <div className="flex-1 min-w-0 space-y-3 pt-1">
           <div className="h-5 w-4/5 rounded-md bg-stone-700/60 light:bg-stone-200" />
           <div className="h-3.5 w-1/2 rounded-md bg-stone-700/40 light:bg-stone-200/80" />

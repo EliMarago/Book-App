@@ -459,7 +459,7 @@ export function BookshelfView({
                   {/* LIBRI APPOGGIATI SUL RIPIANO */}
                   {shelfStyle === 'covers' ? (
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
-                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 sm:gap-5 items-end px-2 pt-4 pb-2 min-h-[220px]">
+                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-5 items-end px-2 pt-4 pb-2 min-h-[220px]">
                       {section.books.map((book) => {
                         const spine = getBookSpineStyle(book.id, book.title);
 

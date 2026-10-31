@@ -262,10 +262,11 @@ export function BookCard({
       {/* Selettore Stato del libro */}
       <div className="relative shrink-0 inline-flex items-center">
         <select
+          data-compact="true"
           value={book.status}
           onChange={(e) => handleStatusChange(e.target.value as Book['status'])}
           aria-label="Stato del libro"
-          className={`appearance-none h-7 sm:h-7.5 text-xs font-semibold pl-2.5 sm:pl-3 pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
+          className={`appearance-none h-7 lg:h-8 text-xs font-semibold pl-2.5 lg:pl-3 pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
         >
           <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
           <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Completato</option>
@@ -276,7 +277,7 @@ export function BookCard({
 
       {/* Badge Data di lettura */}
       {book.read_at ? (
-        <span className="shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2.5 sm:px-3 whitespace-nowrap">
+        <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2.5 lg:px-3 whitespace-nowrap">
           <Calendar size={12} className="shrink-0" />
           <span>
             {new Date(book.read_at).toLocaleDateString('it-IT', {
@@ -293,7 +294,7 @@ export function BookCard({
         <button
           type="button"
           onClick={() => onInspect(book)}
-          className="shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 sm:px-3 rounded-full border border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:border-amber-500/40 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+          className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:border-amber-500/40 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer whitespace-nowrap active:scale-95"
           title="Apri Scheda Libro e trama"
         >
           <BookOpen size={12} className="shrink-0 text-amber-400 light:text-amber-600" />
@@ -305,7 +306,7 @@ export function BookCard({
       <button
         type="button"
         onClick={() => setShowNotesModal(true)}
-        className={`shrink-0 h-7 sm:h-7.5 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 sm:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+        className={`shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
           displayCount > 0
             ? 'border-amber-500/40 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100'
             : 'border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-700/50 light:hover:bg-stone-100'
@@ -497,7 +498,7 @@ export function BookCard({
                 handleAutoFetchCover();
               }
             }}
-            className="relative shrink-0 w-20 sm:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover cursor-pointer"
+            className="relative shrink-0 w-20 lg:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover cursor-pointer"
             title={book.cover_url ? 'Clicca per aprire la Scheda Libro e la trama' : 'Clicca per cercare la copertina in automatico'}
           >
             {book.cover_url ? (
@@ -570,21 +571,21 @@ export function BookCard({
                     {book.title}
                   </h3>
                   <div className="flex items-center gap-1.5 text-stone-400 light:text-stone-600 text-xs sm:text-sm mt-0.5 flex-wrap">
-                    <span className="truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{book.author}</span>
+                    <span className="truncate max-w-[140px] xs:max-w-[190px] sm:max-w-[260px] md:max-w-[160px] lg:max-w-[220px]">{book.author}</span>
                     {book.pages && book.pages > 0 && (
-                      <span className="text-[10px] sm:text-[11px] font-medium text-stone-300 light:text-stone-700 bg-stone-750/70 light:bg-stone-100 px-1.5 py-0.2 rounded border border-stone-600/40 light:border-stone-200 shrink-0">
+                      <span className="text-[10px] sm:text-[11px] font-medium text-stone-300 light:text-stone-700 bg-stone-750/70 light:bg-stone-100 px-1.5 py-0.5 rounded border border-stone-600/40 light:border-stone-200 shrink-0 tabular-nums">
                         {book.pages} pag.
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Pulsanti azioni rapidi */}
+                {/* Pulsanti azioni rapidi (sempre visibili su mobile e tablet touch) */}
                 <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mr-1">
                   <button
                     type="button"
                     onClick={() => onEdit(book)}
-                    className="opacity-75 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-amber-400 light:hover:text-amber-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
+                    className="opacity-80 lg:opacity-60 lg:group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-amber-400 light:hover:text-amber-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
                     title="Modifica libro"
                     aria-label="Modifica libro"
                   >
@@ -593,7 +594,7 @@ export function BookCard({
                   <button
                     type="button"
                     onClick={() => onDelete(book.id)}
-                    className="opacity-75 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-red-400 light:hover:text-red-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
+                    className="opacity-80 lg:opacity-60 lg:group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-red-400 light:hover:text-red-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
                     title="Elimina libro"
                     aria-label="Elimina libro"
                   >

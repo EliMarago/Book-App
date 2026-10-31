@@ -362,15 +362,15 @@ export function BookNotesModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2.5 sm:p-5 animate-fade-up"
+      className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-5 animate-fade-up"
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-3xl border border-stone-800 light:border-stone-200 max-w-2xl w-full max-h-[88dvh] sm:max-h-[92vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain"
+        className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-2xl w-full max-h-[82dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER MODALE */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+        <div className="flex items-center justify-between px-3.5 py-3 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
           <div className="flex items-center gap-3 min-w-0">
             {/* Miniatura copertina */}
             <div className="w-10 h-14 rounded-lg bg-stone-800 light:bg-stone-100 border border-stone-700/80 light:border-stone-300 overflow-hidden shrink-0 shadow-sm relative book-spine-effect">
@@ -405,15 +405,15 @@ export function BookNotesModal({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 light:text-stone-500 hover:text-stone-100 light:hover:text-stone-900 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-full bg-stone-800/90 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-200 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-900 hover:bg-stone-750 light:hover:bg-stone-200 transition-colors cursor-pointer shrink-0 active:scale-95"
             aria-label="Chiudi finestra note"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* CORPO MODALE (SCROLLABILE) */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-4 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] sm:pb-6 overflow-y-auto flex-1 space-y-6">
           {/* SEZIONE 1: AREA DI SCRITTURA SPAZIOSA E CONFORTEVOLE */}
           <div className="bg-stone-850/80 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-4 sm:p-5 shadow-xs transition-all focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/30">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
@@ -809,19 +809,6 @@ export function BookNotesModal({
               </div>
             )}
           </div>
-        </div>
-
-        {/* FOOTER DELLA MODALE */}
-        <div className="p-3 sm:p-4 border-t border-stone-800 light:border-stone-200 flex items-center justify-between text-xs text-stone-500 light:text-stone-400 bg-stone-900 light:bg-white shrink-0">
-          <span>
-            {notes ? notes.length : 0} {notes && notes.length === 1 ? 'nota salvata' : 'note salvate'}
-          </span>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-stone-800 light:bg-stone-100 hover:bg-stone-700 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 font-medium transition-colors cursor-pointer"
-          >
-            Chiudi
-          </button>
         </div>
       </div>
     </div>,
