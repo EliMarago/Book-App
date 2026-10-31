@@ -18,16 +18,27 @@ import {
   StickyNote,
   Pencil,
   Trash2,
+  Search,
+  Check,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import { StarRating } from './StarRating';
 import { BookNotesModal } from './BookNotesModal';
+import { useToast } from './Toast';
 import {
   syncBookDateToSupabase,
   syncBookReadPagesToSupabase,
   syncBookPagesToSupabase,
+  syncBookPlotToSupabase,
 } from '@/lib/bookDates';
-import { fetchBookDetails, type BookDetails } from '@/lib/bookCoverApi';
+import {
+  fetchBookDetails,
+  searchBookPlotsOnline,
+  saveManualBookPlot,
+  clearCachedBookDetails,
+  type BookDetails,
+  type PlotSearchResult,
+} from '@/lib/bookCoverApi';
 
 interface BookDetailModalProps {
   book: Book;
@@ -45,11 +56,137 @@ export function BookDetailModal({
   onDeleteBook,
 }: BookDetailModalProps) {
   const [book, setBook] = useState<Book>(initialBook);
-  const [bookDetails, setBookDetails] = useState<BookDetails | null>(null);
+  const [bookDetails, setBookDetails] = useState<BookDetails | null>(() => {
+    if (initialBook.plot) {
+      return {
+        description: initialBook.plot,
+        publisher: null,
+        publishedDate: null,
+        categories: [],
+        pageCount: initialBook.pages || null,
+        isbn: null,
+        subtitle: null,
+        source: 'Google Books',
+      };
+    }
+    return null;
+  });
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [plotExpanded, setPlotExpanded] = useState(false);
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
+
+  const { toast } = useToast();
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PlotSearchResult[]>([]);
+  const [searchingPlots, setSearchingPlots] = useState(false);
+  const [hasSearchedPlots, setHasSearchedPlots] = useState(false);
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState<'all' | 'Google Books' | 'Apple Books' | 'Wikipedia IT' | 'Open Library'>('all');
+  const [selectedLangFilter, setSelectedLangFilter] = useState<'all' | 'it' | 'en'>('all');
+  const [showEditPlotModal, setShowEditPlotModal] = useState(false);
+  const [customPlotText, setCustomPlotText] = useState('');
+
+  const handleOpenSearchModal = (presetQuery?: string) => {
+    const q = (presetQuery ?? `${book.title} ${book.author || ''}`).trim();
+    setSearchQuery(q);
+    setSearchResults([]);
+    setHasSearchedPlots(false);
+    setSelectedSourceFilter('all');
+    setShowSearchModal(true);
+    if (q) {
+      executePlotSearch(q);
+    }
+  };
+
+  const executePlotSearch = async (queryToSearch: string) => {
+    const q = queryToSearch.trim();
+    if (!q) return;
+    setSearchingPlots(true);
+    setHasSearchedPlots(true);
+    try {
+      const results = await searchBookPlotsOnline(q, book.author);
+      setSearchResults(results);
+    } catch {
+      toast({ message: 'Errore durante la ricerca online della trama', type: 'error' });
+    } finally {
+      setSearchingPlots(false);
+    }
+  };
+
+  const handleApplyPlot = async (result: PlotSearchResult) => {
+    if (!result.description) {
+      toast({ message: 'Questa voce non include un testo di trama', type: 'info' });
+      return;
+    }
+    const updated = saveManualBookPlot(book.title, book.author, result.description, {
+      publisher: result.publisher || bookDetails?.publisher || null,
+      publishedDate: result.publishedDate || bookDetails?.publishedDate || null,
+      categories:
+        result.categories.length > 0
+          ? result.categories
+          : bookDetails?.categories || [],
+      pageCount: result.pageCount || bookDetails?.pageCount || null,
+      isbn: result.isbn || bookDetails?.isbn || null,
+      subtitle: result.subtitle || bookDetails?.subtitle || null,
+      source: result.source,
+    });
+    setBookDetails(updated);
+
+    await syncBookPlotToSupabase(book.id, result.description);
+
+    let updatedPages = book.pages;
+    if ((!book.pages || book.pages <= 0) && result.pageCount && result.pageCount > 0) {
+      await syncBookPagesToSupabase(book.id, result.pageCount);
+      updatedPages = result.pageCount;
+    }
+
+    const updatedBook = { ...book, plot: result.description, pages: updatedPages };
+    setBook(updatedBook);
+    onUpdateBook(updatedBook);
+
+    setShowSearchModal(false);
+    toast({ message: `Trama impostata con successo da ${result.source}!`, type: 'success' });
+  };
+
+  const handleOpenEditPlot = () => {
+    setCustomPlotText(bookDetails?.description || book.plot || '');
+    setShowEditPlotModal(true);
+  };
+
+  const handleSaveCustomPlot = async () => {
+    const trimmed = customPlotText.trim();
+    if (!trimmed) {
+      toast({ message: 'Inserisci un testo per la trama', type: 'info' });
+      return;
+    }
+    const updated = saveManualBookPlot(book.title, book.author, trimmed, {
+      source: 'Google Books',
+    });
+    setBookDetails(updated);
+
+    await syncBookPlotToSupabase(book.id, trimmed);
+    const updatedBook = { ...book, plot: trimmed };
+    setBook(updatedBook);
+    onUpdateBook(updatedBook);
+
+    setShowEditPlotModal(false);
+    toast({ message: 'Trama salvata con successo!', type: 'success' });
+  };
+
+  const handleRemovePlot = async () => {
+    try {
+      await syncBookPlotToSupabase(book.id, null);
+      clearCachedBookDetails(book.title, book.author);
+      setBookDetails((prev) => (prev ? { ...prev, description: null } : null));
+      const updatedBook = { ...book, plot: null };
+      setBook(updatedBook);
+      onUpdateBook(updatedBook);
+      toast({ message: 'Trama rimossa con successo', type: 'info' });
+    } catch {
+      toast({ message: 'Impossibile rimuovere la trama', type: 'error' });
+    }
+  };
 
   const handleHeaderTouchStart = (e: React.TouchEvent) => {
     touchStartYRef.current = e.touches[0]?.clientY ?? null;
@@ -96,7 +233,7 @@ export function BookDetailModal({
     setLoadingDetails(true);
     setPlotExpanded(false);
 
-    fetchBookDetails(book.title, book.author)
+    fetchBookDetails(book.title, book.author, false, book.plot)
       .then(async (details) => {
         if (!isMounted) return;
         setBookDetails(details);
@@ -219,14 +356,6 @@ export function BookDetailModal({
           >
             {/* Indicatore visivo di trascinamento verso il basso su mobile */}
             <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-2.5 sm:hidden" />
-
-            {/* Sfondo atmosferico sfumato derivato dalla copertina */}
-            {book.cover_url && (
-              <div
-                className="absolute inset-0 bg-cover bg-center opacity-15 light:opacity-10 blur-2xl scale-125 pointer-events-none"
-                style={{ backgroundImage: `url(${book.cover_url})` }}
-              />
-            )}
 
             {/* Copertina 3D + Info Principali + Pulsante Chiudi prominente */}
             <div className="relative z-10 flex items-start gap-3 sm:gap-4">
@@ -379,9 +508,9 @@ export function BookDetailModal({
               </div>
             )}
 
-            {/* 2. SEZIONE TRAMA E SINOSSI (SOLO IN ITALIANO) */}
-            <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-3.5 sm:p-4 space-y-2 shadow-xs">
-              <div className="flex items-center justify-between gap-2">
+            {/* 2. SEZIONE TRAMA E SINOSSI (VERIFICATA IN ITALIANO + RICERCA MULTI-FONTE) */}
+            <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
                     <FileText size={13} />
@@ -389,21 +518,57 @@ export function BookDetailModal({
                   <h4 className="font-serif font-bold text-sm sm:text-base text-stone-100 light:text-stone-900">
                     Trama del libro
                   </h4>
-                </div>
-
-                <div className="flex items-center gap-1.5">
                   {bookDetails?.source && bookDetails.description && (
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-200/80 text-stone-400 light:text-stone-600 border border-stone-700 light:border-stone-300">
+                    <span className="hidden sm:inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-200/80 text-stone-400 light:text-stone-600 border border-stone-700 light:border-stone-300">
                       da {bookDetails.source}
                     </span>
                   )}
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Tasto Cerca Online (Google Books + Wikipedia IT + Open Library) */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSearchModal()}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-stone-800/90 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 border border-stone-700/80 light:border-stone-300/80 transition-all cursor-pointer shadow-xs"
+                    title="Cerca edizioni e trame verificate nei cataloghi online"
+                  >
+                    <Search size={12} className="text-amber-400 light:text-amber-600" />
+                    <span>Cerca trama online</span>
+                  </button>
+
+                  {/* Tasto Modifica Manuale */}
+                  <button
+                    type="button"
+                    onClick={handleOpenEditPlot}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg bg-stone-800/90 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 border border-stone-700/80 light:border-stone-300/80 transition-all cursor-pointer shadow-xs"
+                    title="Modifica o scrivi la trama manualmente"
+                  >
+                    <Pencil size={12} />
+                    <span className="hidden xs:inline">Modifica</span>
+                  </button>
+
+                  {/* Tasto Rimuovi Trama Errata (se presente) */}
+                  {bookDetails?.description && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePlot}
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-red-400 hover:bg-stone-800 light:hover:bg-stone-200/70 transition-colors cursor-pointer"
+                      title="Rimuovi trama errata"
+                      aria-label="Rimuovi trama errata"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+
+                  {/* Tasto Ricarica Automatica */}
                   <button
                     type="button"
                     onClick={handleRefreshDetails}
                     disabled={loadingDetails}
-                    className="p-1 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 light:hover:bg-stone-200/70 transition-colors cursor-pointer disabled:opacity-40"
-                    title="Aggiorna trama dal catalogo online"
-                    aria-label="Aggiorna trama dal catalogo online"
+                    className="p-1.5 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 light:hover:bg-stone-200/70 transition-colors cursor-pointer disabled:opacity-40"
+                    title="Ricarica trama automatica dai cataloghi"
+                    aria-label="Ricarica trama automatica"
                   >
                     <RefreshCw
                       size={13}
@@ -457,18 +622,37 @@ export function BookDetailModal({
                   )}
                 </div>
               ) : (
-                <div className="py-1.5 text-xs text-stone-400 light:text-stone-500 flex items-center justify-between gap-2">
-                  <span>
-                    Trama in italiano non trovata nei cataloghi per questo titolo. Verifica che titolo e autore siano scritti correttamente.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRefreshDetails}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-800 light:bg-stone-200 text-stone-200 light:text-stone-800 font-medium hover:bg-stone-750 cursor-pointer"
-                  >
-                    <Sparkles size={11} className="text-amber-400" />
-                    <span>Riprova</span>
-                  </button>
+                <div className="py-2 text-xs text-stone-300 light:text-stone-600 space-y-2.5">
+                  <p>
+                    Nessuna trama verificata trovata automaticamente per questo libro. Puoi cercarla tra le edizioni online o incollarla manualmente:
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSearchModal()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border border-amber-500/35 hover:bg-amber-500/30 font-semibold cursor-pointer transition-all active:scale-95 shadow-xs"
+                    >
+                      <Search size={13} />
+                      <span>Cerca trama online</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenEditPlot}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-800 light:bg-stone-200 text-stone-200 light:text-stone-800 border border-stone-700 light:border-stone-300 hover:bg-stone-750 font-medium cursor-pointer transition-all active:scale-95 shadow-xs"
+                    >
+                      <Pencil size={13} />
+                      <span>Inserisci trama manualmente</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRefreshDetails}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-600 hover:text-stone-200 border border-stone-750 light:border-stone-300 font-medium cursor-pointer"
+                      title="Riprova ricerca automatica"
+                    >
+                      <Sparkles size={12} className="text-amber-400" />
+                      <span>Riprova auto</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -599,6 +783,368 @@ export function BookDetailModal({
             onUpdateBook(updated);
           }}
         />
+      )}
+
+      {/* Modale Ricerca Multi-Fonte Trama (Google Books + Wikipedia IT + Open Library) */}
+      {showSearchModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-stone-950/85 light:bg-stone-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-up"
+          onClick={() => setShowSearchModal(false)}
+        >
+          <div
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-xl w-full max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="p-4 border-b border-stone-800 light:border-stone-200 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
+                  <Search size={16} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-serif font-bold text-base text-stone-100 light:text-stone-900 leading-tight">
+                    Cerca Trama nei Cataloghi Online
+                  </h3>
+                  <p className="text-xs text-stone-400 light:text-stone-500 truncate">
+                    Google Books • Wikipedia Italia • Open Library
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSearchModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-300 light:text-stone-600 hover:text-stone-100 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Barra di ricerca */}
+            <div className="p-3.5 bg-stone-850/60 light:bg-stone-50 border-b border-stone-800 light:border-stone-200 shrink-0 space-y-2.5">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  executePlotSearch(searchQuery);
+                }}
+                className="flex items-center gap-2"
+              >
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Titolo, autore o parole chiave..."
+                    className="w-full pl-3 pr-8 py-2 bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm focus:outline-none focus:border-amber-500/60"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-200 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={searchingPlots || !searchQuery.trim()}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold text-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95 shrink-0"
+                >
+                  {searchingPlots ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+                  <span>Cerca</span>
+                </button>
+              </form>
+
+              {/* Filtri per fonte e lingua */}
+              <div className="flex flex-col gap-1.5 pt-0.5 text-[11px]">
+                <div className="flex items-center justify-between gap-2 overflow-x-auto">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSourceFilter('all')}
+                      className={`px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                        selectedSourceFilter === 'all'
+                          ? 'bg-amber-500 text-stone-950 font-bold'
+                          : 'bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400'
+                      }`}
+                    >
+                      Tutti ({searchResults.length})
+                    </button>
+                    {(['Apple Books', 'Google Books', 'Wikipedia IT', 'Open Library'] as const).map((src) => {
+                      const count = searchResults.filter((r) => r.source === src).length;
+                      if (count === 0 && searchResults.length > 0) return null;
+                      return (
+                        <button
+                          key={src}
+                          type="button"
+                          onClick={() => setSelectedSourceFilter(src)}
+                          className={`px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                            selectedSourceFilter === src
+                              ? 'bg-amber-500 text-stone-950 font-bold'
+                              : 'bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400'
+                          }`}
+                        >
+                          {src} {count > 0 && `(${count})`}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLangFilter('all')}
+                      className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                        selectedLangFilter === 'all'
+                          ? 'bg-stone-700 light:bg-stone-300 text-amber-400 font-bold'
+                          : 'bg-stone-800/80 light:bg-stone-200 text-stone-400 light:text-stone-600 hover:text-amber-400'
+                      }`}
+                    >
+                      Tutte le lingue
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLangFilter('it')}
+                      className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                        selectedLangFilter === 'it'
+                          ? 'bg-emerald-600/30 text-emerald-300 font-bold border border-emerald-500/40'
+                          : 'bg-stone-800/80 light:bg-stone-200 text-stone-400 light:text-stone-600 hover:text-emerald-400'
+                      }`}
+                    >
+                      Solo 🇮🇹 Italiano
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                  <span className="text-stone-500">Query rapida:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = book.title.trim();
+                      setSearchQuery(q);
+                      executePlotSearch(q);
+                    }}
+                    className="px-1.5 py-0.5 rounded bg-stone-800/80 light:bg-stone-200 text-stone-400 light:text-stone-600 hover:text-amber-400 cursor-pointer"
+                  >
+                    Solo titolo
+                  </button>
+                  {book.author && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q = `${book.title} ${book.author}`.trim();
+                        setSearchQuery(q);
+                        executePlotSearch(q);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-stone-800/80 light:bg-stone-200 text-stone-400 light:text-stone-600 hover:text-amber-400 cursor-pointer"
+                    >
+                      Titolo + Autore
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Lista dei risultati trovati */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+              {searchingPlots ? (
+                <div className="py-14 flex flex-col items-center justify-center gap-3 text-stone-400 light:text-stone-500">
+                  <Loader2 size={30} className="animate-spin text-amber-500" />
+                  <span className="text-sm font-medium">Interrogazione in corso su Apple Books, Google Books, Wikipedia e Open Library...</span>
+                </div>
+              ) : searchResults.length > 0 ? (
+                searchResults
+                  .filter((res) => {
+                    const matchSource = selectedSourceFilter === 'all' || res.source === selectedSourceFilter;
+                    const matchLang = selectedLangFilter === 'all' || res.language === selectedLangFilter;
+                    return matchSource && matchLang;
+                  })
+                  .map((res) => (
+                    <div
+                      key={res.id}
+                      className="bg-stone-850/80 light:bg-stone-50 border border-stone-800 light:border-stone-200 rounded-2xl p-3.5 space-y-2.5 transition-all hover:border-amber-500/40"
+                    >
+                      <div className="flex items-start gap-3">
+                        {res.coverUrl ? (
+                          <img
+                            src={res.coverUrl}
+                            alt={res.title}
+                            className="w-12 h-16 object-cover rounded-lg shrink-0 shadow-sm border border-stone-700/60 light:border-stone-300"
+                          />
+                        ) : (
+                          <div className="w-12 h-16 rounded-lg bg-stone-800 light:bg-stone-200 flex items-center justify-center shrink-0 border border-stone-700/60 light:border-stone-300">
+                            <BookMarked size={16} className="text-stone-500" />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                res.source === 'Google Books'
+                                  ? 'bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/30'
+                                  : res.source === 'Apple Books'
+                                  ? 'bg-rose-500/15 text-rose-300 light:text-rose-800 border-rose-500/30'
+                                  : res.source === 'Wikipedia IT'
+                                  ? 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
+                                  : 'bg-purple-500/15 text-purple-300 light:text-purple-800 border-purple-500/30'
+                              }`}
+                            >
+                              {res.source}
+                            </span>
+                            {res.language === 'it' ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30">
+                                🇮🇹 Italiano
+                              </span>
+                            ) : res.language === 'en' ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 light:text-indigo-800 border border-indigo-500/30">
+                                🇬🇧 Lingua originale
+                              </span>
+                            ) : null}
+                            {res.publishedDate && (
+                              <span className="text-[10px] text-stone-400 light:text-stone-500">
+                                • {res.publishedDate}
+                              </span>
+                            )}
+                            {res.pageCount && (
+                              <span className="text-[10px] text-stone-400 light:text-stone-500">
+                                • {res.pageCount} pag.
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="font-serif font-bold text-sm text-stone-100 light:text-stone-900 leading-snug mt-1">
+                            {res.title}
+                          </h4>
+                          {res.authors.length > 0 && (
+                            <p className="text-xs text-amber-400/90 light:text-amber-700 mt-0.5">
+                              {res.authors.join(', ')}
+                            </p>
+                          )}
+                          {res.publisher && (
+                            <p className="text-[10px] text-stone-400 light:text-stone-500 mt-0.5 truncate">
+                              Editore: {res.publisher}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {res.description && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-stone-300 light:text-stone-600 line-clamp-4 leading-relaxed bg-stone-900/60 light:bg-white p-2.5 rounded-xl border border-stone-800/80 light:border-stone-200/80">
+                            {res.description}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyPlot(res)}
+                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-[0.98]"
+                          >
+                            <Check size={14} strokeWidth={2.5} />
+                            <span>Usa questa trama</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+              ) : hasSearchedPlots ? (
+                <div className="py-12 text-center space-y-3">
+                  <p className="text-sm text-stone-400 light:text-stone-500">
+                    Nessuna trama trovata per "{searchQuery}".
+                  </p>
+                  <p className="text-xs text-stone-500">
+                    Prova a cercare usando solo il titolo o a incollare il testo manualmente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSearchModal(false);
+                      handleOpenEditPlot();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-800 light:bg-stone-200 text-stone-200 light:text-stone-800 font-medium text-xs hover:bg-stone-750 cursor-pointer"
+                  >
+                    <Pencil size={12} />
+                    <span>Scrivi la trama manualmente</span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Inserimento/Modifica Manuale Trama */}
+      {showEditPlotModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-stone-950/85 light:bg-stone-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-up"
+          onClick={() => setShowEditPlotModal(false)}
+        >
+          <div
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-stone-800 light:border-stone-200 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 flex items-center justify-center text-amber-400 light:text-amber-700">
+                  <Pencil size={15} />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-base text-stone-100 light:text-stone-900">
+                    Modifica Trama
+                  </h3>
+                  <p className="text-xs text-stone-400 light:text-stone-500">
+                    {book.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditPlotModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-800 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-300 light:text-stone-600 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-stone-400 light:text-stone-600">
+                Puoi incollare la trama da un sito, riassunto o retro di copertina:
+              </p>
+              <textarea
+                value={customPlotText}
+                onChange={(e) => setCustomPlotText(e.target.value)}
+                placeholder="Incolla o scrivi qui la trama del libro..."
+                rows={8}
+                className="w-full p-3 bg-stone-850 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm leading-relaxed focus:outline-none focus:border-amber-500/60 resize-y"
+                autoFocus
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowEditPlotModal(false)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-stone-400 hover:text-stone-200 cursor-pointer"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCustomPlot}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                >
+                  <Check size={14} />
+                  <span>Salva Trama</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>,
     document.body

@@ -14,6 +14,7 @@ import type { Book } from '@/lib/supabase';
 import type { ReadingGoals } from '@/hooks/useReadingGoals';
 import { BookCard } from './BookCard';
 import { sortBooks, type SortKey } from '@/lib/sortBooks';
+import { matchesBookSearch } from '@/lib/bookSearch';
 
 interface ReadBooksByYearProps {
   books: Book[];
@@ -39,15 +40,10 @@ export function ReadBooksByYear({
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [collapsedYears, setCollapsedYears] = useState<Record<string, boolean>>({});
 
-  // Filtra per ricerca su titolo e autore
+  // Filtra per ricerca su titolo, autore e metadati del libro
   const filteredBooks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return books;
-    return books.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q) ||
-        b.author.toLowerCase().includes(q)
-    );
+    if (!searchQuery.trim()) return books;
+    return books.filter((b) => matchesBookSearch(b, searchQuery));
   }, [books, searchQuery]);
 
   // Raggruppa i libri per anno (in base a read_at oppure 'Senza data')

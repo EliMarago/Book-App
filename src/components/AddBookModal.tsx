@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   Loader2,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import { syncBookDateToSupabase, syncBookPagesToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
+import { parseTitleAndAuthorQuery } from '@/lib/bookSearch';
 import {
   fetchBookCover,
   searchAlternativeCovers,
@@ -79,6 +80,24 @@ export function AddBookModal({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose]);
+
+  const detectedSplit = useMemo(() => {
+    if (isEditing || author.trim() || !title.trim()) return null;
+    const parsed = parseTitleAndAuthorQuery(title);
+    return parsed.author ? parsed : null;
+  }, [title, author, isEditing]);
+
+  const handleTitleChange = (val: string) => {
+    if (!author.trim() && val.length > 5) {
+      const parsed = parseTitleAndAuthorQuery(val);
+      if (parsed.author && parsed.title) {
+        setTitle(parsed.title);
+        setAuthor(parsed.author);
+        return;
+      }
+    }
+    setTitle(val);
+  };
 
   // Autocompletamento suggerimenti libri mentre l'utente digita il titolo
   useEffect(() => {
@@ -445,7 +464,7 @@ export function AddBookModal({
                   type="text"
                   required
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => handleTitleChange(e.target.value)}
                   onFocus={() => {
                     if (!isEditing && suggestions.length > 0) setShowSuggestions(true);
                   }}
@@ -453,8 +472,24 @@ export function AddBookModal({
                     setTimeout(() => setShowSuggestions(false), 180);
                   }}
                   className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
-                  placeholder="Es. Il nome della rosa"
+                  placeholder="Es. Il nome della rosa oppure 'Titolo di Autore'"
                 />
+
+                {detectedSplit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitle(detectedSplit.title);
+                      setAuthor(detectedSplit.author);
+                    }}
+                    className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 light:text-amber-800 text-xs font-medium cursor-pointer hover:bg-amber-500/25 transition-all text-left"
+                  >
+                    <Sparkles size={12} className="text-amber-400 shrink-0" />
+                    <span className="truncate">
+                      Rilevato: <b>"{detectedSplit.title}"</b> di <b>"{detectedSplit.author}"</b> — Clicca per separare
+                    </span>
+                  </button>
+                )}
 
                 {/* Menu a tendina suggerimenti rapidi in tempo reale */}
                 {!isEditing && showSuggestions && suggestions.length > 0 && (

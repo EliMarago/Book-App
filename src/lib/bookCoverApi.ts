@@ -1,5 +1,16 @@
+import { parseTitleAndAuthorQuery, getTitleSearchVariants } from './bookSearch';
+
 // In-memory cache per evitare richieste duplicate per gli stessi titoli
 const coverCache = new Map<string, string | null>();
+
+const GOOGLE_BOOKS_API_KEY = (
+  import.meta.env.VITE_GOOGLE_BOOKS_API_KEY as string | undefined
+)?.trim();
+
+export function getGoogleBooksUrl(query: string, extraParams = ''): string {
+  const base = `https://www.googleapis.com/books/v1/volumes?q=${query}${extraParams}`;
+  return GOOGLE_BOOKS_API_KEY ? `${base}&key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}` : base;
+}
 
 /**
  * Pulisce la stringa rimuovendo caratteri speciali che potrebbero disturbare le ricerche
@@ -33,22 +44,42 @@ async function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response
  */
 async function searchAppleBooks(title: string, author?: string): Promise<string | null> {
   try {
-    const cleanTitle = sanitizeQuery(title);
-    const cleanAuthor = author ? sanitizeQuery(author) : '';
-    const query = encodeURIComponent(`${cleanTitle} ${cleanAuthor}`.trim());
-    const url = `https://itunes.apple.com/search?term=${query}&entity=ebook&limit=3`;
+    let cleanTitle = sanitizeQuery(title);
+    let cleanAuthor = author ? sanitizeQuery(author) : '';
 
-    const res = await fetchWithTimeout(url, 4000);
-    if (!res.ok) return null;
+    if (!cleanAuthor && cleanTitle) {
+      const parsed = parseTitleAndAuthorQuery(cleanTitle);
+      if (parsed.author) {
+        cleanTitle = parsed.title;
+        cleanAuthor = parsed.author;
+      }
+    }
 
-    const data = await res.json();
-    if (data.results && data.results.length > 0) {
-      for (const item of data.results) {
-        if (item.artworkUrl100) {
-          // Converte l'anteprima 100x100 in una ad alta risoluzione 600x600 o 800x800
-          return item.artworkUrl100
-            .replace('100x100bb', '600x600bb')
-            .replace('http://', 'https://');
+    const titleVariants = getTitleSearchVariants(cleanTitle);
+    const searchTerms: string[] = [];
+    for (const v of titleVariants) {
+      if (cleanAuthor) searchTerms.push(`${v} ${cleanAuthor}`.trim());
+      searchTerms.push(v);
+    }
+    if (cleanAuthor) searchTerms.push(cleanAuthor);
+
+    for (const country of ['it', 'us']) {
+      for (const term of searchTerms.slice(0, 3)) {
+        const query = encodeURIComponent(term);
+        const url = `https://itunes.apple.com/search?term=${query}&entity=ebook&country=${country}&limit=3`;
+
+        const res = await fetchWithTimeout(url, 3500);
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          for (const item of data.results) {
+            if (item.artworkUrl100) {
+              return item.artworkUrl100
+                .replace('100x100bb', '600x600bb')
+                .replace('http://', 'https://');
+            }
+          }
         }
       }
     }
@@ -63,26 +94,43 @@ async function searchAppleBooks(title: string, author?: string): Promise<string 
  */
 async function searchOpenLibrary(title: string, author?: string): Promise<string | null> {
   try {
-    const cleanTitle = sanitizeQuery(title);
-    const cleanAuthor = author ? sanitizeQuery(author) : '';
-    const query = encodeURIComponent(`${cleanTitle} ${cleanAuthor}`.trim());
-    const url = `https://openlibrary.org/search.json?q=${query}&limit=5`;
+    let cleanTitle = sanitizeQuery(title);
+    let cleanAuthor = author ? sanitizeQuery(author) : '';
 
-    const res = await fetchWithTimeout(url, 5000);
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    if (!data.docs || data.docs.length === 0) return null;
-
-    for (const doc of data.docs) {
-      if (doc.cover_i) {
-        return `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+    if (!cleanAuthor && cleanTitle) {
+      const parsed = parseTitleAndAuthorQuery(cleanTitle);
+      if (parsed.author) {
+        cleanTitle = parsed.title;
+        cleanAuthor = parsed.author;
       }
-      if (doc.cover_edition_key) {
-        return `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-L.jpg`;
-      }
-      if (Array.isArray(doc.isbn) && doc.isbn.length > 0) {
-        return `https://covers.openlibrary.org/b/isbn/${doc.isbn[0]}-L.jpg`;
+    }
+
+    const titleVariants = getTitleSearchVariants(cleanTitle);
+    const terms = [
+      cleanAuthor ? `${cleanTitle} ${cleanAuthor}`.trim() : cleanTitle,
+      ...titleVariants.slice(1, 2).map((v) => (cleanAuthor ? `${v} ${cleanAuthor}`.trim() : v)),
+    ];
+
+    for (const term of terms) {
+      const query = encodeURIComponent(term);
+      const url = `https://openlibrary.org/search.json?q=${query}&limit=5`;
+
+      const res = await fetchWithTimeout(url, 4500);
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      if (!data.docs || data.docs.length === 0) continue;
+
+      for (const doc of data.docs) {
+        if (doc.cover_i) {
+          return `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+        }
+        if (doc.cover_edition_key) {
+          return `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-L.jpg`;
+        }
+        if (Array.isArray(doc.isbn) && doc.isbn.length > 0) {
+          return `https://covers.openlibrary.org/b/isbn/${doc.isbn[0]}-L.jpg`;
+        }
       }
     }
 
@@ -97,30 +145,42 @@ async function searchOpenLibrary(title: string, author?: string): Promise<string
  */
 async function searchGoogleBooks(title: string, author?: string): Promise<string | null> {
   try {
-    const cleanTitle = sanitizeQuery(title);
-    const cleanAuthor = author ? sanitizeQuery(author) : '';
-    const query = encodeURIComponent(
-      cleanAuthor ? `intitle:${cleanTitle} inauthor:${cleanAuthor}` : cleanTitle
-    );
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=3`;
+    let cleanTitle = sanitizeQuery(title);
+    let cleanAuthor = author ? sanitizeQuery(author) : '';
 
-    const res = await fetchWithTimeout(url, 4000);
-    if (!res.ok) return null;
+    if (!cleanAuthor && cleanTitle) {
+      const parsed = parseTitleAndAuthorQuery(cleanTitle);
+      if (parsed.author) {
+        cleanTitle = parsed.title;
+        cleanAuthor = parsed.author;
+      }
+    }
 
-    const data = await res.json();
-    if (!data.items || data.items.length === 0) return null;
+    const queries = [
+      cleanAuthor ? `intitle:${cleanTitle} inauthor:${cleanAuthor}` : cleanTitle,
+      cleanAuthor ? `${cleanTitle} ${cleanAuthor}` : cleanTitle,
+    ];
 
-    for (const item of data.items) {
-      const imageLinks = item?.volumeInfo?.imageLinks;
-      if (imageLinks) {
-        const cover =
-          imageLinks.extraLarge ||
-          imageLinks.large ||
-          imageLinks.medium ||
-          imageLinks.thumbnail ||
-          imageLinks.smallThumbnail;
-        if (cover) {
-          return cover.replace('http://', 'https://').replace('&edge=curl', '');
+    for (const q of queries) {
+      const url = getGoogleBooksUrl(encodeURIComponent(q), '&maxResults=3');
+      const res = await fetchWithTimeout(url, 3800);
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      if (!data.items || data.items.length === 0) continue;
+
+      for (const item of data.items) {
+        const imageLinks = item?.volumeInfo?.imageLinks;
+        if (imageLinks) {
+          const cover =
+            imageLinks.extraLarge ||
+            imageLinks.large ||
+            imageLinks.medium ||
+            imageLinks.thumbnail ||
+            imageLinks.smallThumbnail;
+          if (cover) {
+            return cover.replace('http://', 'https://').replace('&edge=curl', '');
+          }
         }
       }
     }
@@ -190,22 +250,89 @@ export async function searchAlternativeCovers(
   const trimmedAuthor = author?.trim() || '';
 
   const results: string[] = [];
+  const seenCovers = new Set<string>();
 
-  const [appleCover, openLibCover, googleCover] = await Promise.allSettled([
-    searchAppleBooks(trimmedTitle, trimmedAuthor),
-    searchOpenLibrary(trimmedTitle, trimmedAuthor),
-    searchGoogleBooks(trimmedTitle, trimmedAuthor),
-  ]);
+  const addCover = (c: string | null | undefined) => {
+    if (!c || seenCovers.has(c)) return;
+    seenCovers.add(c);
+    results.push(c);
+  };
 
-  if (appleCover.status === 'fulfilled' && appleCover.value) {
-    results.push(appleCover.value);
+  let cleanTitle = sanitizeQuery(trimmedTitle);
+  let cleanAuthor = trimmedAuthor ? sanitizeQuery(trimmedAuthor) : '';
+  if (!cleanAuthor && cleanTitle) {
+    const parsed = parseTitleAndAuthorQuery(cleanTitle);
+    if (parsed.author) {
+      cleanTitle = parsed.title;
+      cleanAuthor = parsed.author;
+    }
   }
-  if (openLibCover.status === 'fulfilled' && openLibCover.value && !results.includes(openLibCover.value)) {
-    results.push(openLibCover.value);
-  }
-  if (googleCover.status === 'fulfilled' && googleCover.value && !results.includes(googleCover.value)) {
-    results.push(googleCover.value);
-  }
+
+  const titleVariants = getTitleSearchVariants(cleanTitle);
+  const terms = [
+    cleanAuthor ? `${cleanTitle} ${cleanAuthor}` : cleanTitle,
+    ...titleVariants.slice(1, 3).map((v) => (cleanAuthor ? `${v} ${cleanAuthor}` : v)),
+  ];
+
+  // 1. Apple Books (IT + US)
+  try {
+    for (const country of ['it', 'us']) {
+      for (const term of terms.slice(0, 2)) {
+        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=ebook&country=${country}&limit=4`;
+        const res = await fetchWithTimeout(url, 3500);
+        if (!res.ok) continue;
+        const data = await res.json();
+        for (const it of data.results || []) {
+          if (it.artworkUrl100) {
+            addCover(
+              it.artworkUrl100.replace('100x100bb', '600x600bb').replace('http://', 'https://')
+            );
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Open Library
+  try {
+    const qTerm = cleanAuthor ? `${cleanTitle} ${cleanAuthor}` : cleanTitle;
+    const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(qTerm)}&limit=5`;
+    const res = await fetchWithTimeout(olUrl, 4000);
+    if (res.ok) {
+      const data = await res.json();
+      for (const doc of data.docs || []) {
+        if (doc.cover_i) {
+          addCover(`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`);
+        } else if (doc.cover_edition_key) {
+          addCover(`https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-L.jpg`);
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Google Books
+  try {
+    const qTerm = cleanAuthor ? `intitle:${cleanTitle} inauthor:${cleanAuthor}` : cleanTitle;
+    const gbUrl = getGoogleBooksUrl(encodeURIComponent(qTerm), '&maxResults=5');
+    const res = await fetchWithTimeout(gbUrl, 3500);
+    if (res.ok) {
+      const data = await res.json();
+      for (const item of data.items || []) {
+        const imageLinks = item?.volumeInfo?.imageLinks;
+        if (imageLinks) {
+          const raw =
+            imageLinks.extraLarge ||
+            imageLinks.large ||
+            imageLinks.medium ||
+            imageLinks.thumbnail ||
+            imageLinks.smallThumbnail;
+          if (raw) {
+            addCover(raw.replace('http://', 'https://').replace('&edge=curl', ''));
+          }
+        }
+      }
+    }
+  } catch {}
 
   return results;
 }
@@ -231,14 +358,21 @@ export async function fetchBookPageCount(
 
   // 1. Prova prima con Google Books (molto affidabile sul numero di pagine)
   try {
-    const cleanTitle = sanitizeQuery(trimmedTitle);
-    const cleanAuthor = trimmedAuthor ? sanitizeQuery(trimmedAuthor) : '';
+    let cleanTitle = sanitizeQuery(trimmedTitle);
+    let cleanAuthor = trimmedAuthor ? sanitizeQuery(trimmedAuthor) : '';
+    if (!cleanAuthor && cleanTitle) {
+      const parsed = parseTitleAndAuthorQuery(cleanTitle);
+      if (parsed.author) {
+        cleanTitle = parsed.title;
+        cleanAuthor = parsed.author;
+      }
+    }
     const query = encodeURIComponent(
       cleanAuthor ? `intitle:${cleanTitle} inauthor:${cleanAuthor}` : cleanTitle
     );
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=3`;
+    const url = getGoogleBooksUrl(query, '&maxResults=3');
 
-    const res = await fetchWithTimeout(url, 4000);
+    const res = await fetchWithTimeout(url, 3800);
     if (res.ok) {
       const data = await res.json();
       if (data.items && data.items.length > 0) {
@@ -294,7 +428,7 @@ export interface BookDetails {
   source: 'Google Books' | 'Apple Books' | 'Wikipedia IT' | 'Open Library' | null;
 }
 
-const DETAILS_STORAGE_KEY = 'bookshelf_book_details_it_v8';
+const DETAILS_STORAGE_KEY = 'bookshelf_book_details_it_v9';
 const detailsCache = new Map<string, BookDetails>();
 
 // Pulisce tutte le versioni precedenti della cache per rimuovere trame in lingua straniera o non corrette
@@ -306,6 +440,7 @@ try {
   localStorage.removeItem('bookshelf_book_details_it_v5');
   localStorage.removeItem('bookshelf_book_details_it_v6');
   localStorage.removeItem('bookshelf_book_details_it_v7');
+  localStorage.removeItem('bookshelf_book_details_it_v8');
 } catch {
   // ignore
 }
@@ -520,6 +655,29 @@ export function isItalianText(text: string | null | undefined): boolean {
 }
 
 /**
+ * Rileva se un testo è in italiano, in lingua originale inglese o in un'altra lingua
+ */
+export function detectLanguage(text: string | null | undefined): 'it' | 'en' | 'other' {
+  if (!text) return 'other';
+  if (isItalianText(text)) return 'it';
+
+  const lower = text.toLowerCase();
+  const words = lower.match(/\p{L}+/gu);
+  if (!words || words.length < 4) return 'other';
+
+  let itCount = 0;
+  let enCount = 0;
+  for (const w of words) {
+    if (ITALIAN_STOPWORDS.has(w)) itCount++;
+    if (FOREIGN_STOPWORDS.has(w)) enCount++;
+  }
+
+  if (itCount >= 3 && itCount > enCount * 1.5) return 'it';
+  if (enCount >= 3 && enCount > itCount) return 'en';
+  return 'other';
+}
+
+/**
  * Normalizza una stringa per confronti di compatibilità (senza accenti o punteggiatura)
  */
 function normalizeForCompare(str: string): string {
@@ -619,6 +777,7 @@ function getAuthorKeyWord(author?: string): string {
 /**
  * Verifica rigorosamente che l'autore trovato sia compatibile con l'autore cercato.
  * Gestisce l'ordine "Cognome Nome", traslitterazioni ed eventuali secondi nomi.
+ * IMPEDISCE categoricamente false corrispondenze dovute a semplici omonimie nel nome di battesimo (es. "Paolo", "Marco", "Stephen").
  */
 function isAuthorCompatible(queryAuthor: string, candidateAuthor: string): boolean {
   if (!queryAuthor || !queryAuthor.trim()) return true;
@@ -627,27 +786,53 @@ function isAuthorCompatible(queryAuthor: string, candidateAuthor: string): boole
   const normQuery = normalizeForCompare(queryAuthor).replace(/[jy]/g, 'i');
   const normCand = normalizeForCompare(candidateAuthor).replace(/[jy]/g, 'i');
 
-  if (normCand.includes(normQuery) || normQuery.includes(normCand)) return true;
+  if (normCand === normQuery) return true;
 
-  const queryWords = normQuery.split(/\s+/).filter((w) => w.length >= 3);
-  const candWords = normCand.split(/\s+/).filter((w) => w.length >= 3);
+  const nameStop = new Set(['de', 'di', 'del', 'della', 'degli', 'delle', 'da', 'van', 'von', 'la', 'le', 'san', 'sant']);
+
+  const queryWords = normQuery.split(/\s+/).filter((w) => !nameStop.has(w) && w.length >= 2);
+  const candWords = normCand.split(/\s+/).filter((w) => !nameStop.has(w) && w.length >= 2);
   if (queryWords.length === 0 || candWords.length === 0) return false;
 
-  // Il cognome o parola chiave principale dell'autore cercato deve comparire nell'autore candidato
-  const authorKey = normalizeForCompare(getAuthorKeyWord(queryAuthor)).replace(/[jy]/g, 'i');
-  if (authorKey && authorKey.length >= 3) {
-    const keyMatches = candWords.some(
-      (cw) => isWordMatch(authorKey, cw) || cw.includes(authorKey) || authorKey.includes(cw)
-    );
-    if (keyMatches) return true;
+  // Se l'autore cercato è una singola parola (es. "Dante", "Calvino", "Orwell", "Omero"):
+  if (queryWords.length === 1) {
+    return candWords.some((cw) => isWordMatch(queryWords[0], cw) || cw.includes(queryWords[0]) || queryWords[0].includes(cw));
   }
 
-  // Almeno una parola significativa dell'autore cercato deve combaciare
-  return queryWords.some((qw) => candWords.some((cw) => isWordMatch(qw, cw)));
+  // Se l'autore cercato ha 2 o più parole (es. "Dante Alighieri", "Stephen King", "Paolo Cognetti"):
+  // Il cognome (ultimo token) o il primo token (se formato "Cognome Nome") DEVE combaciare obbligatoriamente!
+  const querySurname = queryWords[queryWords.length - 1];
+  const queryFirstname = queryWords[0];
+
+  const surnameMatches = candWords.some((cw) => isWordMatch(querySurname, cw));
+  const firstnameMatchesAsSurname = candWords.some((cw) => isWordMatch(queryFirstname, cw));
+
+  if (!surnameMatches && !firstnameMatchesAsSurname) {
+    return false; // Né il cognome né il primo nome combaciano: AUTORE DIVERSO!
+  }
+
+  // Se il candidato ha 1 sola parola: deve essere il cognome cercato o il nome celebre (es. "Dante", "Calvino")
+  if (candWords.length === 1) {
+    return surnameMatches || firstnameMatchesAsSurname;
+  }
+
+  // Se sia la query che il candidato hanno 2 o più parole:
+  // NON è ammesso che combaci SOLO il nome di battesimo se i cognomi differiscono (es. Paolo Cognetti != Paolo Giordano)!
+  if (!surnameMatches && !candWords.some((cw) => isWordMatch(queryWords.slice(1).join(''), cw))) {
+    return false;
+  }
+
+  // Richiede che almeno 2 token combacino, OPPURE che il cognome combaci e il primo nome sia un'iniziale compatibile
+  const matchedCount = queryWords.filter((qw) =>
+    candWords.some((cw) => isWordMatch(qw, cw) || (qw.length > 2 && cw.length === 1 && qw.startsWith(cw)))
+  ).length;
+
+  return matchedCount >= 2 || surnameMatches;
 }
 
 /**
- * Verifica rigorosamente che il titolo trovato sia compatibile con quello cercato
+ * Verifica rigorosamente che il titolo trovato sia compatibile con quello cercato.
+ * Rifiuta categoricamente saggi, guide, analisi del testo o commentari.
  */
 function isTitleCompatible(queryTitle: string, candidateTitle: string): boolean {
   const normQuery = normalizeForCompare(queryTitle);
@@ -655,17 +840,30 @@ function isTitleCompatible(queryTitle: string, candidateTitle: string): boolean 
   if (!normQuery || !normCand) return false;
   if (normQuery === normCand) return true;
 
-  // Separa eventuale sottotitolo del candidato prima di normalizzare
-  const candMain = normalizeForCompare(candidateTitle.split(/\s*[:\-–—(]\s*/)[0]);
-  if (candMain === normQuery) return true;
-
-  // Per titoli molto corti (es. "It", "Io", "1984"), deve combaciare esattamente il titolo principale
-  if (normQuery.length <= 4) {
-    return candMain === normQuery;
+  // Rifiuta saggi, guide e commenti sull'opera se la query non li richiede esplicitamente
+  const DERIVATIVE_PREFIXES = /\b(guida\s+(?:a|alla|al|ai|alle|per)|invito\s+alla\s+lettura|commento\s+(?:a|all'|alla|al|allo)|analisi\s+(?:del|della|di|testuale)|saggio\s+su|riassunto\s+(?:del|della|di)|dizionario\s+(?:del|di)|critica\s+(?:a|di)|antologia|biografia\s+di|le\s+lezioni\s+su|introduzione\s+a)\b/i;
+  if (DERIVATIVE_PREFIXES.test(candidateTitle) && !DERIVATIVE_PREFIXES.test(queryTitle)) {
+    return false;
   }
 
-  if (normCand.includes(normQuery) || candMain.includes(normQuery)) return true;
-  if (normQuery.includes(candMain) && candMain.length >= normQuery.length * 0.7) return true;
+  // Separa eventuale sottotitolo o indicazione volume prima di normalizzare
+  const candMain = normalizeForCompare(
+    candidateTitle
+      .split(/\s*[:\-–—(]\s*/)[0]
+      .replace(/\b(vol\.?|volume|tomo|parte|libro|ediz|edizione|integrale)\s*\d*\b/gi, '')
+  );
+  const queryMain = normalizeForCompare(
+    queryTitle
+      .split(/\s*[:\-–—(]\s*/)[0]
+      .replace(/\b(vol\.?|volume|tomo|parte|libro|ediz|edizione|integrale)\s*\d*\b/gi, '')
+  );
+
+  if (candMain === queryMain || candMain === normQuery) return true;
+
+  // Per titoli corti (<= 5 caratteri o 1 parola), DEVE esserci coincidenza del titolo principale
+  if (normQuery.length <= 5 || !normQuery.includes(' ')) {
+    return candMain === normQuery || candMain === queryMain;
+  }
 
   const stop = new Set([
     'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una', 'l',
@@ -675,17 +873,24 @@ function isTitleCompatible(queryTitle: string, candidateTitle: string): boolean 
   const queryWords = normQuery.split(/\s+/).filter((w) => w.length >= 2 && !stop.has(w) && !/^\d+$/.test(w));
   const candWords = candMain.split(/\s+/).filter((w) => w.length >= 2 && !stop.has(w));
 
-  if (queryWords.length === 0) {
-    return candWords.some((w) => normQuery.split(/\s+/).includes(w));
+  if (queryWords.length === 0 || candWords.length === 0) return false;
+
+  // I candidati non possono avere un eccesso di parole sconosciute nel titolo principale (es. "La casa" vs "La casa sul lago di notte")
+  if (candWords.length > queryWords.length + 2) {
+    return false;
   }
 
-  // Per titoli di 1-2 parole significative, tutte devono combaciare
   const matched = queryWords.filter((qw) =>
     candWords.some((cw) => isWordMatch(qw, cw))
   );
 
-  const threshold = queryWords.length <= 2 ? queryWords.length : Math.ceil(queryWords.length * 0.65);
-  return matched.length >= threshold;
+  // Per titoli di 1-2 parole significative, tutte devono combaciare
+  if (queryWords.length <= 2) {
+    return matched.length === queryWords.length;
+  }
+
+  // Per titoli di 3 o più parole, almeno l'80% deve combaciare
+  return matched.length >= Math.ceil(queryWords.length * 0.8);
 }
 
 /**
@@ -941,6 +1146,12 @@ async function fetchDetailsFromGoogleBooks(
     querySpecs.push({
       q: `${primaryTitle} ${cleanAuthor}`,
     });
+    querySpecs.push({
+      q: `"${primaryTitle}" ${authorKey || cleanAuthor}`,
+    });
+    querySpecs.push({
+      q: primaryTitle,
+    });
   }
 
   for (const variant of titleVariants.slice(1, 3)) {
@@ -1004,12 +1215,12 @@ async function fetchDetailsFromGoogleBooks(
         // Accetta SOLO ED ESCLUSIVAMENTE trame verificate in lingua italiana
         const validItalianDesc = rawDesc && isItalianText(rawDesc) ? rawDesc : null;
 
-        // Se il libro combacia perfettamente ma la lista non ha la descrizione completa, salviamo l'ID per lookup diretto
+        // Se il libro combacia ma la lista non ha la descrizione completa, salviamo l'ID per lookup diretto
         if (
           (!validItalianDesc || validItalianDesc.length < 90) &&
           item.id &&
-          matchScore >= 160 &&
-          volumeIdsToInspect.length < 3 &&
+          matchScore >= 100 &&
+          volumeIdsToInspect.length < 6 &&
           !volumeIdsToInspect.includes(String(item.id))
         ) {
           volumeIdsToInspect.push(String(item.id));
@@ -1051,16 +1262,17 @@ async function fetchDetailsFromGoogleBooks(
             candidate.pageCount)
         ) {
           bestPartial = candidate;
-        } else if (bestPartial) {
+        } else if (bestPartial !== null) {
+          const currentPartial: BookDetails = bestPartial;
           bestPartial = {
-            ...bestPartial,
-            publisher: bestPartial.publisher || candidate.publisher,
-            publishedDate: bestPartial.publishedDate || candidate.publishedDate,
+            ...currentPartial,
+            publisher: currentPartial.publisher || candidate.publisher,
+            publishedDate: currentPartial.publishedDate || candidate.publishedDate,
             categories:
-              bestPartial.categories.length > 0 ? bestPartial.categories : candidate.categories,
-            pageCount: bestPartial.pageCount || candidate.pageCount,
-            isbn: bestPartial.isbn || candidate.isbn,
-            subtitle: bestPartial.subtitle || candidate.subtitle,
+              currentPartial.categories.length > 0 ? currentPartial.categories : candidate.categories,
+            pageCount: currentPartial.pageCount || candidate.pageCount,
+            isbn: currentPartial.isbn || candidate.isbn,
+            subtitle: currentPartial.subtitle || candidate.subtitle,
           };
         }
 
@@ -1095,7 +1307,7 @@ async function fetchDetailsFromGoogleBooks(
   // Se la ricerca per lista non ha restituito una trama lunga, controlliamo il volume singolo per i volumi top
   if ((!bestWithPlot?.description || bestWithPlot.description.length < 100) && volumeIdsToInspect.length > 0) {
     const detailResults = await Promise.allSettled(
-      volumeIdsToInspect.slice(0, 2).map(async (volId) => {
+      volumeIdsToInspect.slice(0, 5).map(async (volId) => {
         const res = await fetchWithTimeout(
           `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volId)}`,
           3500
@@ -1299,11 +1511,12 @@ async function fetchDetailsFromWikipediaIt(
             lowerTitle
           );
 
-        // Se l'utente ha indicato l'autore, la voce o lo snippet devono essere compatibili con l'autore cercato
+        // Se l'utente ha indicato l'autore, la voce o lo snippet DEVE essere compatibile con l'autore cercato.
+        // NESSUNA eccezione: evita che libri omonimi di autori diversi (es. "Inferno (romanzo)" di Dan Brown per Dante) vengano confusi!
         const authorCompatible = cleanAuthor
           ? isAuthorCompatible(cleanAuthor, `${pageTitle} ${snippet}`)
           : true;
-        if (cleanAuthor && !authorCompatible && !explicitBookTag) {
+        if (cleanAuthor && !authorCompatible) {
           continue;
         }
 
@@ -1352,13 +1565,13 @@ async function fetchDetailsFromWikipediaIt(
     if (r.status !== 'fulfilled' || !r.value || r.value.extract.length < 60) continue;
     const { extract, isDedicatedBookPage } = r.value;
 
-    // Se l'utente ha fornito un autore, verifichiamo che l'estratto menzioni l'autore per evitare omonimie
-    if (cleanAuthor && !isAuthorCompatible(cleanAuthor, extract)) {
-      continue;
-    }
-
     // Estrae l'introduzione (prima della prima sezione == ... ==)
     const intro = extract.split(/\n==+\s*[^=]+\s*==+/)[0]?.trim() || '';
+
+    // Se l'utente ha fornito un autore, l'introduzione della voce deve confermare l'autore dell'opera
+    if (cleanAuthor && !isAuthorCompatible(cleanAuthor, `${intro} ${extract.slice(0, 1000)}`)) {
+      continue;
+    }
 
     // Cerca una sezione dedicata alla trama / sinossi / contenuto
     const sectionMatch = extract.match(
@@ -1374,17 +1587,11 @@ async function fetchDetailsFromWikipediaIt(
         isDedicatedBookPage && intro && intro.length > 40
           ? `${intro}\n\n${cleanSection}`
           : cleanSection;
-    } else if (isDedicatedBookPage) {
+    } else if (isDedicatedBookPage && intro && intro.length > 50) {
       plotText = intro;
     } else {
-      // È la pagina dell'autore o di una saga: cerchiamo i paragrafi che parlano specificamente del libro cercato
-      const paragraphs = extract
-        .split(/\n+/)
-        .map((p) => p.trim())
-        .filter((p) => p.length > 70 && !p.startsWith('==') && normalizeForCompare(p).includes(normPrimary));
-      if (paragraphs.length > 0) {
-        plotText = paragraphs.slice(0, 2).join('\n\n');
-      }
+      // Non è una pagina dedicata al libro e non ha una sezione trama: scartata
+      continue;
     }
 
     plotText = cleanPlotText(plotText);
@@ -1498,11 +1705,29 @@ async function fetchDetailsFromOpenLibrary(
 export async function fetchBookDetails(
   title: string,
   author?: string,
-  forceRefresh = false
+  forceRefresh = false,
+  confirmedPlot?: string | null
 ): Promise<BookDetails> {
   const trimmedTitle = title.trim();
   const trimmedAuthor = author?.trim() || '';
   const cacheKey = `${trimmedTitle.toLowerCase()}::${trimmedAuthor.toLowerCase()}`;
+
+  // 0. Se è presente una trama confermata/salvata dall'utente per questo libro, usala istantaneamente senza scraping
+  if (confirmedPlot && confirmedPlot.trim()) {
+    const details: BookDetails = {
+      description: confirmedPlot.trim(),
+      publisher: null,
+      publishedDate: null,
+      categories: [],
+      pageCount: null,
+      isbn: null,
+      subtitle: null,
+      source: 'Google Books',
+    };
+    detailsCache.set(cacheKey, details);
+    saveDetailsToStorage(cacheKey, details);
+    return details;
+  }
 
   if (!forceRefresh) {
     const cached = detailsCache.get(cacheKey);
@@ -1608,74 +1833,592 @@ export interface BookSuggestion {
   coverUrl: string | null;
   pages: number | null;
   publishedYear: string | null;
+  source?: string;
 }
 
 /**
  * Ricerca suggerimenti di autocompletamento libri (Titolo, Autore, Copertina, Pagine)
- * interrogando Google Books (preferenza lingua italiana) per compilazione istantanea 1-tap.
+ * interrogando Apple Books (IT/US), Open Library e Google Books per compilazione istantanea 1-tap.
  */
 export async function searchBookSuggestions(query: string): Promise<BookSuggestion[]> {
+  const raw = sanitizeQuery(query);
+  if (!raw || raw.length < 2) return [];
+
+  const { title: parsedTitle, author: parsedAuthor } = parseTitleAndAuthorQuery(raw);
+  const primaryTitle = parsedTitle || raw;
+  const primaryAuthor = parsedAuthor;
+  const titleVariants = getTitleSearchVariants(primaryTitle);
+
+  const seen = new Set<string>();
+  const results: BookSuggestion[] = [];
+
+  const addResult = (s: BookSuggestion) => {
+    const key = `${s.title.toLowerCase()}::${s.author.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    results.push(s);
+  };
+
+  // 1. Apple Books (IT + US) - Istantaneo, copertine 600x600 in alta risoluzione, immune a blocchi di quota 429
+  try {
+    const searchTerms: string[] = [];
+    if (primaryAuthor) {
+      for (const v of titleVariants) {
+        searchTerms.push(`${v} ${primaryAuthor}`.trim());
+      }
+      searchTerms.push(primaryAuthor);
+    }
+    for (const v of titleVariants) {
+      searchTerms.push(v);
+    }
+
+    for (const country of ['it', 'us']) {
+      for (const term of searchTerms.slice(0, 5)) {
+        const appleUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=ebook&country=${country}&limit=6`;
+        const res = await fetchWithTimeout(appleUrl, 3200);
+        if (!res.ok) continue;
+        const data = await res.json();
+        for (const item of data.results || []) {
+          if (!item.trackName || !item.artistName) continue;
+          let coverUrl: string | null = null;
+          if (item.artworkUrl100) {
+            coverUrl = item.artworkUrl100
+              .replace('100x100bb', '600x600bb')
+              .replace('http://', 'https://');
+          }
+          const releaseYear = item.releaseDate ? String(item.releaseDate).slice(0, 4) : null;
+          addResult({
+            id: `apple-${item.trackId || `${item.trackName}-${item.artistName}`}`,
+            title: item.trackName,
+            author: item.artistName,
+            coverUrl,
+            pages: null,
+            publishedYear: releaseYear,
+            source: 'Apple Books',
+          });
+        }
+      }
+      if (results.length >= 8) break;
+    }
+  } catch {}
+
+  // 2. Open Library search
+  if (results.length < 6) {
+    try {
+      const qTerm = primaryAuthor ? `${primaryTitle} ${primaryAuthor}` : primaryTitle;
+      const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(qTerm)}&limit=6`;
+      const res = await fetchWithTimeout(olUrl, 3500);
+      if (res.ok) {
+        const data = await res.json();
+        for (const doc of data.docs || []) {
+          if (!doc.title || !doc.author_name || doc.author_name.length === 0) continue;
+          const auth = doc.author_name[0];
+          let coverUrl: string | null = null;
+          if (doc.cover_i) {
+            coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+          } else if (doc.cover_edition_key) {
+            coverUrl = `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-L.jpg`;
+          }
+          addResult({
+            id: `ol-${doc.key || `${doc.title}-${auth}`}`,
+            title: doc.title,
+            author: auth,
+            coverUrl,
+            pages: doc.number_of_pages_median || doc.number_of_pages || null,
+            publishedYear: doc.first_publish_year ? String(doc.first_publish_year) : null,
+            source: 'Open Library',
+          });
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Google Books (se disponibile e non in errore 429)
+  if (results.length < 6) {
+    try {
+      const queries = [
+        primaryAuthor ? `intitle:${primaryTitle} inauthor:${primaryAuthor}` : primaryTitle,
+        primaryAuthor ? `${primaryTitle} ${primaryAuthor}` : primaryTitle,
+      ];
+      for (const q of queries) {
+        const gbUrl = getGoogleBooksUrl(encodeURIComponent(q), '&maxResults=6');
+        const res = await fetchWithTimeout(gbUrl, 3200);
+        if (!res.ok) continue;
+        const data = await res.json();
+        for (const item of data.items || []) {
+          const info = item?.volumeInfo;
+          if (!info || !info.title) continue;
+          const auth = Array.isArray(info.authors) && info.authors.length > 0 ? info.authors[0] : '';
+          let coverUrl: string | null = null;
+          if (info.imageLinks) {
+            const raw = info.imageLinks.thumbnail || info.imageLinks.smallThumbnail;
+            if (raw) coverUrl = raw.replace('http://', 'https://').replace('&edge=curl', '');
+          }
+          addResult({
+            id: `gb-${item.id}`,
+            title: info.title,
+            author: auth,
+            coverUrl,
+            pages: typeof info.pageCount === 'number' && info.pageCount > 0 ? info.pageCount : null,
+            publishedYear: info.publishedDate ? String(info.publishedDate).slice(0, 4) : null,
+            source: 'Google Books',
+          });
+        }
+        if (results.length >= 6) break;
+      }
+    } catch {}
+  }
+
+  if (primaryAuthor) {
+    results.sort((a, b) => {
+      const aMatches = isAuthorCompatible(primaryAuthor, a.author);
+      const bMatches = isAuthorCompatible(primaryAuthor, b.author);
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+      return 0;
+    });
+  }
+
+  return results.slice(0, 8);
+}
+
+export interface PlotSearchResult {
+  id: string;
+  source: 'Google Books' | 'Apple Books' | 'Wikipedia IT' | 'Open Library';
+  language?: 'it' | 'en' | 'other';
+  title: string;
+  subtitle: string | null;
+  authors: string[];
+  publisher: string | null;
+  publishedDate: string | null;
+  description: string;
+  pageCount: number | null;
+  categories: string[];
+  coverUrl: string | null;
+  isbn: string | null;
+}
+
+export type GoogleBookSearchResult = PlotSearchResult;
+
+/**
+ * Ricerca multi-catalogo online di trame (Apple Books + Google Books + Wikipedia IT + Open Library).
+ * Fornisce risultati completi e immediatamente selezionabili dall'utente per qualsiasi libro.
+ */
+export async function searchBookPlotsOnline(
+  query: string,
+  author?: string
+): Promise<PlotSearchResult[]> {
   const clean = sanitizeQuery(query);
   if (!clean || clean.length < 2) return [];
 
-  try {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(clean)}&langRestrict=it&maxResults=6`;
-    const res = await fetchWithTimeout(url, 3500);
-    if (!res.ok) return [];
+  const { title: parsedTitle, author: parsedAuthor } = parseTitleAndAuthorQuery(clean);
+  const primaryTitle = parsedTitle || clean;
+  const cleanAuthor = author ? sanitizeQuery(author) : parsedAuthor;
+  const titleVariants = getTitleSearchVariants(primaryTitle);
+  const seenPlots = new Set<string>();
 
-    const data = await res.json();
-    if (!data.items || !Array.isArray(data.items)) return [];
-
-    const seen = new Set<string>();
-    const results: BookSuggestion[] = [];
-
-    for (const item of data.items) {
-      const info = item?.volumeInfo;
-      if (!info || !info.title) continue;
-
-      const title = String(info.title).trim();
-      const author =
-        Array.isArray(info.authors) && info.authors.length > 0
-          ? String(info.authors[0]).trim()
-          : '';
-      if (!title || !author) continue;
-
-      const dedupKey = `${title.toLowerCase()}::${author.toLowerCase()}`;
-      if (seen.has(dedupKey)) continue;
-      seen.add(dedupKey);
-
-      const imageLinks = info.imageLinks;
-      let coverUrl: string | null = null;
-      if (imageLinks) {
-        const raw =
-          imageLinks.extraLarge ||
-          imageLinks.large ||
-          imageLinks.medium ||
-          imageLinks.thumbnail ||
-          imageLinks.smallThumbnail;
-        if (raw) {
-          coverUrl = raw.replace('http://', 'https://').replace('&edge=curl', '');
+  const [applePromise, googlePromise, wikiPromise, openLibPromise] = await Promise.allSettled([
+    // 1. Apple Books (IT + US)
+    (async () => {
+      try {
+        const appleResults: PlotSearchResult[] = [];
+        const terms: string[] = [];
+        if (cleanAuthor) {
+          for (const v of titleVariants) {
+            terms.push(`${v} ${cleanAuthor}`.trim());
+          }
+          terms.push(cleanAuthor);
         }
+        for (const v of titleVariants) {
+          terms.push(v);
+        }
+
+        for (const country of ['it', 'us']) {
+          for (const term of terms.slice(0, 5)) {
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=ebook&country=${country}&limit=8`;
+            const data = await fetchItunesSearch(url, 3800);
+            if (!data?.results || !Array.isArray(data.results)) continue;
+
+            for (const item of data.results) {
+              const trackName = String(item.trackName || '').trim();
+              if (!trackName) continue;
+              const rawDesc = item.description ? cleanPlotText(item.description) : null;
+              if (!rawDesc || rawDesc.length < 35) continue;
+
+              const lang = detectLanguage(rawDesc);
+              let coverUrl: string | null = null;
+              if (item.artworkUrl100) {
+                coverUrl = item.artworkUrl100
+                  .replace('100x100bb', '600x600bb')
+                  .replace('http://', 'https://');
+              }
+
+              appleResults.push({
+                id: `apple-${item.trackId || `${trackName}-${item.artistName}`}`,
+                source: 'Apple Books',
+                language: lang,
+                title: trackName,
+                subtitle: null,
+                authors: item.artistName ? [item.artistName] : [],
+                publisher: item.sellerName || null,
+                publishedDate: item.releaseDate ? String(item.releaseDate).slice(0, 4) : null,
+                description: rawDesc,
+                pageCount: null,
+                categories: Array.isArray(item.genres) ? normalizeCategoriesToItalian(item.genres) : [],
+                coverUrl,
+                isbn: null,
+              });
+            }
+          }
+          if (appleResults.length >= 5) break;
+        }
+        return appleResults;
+      } catch {
+        return [];
       }
+    })(),
 
-      const pages =
-        typeof info.pageCount === 'number' && info.pageCount > 0 ? info.pageCount : null;
-      const publishedYear = info.publishedDate ? String(info.publishedDate).slice(0, 4) : null;
+    // 2. Google Books API
+    (async () => {
+      try {
+        const searchTerms = [
+          cleanAuthor ? `intitle:${primaryTitle} inauthor:${cleanAuthor}` : primaryTitle,
+          clean,
+        ];
+        let items: any[] = [];
 
-      results.push({
-        id: item.id || dedupKey,
-        title,
-        author,
-        coverUrl,
-        pages,
-        publishedYear,
-      });
+        for (const st of searchTerms) {
+          let url = getGoogleBooksUrl(encodeURIComponent(st), '&maxResults=10&langRestrict=it');
+          let res = await fetchWithTimeout(url, 3500);
+          let data = res.ok ? await res.json() : null;
 
-      if (results.length >= 5) break;
+          if (!data?.items || data.items.length === 0) {
+            url = getGoogleBooksUrl(encodeURIComponent(st), '&maxResults=10');
+            res = await fetchWithTimeout(url, 3500);
+            data = res.ok ? await res.json() : null;
+          }
+
+          if (data?.items && Array.isArray(data.items)) {
+            items = data.items;
+            break;
+          }
+        }
+
+        if (items.length === 0) return [];
+
+        const missingDescIds = items
+          .filter((it) => !it?.volumeInfo?.description && it?.id)
+          .slice(0, 4)
+          .map((it) => it.id);
+
+        const detailMap = new Map<string, string>();
+        if (missingDescIds.length > 0) {
+          await Promise.allSettled(
+            missingDescIds.map(async (id) => {
+              try {
+                const detailRes = await fetchWithTimeout(
+                  getGoogleBooksUrl('', `&id=${encodeURIComponent(id)}`),
+                  3000
+                );
+                if (detailRes.ok) {
+                  const detailData = await detailRes.json();
+                  if (detailData?.volumeInfo?.description) {
+                    detailMap.set(id, detailData.volumeInfo.description);
+                  }
+                }
+              } catch {}
+            })
+          );
+        }
+
+        const gbResults: PlotSearchResult[] = [];
+        for (const item of items) {
+          const info = item?.volumeInfo || {};
+          const title = info.title ? String(info.title).trim() : '';
+          if (!title) continue;
+
+          let rawDesc = info.description || detailMap.get(item.id) || null;
+          if ((!rawDesc || rawDesc.length <= 25) && item?.searchInfo?.textSnippet) {
+            rawDesc = item.searchInfo.textSnippet;
+          }
+          const desc = rawDesc ? cleanPlotText(rawDesc) : null;
+          if (!desc || desc.length < 35) continue;
+
+          const lang = detectLanguage(desc);
+          const imageLinks = info.imageLinks;
+          let coverUrl: string | null = null;
+          if (imageLinks) {
+            const raw =
+              imageLinks.extraLarge ||
+              imageLinks.large ||
+              imageLinks.medium ||
+              imageLinks.thumbnail ||
+              imageLinks.smallThumbnail;
+            if (raw) {
+              coverUrl = raw.replace('http://', 'https://').replace('&edge=curl', '');
+            }
+          }
+
+          let isbn: string | null = null;
+          if (Array.isArray(info.industryIdentifiers)) {
+            const isbn13 = info.industryIdentifiers.find((id: any) => id.type === 'ISBN_13');
+            const isbn10 = info.industryIdentifiers.find((id: any) => id.type === 'ISBN_10');
+            isbn = isbn13?.identifier || isbn10?.identifier || null;
+          }
+
+          gbResults.push({
+            id: `gb-${item.id}`,
+            source: 'Google Books',
+            language: lang,
+            title,
+            subtitle: info.subtitle ? cleanPlotText(String(info.subtitle)) : null,
+            authors: Array.isArray(info.authors) ? info.authors.map(String) : [],
+            publisher: info.publisher ? String(info.publisher).trim() : null,
+            publishedDate: info.publishedDate ? String(info.publishedDate).slice(0, 4) : null,
+            description: desc,
+            pageCount: typeof info.pageCount === 'number' && info.pageCount > 0 ? info.pageCount : null,
+            categories: Array.isArray(info.categories) ? normalizeCategoriesToItalian(info.categories) : [],
+            coverUrl,
+            isbn,
+          });
+        }
+        return gbResults;
+      } catch {
+        return [];
+      }
+    })(),
+
+    // 3. Wikipedia Italia API
+    (async () => {
+      try {
+        const searchUrl = `https://it.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srsearch=${encodeURIComponent(
+          primaryTitle + (cleanAuthor ? ` ${cleanAuthor}` : ' romanzo')
+        )}&srlimit=6`;
+        const res = await fetchWithTimeout(searchUrl, 3800);
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        const searchItems = data?.query?.search;
+        if (!Array.isArray(searchItems) || searchItems.length === 0) return [];
+
+        const wikiResults: PlotSearchResult[] = [];
+        const topPages = searchItems
+          .filter((it: any) => !/\((disambigua|film|album|serie)/i.test(String(it.title || '')))
+          .slice(0, 3);
+
+        await Promise.allSettled(
+          topPages.map(async (page: any) => {
+            try {
+              const extUrl = `https://it.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&explaintext=1&pageids=${page.pageid}`;
+              const extRes = await fetchWithTimeout(extUrl, 3800);
+              if (!extRes.ok) return;
+
+              const extData = await extRes.json();
+              const fullText = String(extData?.query?.pages?.[page.pageid]?.extract || '').trim();
+              if (fullText.length < 70) return;
+
+              const intro = fullText.split(/\n==+\s*[^=]+\s*==+/)[0]?.trim() || '';
+              const sectionMatch = fullText.match(
+                /==+\s*(?:Trama[^=\n]*|Sinossi[^=\n]*|Contenuto|Descrizione|Argomento|Il racconto|Sintesi)\s*==+\s*([\s\S]*?)(?:\n==\s*[^=]+\s*==|$)/i
+              );
+
+              let plot = '';
+              if (sectionMatch && sectionMatch[1] && sectionMatch[1].trim().length > 40) {
+                const cleanSec = sectionMatch[1].replace(/===+\s*[^=]+\s*===+/g, '\n').trim();
+                plot = intro.length > 50 ? `${intro}\n\n${cleanSec}` : cleanSec;
+              } else if (intro.length > 60) {
+                plot = intro;
+              }
+
+              plot = cleanPlotText(plot);
+              if (plot.length > 2200) {
+                plot = plot.slice(0, 2200).replace(/\s+\S*$/, '') + '…';
+              }
+
+              if (plot && plot.length >= 40 && isItalianText(plot)) {
+                wikiResults.push({
+                  id: `wiki-${page.pageid}`,
+                  source: 'Wikipedia IT',
+                  language: 'it',
+                  title: String(page.title).replace(/\s*\([^)]*\)\s*$/, '').trim(),
+                  subtitle: null,
+                  authors: cleanAuthor ? [cleanAuthor] : [],
+                  publisher: null,
+                  publishedDate: null,
+                  description: plot,
+                  pageCount: null,
+                  categories: ['Enciclopedia'],
+                  coverUrl: null,
+                  isbn: null,
+                });
+              }
+            } catch {}
+          })
+        );
+        return wikiResults;
+      } catch {
+        return [];
+      }
+    })(),
+
+    // 4. Open Library API
+    (async () => {
+      try {
+        const qTerm = cleanAuthor ? `${primaryTitle} ${cleanAuthor}` : primaryTitle;
+        const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(qTerm)}&limit=5`;
+        const res = await fetchWithTimeout(url, 4200);
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        if (!data?.docs || !Array.isArray(data.docs)) return [];
+
+        const olResults: PlotSearchResult[] = [];
+        const topDocs = data.docs.slice(0, 4);
+
+        await Promise.allSettled(
+          topDocs.map(async (doc: any) => {
+            if (!doc.key) return;
+            try {
+              const workRes = await fetchWithTimeout(`https://openlibrary.org${doc.key}.json`, 3500);
+              if (!workRes.ok) return;
+
+              const workData = await workRes.json();
+              let rawDesc = '';
+              if (typeof workData.description === 'string') {
+                rawDesc = cleanPlotText(workData.description);
+              } else if (workData.description && typeof workData.description.value === 'string') {
+                rawDesc = cleanPlotText(workData.description.value);
+              }
+
+              if (rawDesc && rawDesc.length >= 35) {
+                const lang = detectLanguage(rawDesc);
+                let coverUrl: string | null = null;
+                if (doc.cover_i) {
+                  coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+                }
+
+                olResults.push({
+                  id: `ol-${doc.key}`,
+                  source: 'Open Library',
+                  language: lang,
+                  title: String(doc.title || clean),
+                  subtitle: doc.subtitle ? String(doc.subtitle) : null,
+                  authors: Array.isArray(doc.author_name) ? doc.author_name.map(String) : [],
+                  publisher: Array.isArray(doc.publisher) ? String(doc.publisher[0]) : null,
+                  publishedDate: doc.first_publish_year ? String(doc.first_publish_year) : null,
+                  description: rawDesc,
+                  pageCount: doc.number_of_pages_median || null,
+                  categories: Array.isArray(doc.subject) ? normalizeCategoriesToItalian(doc.subject) : [],
+                  coverUrl,
+                  isbn: Array.isArray(doc.isbn) ? String(doc.isbn[0]) : null,
+                });
+              }
+            } catch {}
+          })
+        );
+        return olResults;
+      } catch {
+        return [];
+      }
+    })(),
+  ]);
+
+  const rawList: PlotSearchResult[] = [];
+  if (applePromise.status === 'fulfilled') rawList.push(...applePromise.value);
+  if (googlePromise.status === 'fulfilled') rawList.push(...googlePromise.value);
+  if (wikiPromise.status === 'fulfilled') rawList.push(...wikiPromise.value);
+  if (openLibPromise.status === 'fulfilled') rawList.push(...openLibPromise.value);
+
+  const results: PlotSearchResult[] = [];
+  for (const item of rawList) {
+    const key = item.description.slice(0, 50).toLowerCase().replace(/\s+/g, ' ');
+    if (seenPlots.has(key)) continue;
+    seenPlots.add(key);
+    results.push(item);
+  }
+
+  // Ordina per pertinenza:
+  // 1. Risultati con autore coincidente
+  // 2. Lingua italiana prioritariamente in cima
+  // 3. Lunghezza e qualità del testo
+  results.sort((a, b) => {
+    if (cleanAuthor) {
+      const aAuth = a.authors.some((au) => isAuthorCompatible(cleanAuthor, au));
+      const bAuth = b.authors.some((au) => isAuthorCompatible(cleanAuthor, au));
+      if (aAuth && !bAuth) return -1;
+      if (!aAuth && bAuth) return 1;
     }
+    // Lingua italiana in cima
+    if (a.language === 'it' && b.language !== 'it') return -1;
+    if (a.language !== 'it' && b.language === 'it') return 1;
+    return b.description.length - a.description.length;
+  });
 
-    return results;
+  return results;
+}
+
+export const searchGoogleBooksManual = searchBookPlotsOnline;
+
+/**
+ * Salva e persiste una trama personalizzata o scelta da Google Books in cache e localStorage
+ */
+export function saveManualBookPlot(
+  title: string,
+  author: string | undefined,
+  plot: string,
+  extra?: Partial<BookDetails>
+): BookDetails {
+  const trimmedTitle = title.trim();
+  const trimmedAuthor = author?.trim() || '';
+  const cacheKey = `${trimmedTitle.toLowerCase()}::${trimmedAuthor.toLowerCase()}`;
+  const stored = loadStoredDetailsCache();
+
+  const current = detailsCache.get(cacheKey) || stored[cacheKey] || {
+    description: null,
+    publisher: null,
+    publishedDate: null,
+    categories: [],
+    pageCount: null,
+    isbn: null,
+    subtitle: null,
+    source: null,
+  };
+
+  const updated: BookDetails = {
+    ...current,
+    ...extra,
+    description: plot.trim(),
+    source: (extra?.source as any) || current.source || 'Google Books',
+  };
+
+  detailsCache.set(cacheKey, updated);
+  saveDetailsToStorage(cacheKey, updated);
+
+  if (trimmedAuthor) {
+    const noAuthorKey = `${trimmedTitle.toLowerCase()}::`;
+    detailsCache.set(noAuthorKey, updated);
+    saveDetailsToStorage(noAuthorKey, updated);
+  }
+
+  return updated;
+}
+
+/**
+ * Rimuove i dettagli salvati in cache per un libro
+ */
+export function clearCachedBookDetails(title: string, author?: string): void {
+  const trimmedTitle = title.trim();
+  const trimmedAuthor = author?.trim() || '';
+  const cacheKey = `${trimmedTitle.toLowerCase()}::${trimmedAuthor.toLowerCase()}`;
+  detailsCache.delete(cacheKey);
+  try {
+    const stored = loadStoredDetailsCache();
+    delete stored[cacheKey];
+    if (trimmedAuthor) {
+      delete stored[`${trimmedTitle.toLowerCase()}::`];
+    }
+    localStorage.setItem(DETAILS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
-    return [];
+    // ignore
   }
 }

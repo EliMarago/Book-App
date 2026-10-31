@@ -81,6 +81,53 @@ export function removeBookReadPages(bookId: string) {
   saveBookReadPages(bookId, null);
 }
 
+export function getStoredPlots(): Record<string, string> {
+  try {
+    const data = localStorage.getItem('books_plots');
+    return data ? JSON.parse(data) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveBookPlot(bookId: string, plot: string | null) {
+  try {
+    const stored = getStoredPlots();
+    if (plot && plot.trim()) {
+      stored[bookId] = plot.trim();
+    } else {
+      delete stored[bookId];
+    }
+    localStorage.setItem('books_plots', JSON.stringify(stored));
+  } catch (e) {
+    console.error('Errore nel salvataggio della trama in localStorage:', e);
+  }
+}
+
+export function removeBookPlot(bookId: string) {
+  saveBookPlot(bookId, null);
+}
+
+export async function syncBookPlotToSupabase(bookId: string, plot: string | null) {
+  saveBookPlot(bookId, plot);
+  try {
+    await supabase
+      .from('notes')
+      .delete()
+      .eq('book_id', bookId)
+      .like('content', '__PLOT__:%');
+
+    if (plot && plot.trim()) {
+      await supabase.from('notes').insert({
+        book_id: bookId,
+        content: `__PLOT__:${plot.trim()}`,
+      });
+    }
+  } catch (err) {
+    console.error('Errore nel sincronizzare la trama su Supabase:', err);
+  }
+}
+
 export async function syncBookReadPagesToSupabase(bookId: string, readPages: number | null) {
   saveBookReadPages(bookId, readPages);
   try {
@@ -149,6 +196,7 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
   dates: Record<string, string>;
   pages: Record<string, number>;
   readPages: Record<string, number>;
+  plots: Record<string, string>;
   counts: Record<string, number>;
 }> {
   try {
@@ -157,12 +205,13 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
       .select('book_id, content');
 
     if (error || !data) {
-      return { dates: {}, pages: {}, readPages: {}, counts: {} };
+      return { dates: {}, pages: {}, readPages: {}, plots: {}, counts: {} };
     }
 
     const dates: Record<string, string> = {};
     const pages: Record<string, number> = {};
     const readPages: Record<string, number> = {};
+    const plots: Record<string, string> = {};
     const counts: Record<string, number> = {};
 
     for (const item of data) {
@@ -178,15 +227,17 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
         if (!isNaN(rp) && rp >= 0) {
           readPages[item.book_id] = rp;
         }
+      } else if (item.content.startsWith('__PLOT__:')) {
+        plots[item.book_id] = item.content.replace('__PLOT__:', '');
       } else {
         counts[item.book_id] = (counts[item.book_id] || 0) + 1;
       }
     }
 
-    return { dates, pages, readPages, counts };
+    return { dates, pages, readPages, plots, counts };
   } catch (err) {
     console.error('Errore nel recupero note, date e pagine da Supabase:', err);
-    return { dates: {}, pages: {}, readPages: {}, counts: {} };
+    return { dates: {}, pages: {}, readPages: {}, plots: {}, counts: {} };
   }
 }
 

@@ -25,7 +25,18 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { supabase, type Book } from '@/lib/supabase';
-import { getStoredDates, removeBookDate, getStoredPages, removeBookPages, getStoredReadPages, removeBookReadPages, fetchNotesMetadataFromSupabase } from '@/lib/bookDates';
+import { matchesBookSearch } from '@/lib/bookSearch';
+import {
+  getStoredDates,
+  removeBookDate,
+  getStoredPages,
+  removeBookPages,
+  getStoredReadPages,
+  removeBookReadPages,
+  getStoredPlots,
+  removeBookPlot,
+  fetchNotesMetadataFromSupabase,
+} from '@/lib/bookDates';
 import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
 import { BookshelfView } from './BookshelfView';
@@ -101,8 +112,8 @@ export function Dashboard() {
     };
 
     const doScroll = (element: HTMLElement) => {
-      // Su mobile l'header scorre liberamente con la pagina, su desktop è sticky
-      const headerOffset = window.innerWidth < 640 ? 16 : 75;
+      // Header non-sticky a scorrimento naturale su tutti i dispositivi
+      const headerOffset = 16;
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
@@ -177,10 +188,11 @@ export function Dashboard() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      const [storedLocalDates, storedLocalPages, storedLocalReadPages, notesMeta] = await Promise.all([
+      const [storedLocalDates, storedLocalPages, storedLocalReadPages, storedLocalPlots, notesMeta] = await Promise.all([
         getStoredDates(),
         getStoredPages(),
         getStoredReadPages(),
+        getStoredPlots(),
         fetchNotesMetadataFromSupabase(),
       ]);
 
@@ -196,6 +208,7 @@ export function Dashboard() {
                   ? storedLocalReadPages[b.id]
                   : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
         notes_count: notesMeta.counts[b.id] || 0,
+        plot: b.plot || notesMeta.plots[b.id] || storedLocalPlots[b.id] || null,
       }));
 
       setBooks(booksWithDatesAndPages);
@@ -287,6 +300,7 @@ export function Dashboard() {
     removeBookDate(book.id);
     removeBookPages(book.id);
     removeBookReadPages(book.id);
+    removeBookPlot(book.id);
     setBooks((prev) => prev.filter((b) => b.id !== book.id));
     setPendingDeleteIds((prev) => prev.filter((id) => id !== book.id));
   }, [toast]);
@@ -339,12 +353,8 @@ export function Dashboard() {
     storeSort(key);
   };
 
-  // Libri filtrati per ricerca globale
-  const searchFilter = (b: Book) => {
-    if (!search.trim()) return true;
-    const q = search.trim().toLowerCase();
-    return b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q);
-  };
+  // Libri filtrati per ricerca globale intelligente
+  const searchFilter = (b: Book) => matchesBookSearch(b, search);
 
   // Suddivisione dei libri per stato (filtrati per ricerca e ordinati)
   const readingBooks = useMemo(
@@ -377,8 +387,8 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-stone-850 to-stone-900 light:from-[#fcfbfa] light:via-[#f7f4ed] light:to-[#fcfbfa] text-stone-100 light:text-stone-900 transition-colors duration-200">
-      {/* Header principale: su mobile scorre naturalmente senza bloccare la vista né applicare blur */}
-      <header className="relative sm:sticky sm:top-0 z-30 bg-stone-900 light:bg-[#fcfbfa] sm:bg-stone-900/90 sm:light:bg-[#fcfbfa]/90 sm:backdrop-blur-md border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
+      {/* Header principale: scorre naturalmente senza bloccarsi né creare aloni sfocati */}
+      <header className="relative z-30 bg-stone-900 light:bg-[#fcfbfa] border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/10 light:bg-amber-500/15 border border-amber-500/20 light:border-amber-500/30 text-amber-400 light:text-amber-600 shrink-0">
