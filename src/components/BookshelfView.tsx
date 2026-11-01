@@ -10,6 +10,7 @@ import {
   Layers,
   BookMarked,
   ArrowUpDown,
+  Pencil,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
@@ -496,10 +497,10 @@ export function BookshelfView({
                                 ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
                                 : 'bg-stone-850/80 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400 hover:bg-sky-500/10'
                             }`}
-                            title="Trascina o usa le frecce per posizionare i libri in base all'ordine di lettura"
+                            title="Modifica priorità di lettura con Drag and Drop"
                           >
-                            <ArrowUpDown size={12} />
-                            <span>{isReorderingWant ? 'Fine' : 'Riordina priorità'}</span>
+                            <Pencil size={12} />
+                            <span>{isReorderingWant ? 'Fine' : 'Modifica ordine'}</span>
                           </button>
                         )}
                         <span className="text-xs font-sans font-semibold px-2.5 py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
@@ -524,8 +525,8 @@ export function BookshelfView({
                               : 'bg-stone-850 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400'
                           }`}
                         >
-                          <ArrowUpDown size={12} />
-                          <span>{isReorderingWant ? 'Fine' : 'Sposta / Riordina'}</span>
+                          <Pencil size={12} />
+                          <span>{isReorderingWant ? 'Fine' : 'Modifica ordine'}</span>
                         </button>
                       </div>
                     )}
@@ -537,7 +538,7 @@ export function BookshelfView({
                       <div className="flex items-center gap-2">
                         <Bookmark size={14} className="shrink-0 text-sky-400" />
                         <span>
-                          <strong>Ordine di lettura:</strong> trascina i libri o usa le frecce <strong>‹</strong> e <strong>›</strong> per decidere quale leggerai prima (il <strong>#1</strong> è il prossimo).
+                          <strong>Ordine di lettura:</strong> trascina e rilascia i libri per decidere quale leggerai prima (il <strong>#1</strong> è il prossimo).
                         </span>
                       </div>
                       <button
@@ -702,49 +703,6 @@ export function BookshelfView({
                                   <span>{book.notes_count}</span>
                                 </div>
                               ) : null}
-
-                              {/* Controlli rapidi di riordino sulla copertina */}
-                              {isWantSection && section.books.length > 1 && (
-                                <div
-                                  className={`absolute bottom-2 left-2 right-2 z-30 flex items-center justify-center gap-1 transition-opacity duration-200 ${
-                                    isReorderingWant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-                                  }`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button
-                                    type="button"
-                                    disabled={isFirst}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleShift(book.id, 'left');
-                                    }}
-                                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
-                                      isFirst
-                                        ? 'opacity-20 bg-black/60 text-stone-400 cursor-not-allowed'
-                                        : 'bg-stone-900/95 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
-                                    }`}
-                                    title="Sposta prima"
-                                  >
-                                    ‹
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isLast}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleShift(book.id, 'right');
-                                    }}
-                                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
-                                      isLast
-                                        ? 'opacity-20 bg-black/60 text-stone-400 cursor-not-allowed'
-                                        : 'bg-stone-900/95 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
-                                    }`}
-                                    title="Sposta dopo"
-                                  >
-                                    ›
-                                  </button>
-                                </div>
-                              )}
                             </div>
 
                             {/* Ombra di contatto sotto il libro appoggiato sullo scaffale */}
@@ -931,51 +889,6 @@ export function BookshelfView({
                               >
                                 {book.pages ? `${book.pages}p` : '•'}
                               </span>
-
-                              {/* Controlli di spostamento rapido priorità ‹ e › sul dorso */}
-                              {isWantSection && section.books.length > 1 && (
-                                <div
-                                  className={`flex items-center justify-center gap-0.5 mt-1 transition-opacity duration-200 ${
-                                    isReorderingWant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-                                  }`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button
-                                    type="button"
-                                    disabled={isFirst}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleShift(book.id, 'left');
-                                    }}
-                                    aria-label="Sposta a sinistra"
-                                    className={`w-4 h-4 rounded text-[10px] font-black leading-none flex items-center justify-center transition-all ${
-                                      isFirst
-                                        ? 'opacity-20 text-stone-400 cursor-not-allowed bg-black/40'
-                                        : 'bg-stone-900/90 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
-                                    }`}
-                                    title="Sposta prima (aumenta priorità)"
-                                  >
-                                    ‹
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isLast}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleShift(book.id, 'right');
-                                    }}
-                                    aria-label="Sposta a destra"
-                                    className={`w-4 h-4 rounded text-[10px] font-black leading-none flex items-center justify-center transition-all ${
-                                      isLast
-                                        ? 'opacity-20 text-stone-400 cursor-not-allowed bg-black/40'
-                                        : 'bg-stone-900/90 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
-                                    }`}
-                                    title="Sposta dopo (diminuisci priorità)"
-                                  >
-                                    ›
-                                  </button>
-                                </div>
-                              )}
                             </div>
 
                             {/* Nervature orizzontali da legatoria classica */}

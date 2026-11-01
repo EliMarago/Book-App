@@ -135,7 +135,7 @@ export function MonthlyReadingStats({
                 {isSelectedActive ? (
                   <>
                     Filtro:{' '}
-                    <span className="text-emerald-400 light:text-emerald-700 font-bold">
+                    <span className="text-amber-400 light:text-amber-600 font-bold">
                       {MONTH_NAMES[selectedMonth].full} {activeYearNum}
                     </span>
                   </>
@@ -175,11 +175,11 @@ export function MonthlyReadingStats({
             <button
               type="button"
               onClick={() => onSelectMonth(null)}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300 light:text-emerald-800 bg-emerald-500/20 hover:bg-emerald-500/30 light:bg-emerald-100 light:hover:bg-emerald-200 border border-emerald-500/40 light:border-emerald-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
-              title="Rimuovi filtro mensile"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-300 light:text-stone-700 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+              title="Mostra tutti i mesi"
             >
               <X size={12} />
-              <span>Rimuovi filtro</span>
+              <span>Tutti i mesi</span>
             </button>
           )}
 
@@ -245,7 +245,7 @@ export function MonthlyReadingStats({
               onClick={() => handleMonthClick(null)}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border transition-all cursor-pointer shrink-0 active:scale-95 ${
                 selectedMonth === null
-                  ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-bold shadow-xs'
+                  ? 'bg-amber-500 text-stone-950 border-amber-400 font-bold shadow-xs'
                   : 'bg-stone-800/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-stone-100'
               }`}
             >
@@ -265,7 +265,7 @@ export function MonthlyReadingStats({
                   onClick={() => handleMonthClick(m.index)}
                   className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap border transition-all cursor-pointer shrink-0 flex items-center gap-1.5 active:scale-95 ${
                     isSelected
-                      ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-bold shadow-xs ring-1 ring-emerald-400/50'
+                      ? 'bg-amber-500 text-stone-950 border-amber-400 font-bold shadow-xs ring-2 ring-amber-400/50'
                       : isCurrent
                       ? 'bg-amber-500/15 light:bg-amber-100 text-amber-300 light:text-amber-900 border-amber-500/40 light:border-amber-300 hover:bg-amber-500/25'
                       : hasBooks
@@ -298,23 +298,6 @@ export function MonthlyReadingStats({
               );
             })}
           </div>
-
-          {/* Banner discreto di riepilogo se c'è un filtro attivo */}
-          {isSelectedActive && (
-            <div className="flex items-center justify-between gap-2 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/20 light:border-emerald-200 px-3 py-1.5 rounded-xl text-xs text-emerald-300 light:text-emerald-800">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 size={13} className="text-emerald-400 light:text-emerald-600" />
-                Filtro attivo: visualizzazione limitata a <strong>{MONTH_NAMES[selectedMonth].full} {activeYearNum}</strong> ({monthlyData[selectedMonth].books.length} {monthlyData[selectedMonth].books.length === 1 ? 'libro' : 'libri'})
-              </span>
-              <button
-                type="button"
-                onClick={() => onSelectMonth(null)}
-                className="text-[11px] font-semibold text-emerald-400 light:text-emerald-700 hover:underline cursor-pointer"
-              >
-                Annulla
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -20,6 +20,8 @@ import {
   Calendar,
   X,
   LayoutGrid,
+  Pencil,
+  GripVertical,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -60,7 +62,10 @@ export function Dashboard() {
   const { signOut, user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { toast } = useToast();
-  const { priorityOrder, setPriority, sortWantBooks, shiftBook } = useBookPriority();
+  const { priorityOrder, setPriority, sortWantBooks, shiftBook, reorderOnDrop } = useBookPriority();
+  const [isReorderingWantCards, setIsReorderingWantCards] = useState(false);
+  const [draggedCardBookId, setDraggedCardBookId] = useState<string | null>(null);
+  const [dragOverCardBookId, setDragOverCardBookId] = useState<string | null>(null);
   const [rawBooks, setBooks] = useState<Book[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const pendingDeletes = useRef<Map<string, { book: Book; timer: ReturnType<typeof setTimeout> }>>(new Map());
@@ -372,6 +377,18 @@ export function Dashboard() {
     return orderWantBooks(filtered, priorityOrder);
   }, [books, search, sortBy, priorityOrder]);
 
+  const handleCardDropReorder = useCallback(
+    (sourceId: string, targetId: string) => {
+      if (sourceId === targetId) return;
+      reorderOnDrop(wantBooks, sourceId, targetId);
+      if (sortBy !== 'priority') {
+        setSortBy('priority');
+        storeSort('priority');
+      }
+    },
+    [reorderOnDrop, wantBooks, sortBy]
+  );
+
   const completedBooks = useMemo(
     () => sortBooks(books.filter((b) => b.status === 'completed' && searchFilter(b)), sortBy),
     [books, search, sortBy]
@@ -399,23 +416,30 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-stone-850 to-stone-900 light:from-[#fcfbfa] light:via-[#f7f4ed] light:to-[#fcfbfa] text-stone-100 light:text-stone-900 transition-colors duration-200">
-      {/* Header principale: scorre naturalmente senza bloccarsi né creare aloni sfocati */}
+      {/* Copertura fissa e opaca per la Safe Area / Status Bar iOS (impedisce a WebKit di generare la sfocatura di sistema) */}
+      <div className="ios-status-bar-fill" aria-hidden="true" />
+
+      {/* Header principale solido e nitido: scorre naturalmente senza bloccarsi né creare aloni sfocati */}
       <header className="relative z-30 bg-stone-900 light:bg-[#fcfbfa] border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/10 light:bg-amber-500/15 border border-amber-500/20 light:border-amber-500/30 text-amber-400 light:text-amber-600 shrink-0">
+            <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/15 light:bg-amber-500/15 border border-amber-500/30 light:border-amber-500/30 text-amber-400 light:text-amber-600 shrink-0 shadow-xs">
               <BookOpen size={20} />
             </div>
             <div className="min-w-0">
-              <h1 className="font-serif text-lg font-bold text-stone-100 light:text-stone-900 leading-none">Bookshelf</h1>
-              <p className="text-xs text-stone-500 light:text-stone-500 mt-0.5 truncate max-w-[170px] xs:max-w-[240px] sm:max-w-xs">{user?.email}</p>
+              <h1 className="font-serif text-lg font-bold text-stone-100 light:text-stone-900 leading-none tracking-tight select-none antialiased">
+                Bookshelf
+              </h1>
+              <p className="text-xs text-stone-400 light:text-stone-500 mt-1 truncate max-w-[170px] xs:max-w-[240px] sm:max-w-xs font-sans">
+                {user?.email}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Toggle Modalità Chiara / Scura */}
             <button
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-300 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-950 bg-stone-800/80 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200/80 border border-stone-700/80 light:border-stone-300/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-200 light:text-stone-750 hover:text-white light:hover:text-stone-950 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
               title={isDark ? 'Passa alla modalità chiara' : 'Passa alla modalità scura'}
               aria-label="Cambia tema"
             >
@@ -432,7 +456,7 @@ export function Dashboard() {
             <button
               onClick={() => loadBooks(false)}
               disabled={isSyncing}
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-300 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-950 bg-stone-800/80 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200/80 border border-stone-700/80 light:border-stone-300/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-60 shadow-xs"
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-200 light:text-stone-750 hover:text-white light:hover:text-stone-950 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-60 shadow-xs active:scale-95"
               title={
                 lastSyncedAt
                   ? `Ultimo aggiornamento: ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Clicca per sincronizzare subito.`
@@ -712,7 +736,7 @@ export function Dashboard() {
         ) : activeTab === 'want' ? (
           /* VISTA: Solo libri Da Leggere */
           <div id="section-want" className="space-y-4 scroll-mt-20">
-            <div className="flex items-center justify-between border-b border-stone-800 light:border-stone-200 pb-3">
+            <div className="flex items-center justify-between border-b border-stone-800 light:border-stone-200 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-sky-500/15 light:bg-sky-100 border border-sky-500/25 light:border-sky-300 flex items-center justify-center text-sky-400 light:text-sky-700">
                   <Bookmark size={18} />
@@ -724,10 +748,46 @@ export function Dashboard() {
                   </p>
                 </div>
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-sky-50 text-sky-400 light:text-sky-700 border border-sky-500/20 light:border-sky-300/60">
-                {wantBooks.length} {wantBooks.length === 1 ? 'libro' : 'libri'}
-              </span>
+              <div className="flex items-center gap-2">
+                {wantBooks.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReorderingWantCards((v) => !v)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                      isReorderingWantCards
+                        ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
+                        : 'bg-stone-850 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400 hover:bg-sky-500/10'
+                    }`}
+                    title="Modifica priorità di lettura tramite Drag and Drop"
+                  >
+                    <Pencil size={12} />
+                    <span>{isReorderingWantCards ? 'Fine' : 'Modifica ordine'}</span>
+                  </button>
+                )}
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-sky-50 text-sky-400 light:text-sky-700 border border-sky-500/20 light:border-sky-300/60">
+                  {wantBooks.length} {wantBooks.length === 1 ? 'libro' : 'libri'}
+                </span>
+              </div>
             </div>
+
+            {/* Messaggio guida quando la modalità riordino è attiva */}
+            {isReorderingWantCards && wantBooks.length > 1 && (
+              <div className="px-3.5 py-2.5 rounded-xl bg-sky-950/60 light:bg-sky-50 border border-sky-500/30 flex items-center justify-between gap-3 text-xs text-sky-200 light:text-sky-900 shadow-inner">
+                <div className="flex items-center gap-2">
+                  <Bookmark size={14} className="shrink-0 text-sky-400" />
+                  <span>
+                    <strong>Drag and Drop attivo:</strong> trascina una scheda sopra un'altra per posizionarla nell'ordine desiderato (il <strong>#1</strong> è il prossimo).
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReorderingWantCards(false)}
+                  className="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs"
+                >
+                  Salva ordine
+                </button>
+              </div>
+            )}
 
             {wantBooks.length === 0 ? (
               <div className="bg-stone-850/30 light:bg-white border border-stone-800/80 light:border-stone-200/90 rounded-xl p-8 text-center shadow-xs">
@@ -749,23 +809,58 @@ export function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {wantBooks.map((book, idx) => (
-                  <BookCard
+                  <div
                     key={book.id}
-                    book={book}
-                    priorityRank={idx + 1}
-                    totalWantCount={wantBooks.length}
-                    onShiftPriority={(direction) => {
-                      shiftBook(wantBooks, book.id, direction);
-                      if (sortBy !== 'priority') {
-                        setSortBy('priority');
-                        storeSort('priority');
+                    draggable={isReorderingWantCards || wantBooks.length > 1}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', book.id);
+                      e.dataTransfer.effectAllowed = 'move';
+                      setDraggedCardBookId(book.id);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverCardBookId !== book.id) {
+                        setDragOverCardBookId(book.id);
                       }
                     }}
-                    onUpdate={handleUpdateBook}
-                    onDelete={handleDeleteBook}
-                    onEdit={handleOpenEditBook}
-                    onInspect={setInspectingBook}
-                  />
+                    onDragLeave={(e) => {
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                      if (dragOverCardBookId === book.id) {
+                        setDragOverCardBookId(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const sourceId = e.dataTransfer.getData('text/plain') || draggedCardBookId;
+                      if (sourceId && sourceId !== book.id) {
+                        handleCardDropReorder(sourceId, book.id);
+                      }
+                      setDraggedCardBookId(null);
+                      setDragOverCardBookId(null);
+                    }}
+                    className={`transition-all duration-200 rounded-2xl ${
+                      draggedCardBookId === book.id ? 'opacity-40 scale-[0.98]' : ''
+                    } ${
+                      dragOverCardBookId === book.id
+                        ? 'ring-2 ring-sky-400 border-sky-400 scale-[1.01] shadow-lg shadow-sky-500/20'
+                        : ''
+                    } ${
+                      isReorderingWantCards ? 'cursor-grab active:cursor-grabbing' : ''
+                    }`}
+                  >
+                    <BookCard
+                      book={book}
+                      priorityRank={idx + 1}
+                      totalWantCount={wantBooks.length}
+                      isDraggable={isReorderingWantCards}
+                      onUpdate={handleUpdateBook}
+                      onDelete={handleDeleteBook}
+                      onEdit={handleOpenEditBook}
+                      onInspect={setInspectingBook}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -836,7 +931,7 @@ export function Dashboard() {
                 {/* 2. SEZIONE DA LEGGERE */}
                 {wantBooks.length > 0 && (
                   <section id="section-want-in-all" className="space-y-4 scroll-mt-20">
-                    <div className="flex items-center justify-between border-b border-stone-800 light:border-stone-200 pb-3">
+                    <div className="flex items-center justify-between border-b border-stone-800 light:border-stone-200 pb-3 flex-wrap gap-2">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-sky-500/15 light:bg-sky-100 border border-sky-500/25 light:border-sky-300 flex items-center justify-center text-sky-400 light:text-sky-700">
                           <Bookmark size={18} />
@@ -848,30 +943,82 @@ export function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-sky-50 text-sky-400 light:text-sky-700 border border-sky-500/20 light:border-sky-300/60 whitespace-nowrap shrink-0">
-                        {wantBooks.length} {wantBooks.length === 1 ? 'libro' : 'libri'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {wantBooks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsReorderingWantCards((v) => !v)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                              isReorderingWantCards
+                                ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
+                                : 'bg-stone-850 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400 hover:bg-sky-500/10'
+                            }`}
+                            title="Modifica priorità di lettura tramite Drag and Drop"
+                          >
+                            <Pencil size={12} />
+                            <span>{isReorderingWantCards ? 'Fine' : 'Modifica ordine'}</span>
+                          </button>
+                        )}
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-800 light:bg-sky-50 text-sky-400 light:text-sky-700 border border-sky-500/20 light:border-sky-300/60 whitespace-nowrap shrink-0">
+                          {wantBooks.length} {wantBooks.length === 1 ? 'libro' : 'libri'}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       {wantBooks.map((book, idx) => (
-                        <BookCard
+                        <div
                           key={book.id}
-                          book={book}
-                          priorityRank={idx + 1}
-                          totalWantCount={wantBooks.length}
-                          onShiftPriority={(direction) => {
-                            shiftBook(wantBooks, book.id, direction);
-                            if (sortBy !== 'priority') {
-                              setSortBy('priority');
-                              storeSort('priority');
+                          draggable={isReorderingWantCards || wantBooks.length > 1}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', book.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggedCardBookId(book.id);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            if (dragOverCardBookId !== book.id) {
+                              setDragOverCardBookId(book.id);
                             }
                           }}
-                          onUpdate={handleUpdateBook}
-                          onDelete={handleDeleteBook}
-                          onEdit={handleOpenEditBook}
-                          onInspect={setInspectingBook}
-                        />
+                          onDragLeave={(e) => {
+                            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                            if (dragOverCardBookId === book.id) {
+                              setDragOverCardBookId(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const sourceId = e.dataTransfer.getData('text/plain') || draggedCardBookId;
+                            if (sourceId && sourceId !== book.id) {
+                              handleCardDropReorder(sourceId, book.id);
+                            }
+                            setDraggedCardBookId(null);
+                            setDragOverCardBookId(null);
+                          }}
+                          className={`transition-all duration-200 rounded-2xl ${
+                            draggedCardBookId === book.id ? 'opacity-40 scale-[0.98]' : ''
+                          } ${
+                            dragOverCardBookId === book.id
+                              ? 'ring-2 ring-sky-400 border-sky-400 scale-[1.01] shadow-lg shadow-sky-500/20'
+                              : ''
+                          } ${
+                            isReorderingWantCards ? 'cursor-grab active:cursor-grabbing' : ''
+                          }`}
+                        >
+                          <BookCard
+                            book={book}
+                            priorityRank={idx + 1}
+                            totalWantCount={wantBooks.length}
+                            isDraggable={isReorderingWantCards}
+                            onUpdate={handleUpdateBook}
+                            onDelete={handleDeleteBook}
+                            onEdit={handleOpenEditBook}
+                            onInspect={setInspectingBook}
+                          />
+                        </div>
                       ))}
                     </div>
                   </section>

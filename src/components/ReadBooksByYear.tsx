@@ -356,7 +356,7 @@ export function ReadBooksByYear({
                         <button
                           type="button"
                           onClick={() => setSelectedMonth(null)}
-                          className="mt-2 text-xs font-semibold text-emerald-400 light:text-emerald-700 hover:underline cursor-pointer"
+                          className="mt-2 text-xs font-semibold text-amber-400 light:text-amber-600 hover:underline cursor-pointer"
                         >
                           Mostra tutti i libri dell'anno
                         </button>

@@ -59,19 +59,36 @@
     color: inherit;
   }
 
-  /* Eliminazione categorica di qualsiasi effetto blur o sticky sull'header su mobile, tablet e desktop */
+  /* Barra di navigazione principale solida e nitida: elimina qualsiasi blur o alone di sistema su iOS Safari, PWA e tablet */
   header {
     position: relative !important;
     top: auto !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background-color: #1c1917 !important;
-    isolation: isolate;
   }
 
   .light header,
   [data-theme='light'] header {
     background-color: #fcfbfa !important;
+  }
+
+  /* Copertura fissa per la Safe Area superiore di iOS: impedisce a WebKit di generare la sfocatura di sistema */
+  .ios-status-bar-fill {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background-color: #1c1917;
+    z-index: 45;
+    pointer-events: none;
+    transition: background-color 0.2s ease;
+  }
+
+  .light .ios-status-bar-fill,
+  [data-theme='light'] .ios-status-bar-fill {
+    background-color: #fcfbfa;
   }
 }
 

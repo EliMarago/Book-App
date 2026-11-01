@@ -50,10 +50,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.setAttribute('data-theme', 'dark');
     }
 
-    // Aggiorna anche il meta theme-color per la barra del browser / PWA
+    // Aggiorna anche i meta tag theme-color e status-bar per la barra del browser / iOS PWA
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', theme === 'light' ? '#fcfbfa' : '#1c1917');
+    }
+    const metaStatusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (metaStatusBar) {
+      metaStatusBar.setAttribute('content', theme === 'light' ? 'default' : 'black-translucent');
     }
   }, [theme]);
 
