@@ -1,8 +1,9 @@
 import type { Book } from '@/lib/supabase';
 
-export type SortKey = 'recent' | 'oldest' | 'title' | 'author' | 'rating';
+export type SortKey = 'recent' | 'oldest' | 'title' | 'author' | 'rating' | 'priority';
 
 export const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: 'priority', label: 'Priorità di lettura' },
   { value: 'recent', label: 'Più recenti' },
   { value: 'oldest', label: 'Meno recenti' },
   { value: 'title', label: 'Titolo (A-Z)' },
@@ -17,9 +18,23 @@ function dateValue(b: Book) {
   return isNaN(d) ? 0 : d;
 }
 
-export function sortBooks(books: Book[], key: SortKey): Book[] {
+export function sortBooks(books: Book[], key: SortKey, priorityOrder?: string[]): Book[] {
   const list = [...books];
   switch (key) {
+    case 'priority': {
+      if (!priorityOrder || priorityOrder.length === 0) {
+        return list.sort((a, b) => dateValue(b) - dateValue(a));
+      }
+      const idMap = new Map<string, number>();
+      priorityOrder.forEach((id, idx) => idMap.set(id, idx));
+
+      return list.sort((a, b) => {
+        const pA = idMap.has(a.id) ? idMap.get(a.id)! : 999999;
+        const pB = idMap.has(b.id) ? idMap.get(b.id)! : 999999;
+        if (pA !== pB) return pA - pB;
+        return dateValue(b) - dateValue(a);
+      });
+    }
     case 'oldest':
       return list.sort((a, b) => dateValue(a) - dateValue(b));
     case 'title':

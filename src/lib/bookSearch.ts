@@ -63,13 +63,21 @@ export function parseTitleAndAuthorQuery(input: string): { title: string; author
 export function getTitleSearchVariants(rawTitle: string): string[] {
   if (!rawTitle) return [];
   const clean = rawTitle.trim();
-  const list: string[] = [clean];
+  const list: string[] = [];
 
   // Riconosce separatori frequenti: punto seguito da spazio, due punti, trattino, barra o parentesi
   const parts = clean
-    .split(/[\.:\-\/|\(\)]+/)
+    .split(/[.:/|()\-]+/)
     .map((s) => s.trim())
     .filter((s) => s.length >= 3);
+
+  // Se il titolo è composto da più sezioni (es. "Titolo Principale. Sottotitolo"),
+  // la parte principale va al primo posto per massimizzare la precisione nei cataloghi
+  if (parts.length > 1 && parts[0].length >= 3) {
+    list.push(parts[0]);
+  }
+
+  list.push(clean);
 
   for (const p of parts) {
     if (!list.some((existing) => existing.toLowerCase() === p.toLowerCase())) {

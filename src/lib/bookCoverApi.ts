@@ -426,9 +426,10 @@ export interface BookDetails {
   isbn: string | null;
   subtitle: string | null;
   source: 'Google Books' | 'Apple Books' | 'Wikipedia IT' | 'Open Library' | null;
+  fallbackDescription?: string | null;
 }
 
-const DETAILS_STORAGE_KEY = 'bookshelf_book_details_it_v9';
+const DETAILS_STORAGE_KEY = 'bookshelf_book_details_it_v10';
 const detailsCache = new Map<string, BookDetails>();
 
 // Pulisce tutte le versioni precedenti della cache per rimuovere trame in lingua straniera o non corrette
@@ -525,25 +526,25 @@ async function fetchItunesSearch(url: string, timeoutMs = 4500): Promise<any | n
   });
 }
 
+// Parole UNICAMENTE e inequivocabilmente dell'ortografia/grammatica italiana
+// (Escluse categoricamente parole brevi ambigue che esistono anche in inglese come 'a', 'in', 'no', 'me', 'per', 'fine', 'era')
 const ITALIAN_STOPWORDS = new Set([
   'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una',
-  'e', 'ed', 'o', 'od', 'si', 'se', 'mi', 'ti', 'ci', 'vi', 'li', 'ne',
-  'di', 'del', 'dello', 'della', 'dei', 'degli', 'delle', 'dell',
-  'a', 'al', 'allo', 'alla', 'ai', 'agli', 'alle', 'all',
-  'da', 'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle', 'dall',
-  'in', 'nel', 'nello', 'nella', 'nei', 'negli', 'nelle', 'nell',
-  'con', 'col', 'coi',
-  'su', 'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'sull',
-  'per', 'tra', 'fra', 'che', 'cui', 'chi', 'non', 'più', 'anche',
-  'ma', 'però', 'quindi', 'cioè', 'infatti', 'mentre', 'quando',
+  'del', 'dello', 'della', 'dei', 'degli', 'delle', 'dell',
+  'al', 'allo', 'alla', 'ai', 'agli', 'alle', 'all',
+  'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle', 'dall',
+  'nel', 'nello', 'nella', 'nei', 'negli', 'nelle', 'nell',
+  'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'sull',
+  'con', 'col', 'coi', 'tra', 'fra', 'che', 'cui', 'chi', 'non', 'più', 'anche',
+  'però', 'quindi', 'cioè', 'infatti', 'mentre', 'quando',
   'dove', 'perché', 'poiché', 'finché', 'così', 'già', 'può', 'possono',
-  'è', 'sono', 'era', 'erano', 'fu', 'stato', 'stata', 'stati', 'state',
+  'è', 'sono', 'erano', 'fu', 'stato', 'stata', 'stati', 'state',
   'essere', 'ha', 'hanno', 'aveva', 'avevano', 'sarà', 'sarebbe', 'sia',
-  'tutto', 'tutti', 'tutta', 'tutte', 'solo', 'soltanto', 'dopo', 'prima',
+  'tutto', 'tutti', 'tutta', 'tutte', 'soltanto', 'dopo', 'prima',
   'ancora', 'sempre', 'molto', 'molti', 'molte', 'altro', 'altri', 'altra', 'altre',
   'stesso', 'stessa', 'suo', 'sua', 'suoi', 'sue', 'loro', 'proprio', 'propria',
   'questo', 'questa', 'questi', 'queste', 'quello', 'quella', 'quelli', 'quelle',
-  'quale', 'quali', 'come', 'fino', 'ogni', 'senza', 'contro', 'durante',
+  'quale', 'quali', 'senza', 'contro', 'durante',
   'insieme', 'intorno', 'dentro', 'fuori', 'dietro', 'sopra', 'sotto', 'oltre',
   'attraverso', 'verso', 'romanzo', 'romanzi', 'storia', 'storie', 'libro', 'libri',
   'protagonista', 'protagonisti', 'vita', 'mondo', 'anni', 'giorni', 'uomo', 'donna',
@@ -555,10 +556,10 @@ const ITALIAN_STOPWORDS = new Set([
   'amico', 'amici', 'segreto', 'segreti', 'mistero', 'indagine', 'omicidio',
   'commissario', 'ispettore', 'polizia', 'destino', 'passione', 'dolore', 'paura',
   'speranza', 'avventura', 'guerra', 'secolo', 'italia', 'notte', 'giorno', 'volta',
-  'volte', 'parte', 'fine', 'inizio', 'mezzo', 'nulla', 'niente', 'qualcosa',
+  'volte', 'inizio', 'mezzo', 'nulla', 'niente', 'qualcosa',
   'qualcuno', 'nessuno', 'alcuni', 'alcune', 'invece', 'eppure', 'tuttavia',
   'inoltre', 'infine', 'spesso', 'forse', 'quasi', 'intanto', 'allora', 'ora',
-  'oggi', 'ieri', 'domani', 'qui', 'là', 'lì', 'né', 'sé', 'ciò', 'scopre',
+  'oggi', 'ieri', 'domani', 'qui', 'là', 'lì', 'sé', 'ciò', 'scopre',
   'decide', 'vive', 'torna', 'incontra', 'cerca', 'trova', 'sembra', 'diventa',
   'lascia', 'porta', 'arriva', 'essa', 'esse',
 ]);
@@ -566,22 +567,27 @@ const ITALIAN_STOPWORDS = new Set([
 // Parole ESCLUSIVE di altre lingue (English, Spanish, French, German, Portuguese) che NON esistono in italiano
 const FOREIGN_STOPWORDS = new Set([
   // English
-  'the', 'of', 'to', 'is', 'that', 'was', 'for', 'on', 'are', 'as', 'with', 'his',
+  'the', 'and', 'of', 'to', 'is', 'you', 'that', 'it', 'he', 'was', 'for', 'on', 'are', 'as', 'with', 'his',
   'they', 'at', 'be', 'this', 'have', 'from', 'had', 'by', 'but', 'not', 'what', 'were', 'we',
-  'when', 'your', 'can', 'said', 'there', 'an', 'each', 'which', 'she', 'how', 'their', 'will', 'other',
-  'about', 'out', 'many', 'then', 'them', 'these', 'some', 'her', 'would', 'make', 'him', 'into',
+  'when', 'your', 'can', 'said', 'there', 'an', 'each', 'which', 'she', 'how', 'their', 'if', 'will', 'other',
+  'about', 'out', 'many', 'then', 'them', 'these', 'some', 'her', 'would', 'make', 'makes', 'him', 'into',
   'has', 'look', 'two', 'more', 'write', 'see', 'could', 'people', 'my', 'than', 'first', 'been', 'who',
   'its', 'now', 'find', 'down', 'day', 'did', 'get', 'over', 'new', 'only', 'little',
   'know', 'year', 'after', 'thing', 'our', 'just', 'good', 'think', 'great', 'where',
-  'help', 'through', 'much', 'before', 'too', 'any', 'same', 'tell', 'boy', 'follow', 'came', 'want', 'show',
+  'help', 'helps', 'through', 'much', 'before', 'too', 'any', 'same', 'tell', 'boy', 'follow', 'came', 'want', 'wants', 'show',
   'around', 'three', 'small', 'does', 'another', 'well', 'large', 'must', 'big', 'even',
-  'such', 'because', 'turn', 'here', 'why', 'ask', 'went', 'men', 'read', 'need', 'different', 'home',
+  'such', 'because', 'turn', 'turns', 'here', 'why', 'ask', 'went', 'men', 'read', 'need', 'needs', 'different', 'home',
   'us', 'move', 'kind', 'again', 'change', 'off', 'away', 'house', 'answer',
   'found', 'study', 'still', 'learn', 'should', 'world', 'high', 'every', 'food', 'between', 'own', 'below',
-  'country', 'last', 'school', 'keep', 'never', 'start', 'earth', 'eyes', 'light',
+  'country', 'last', 'school', 'keep', 'never', 'start', 'starts', 'earth', 'eyes', 'light',
   'thought', 'head', 'under', 'story', 'novel', 'book', 'author', 'reader', 'chapter',
   'characters', 'friends', 'life', 'death', 'dark', 'girl', 'woman', 'wife',
   'husband', 'brother', 'sister', 'child', 'children', 'secrets', 'war', 'published', 'edition',
+  'happy', 'baker', 'bakery', 'town', 'dad', 'mom', 'love', 'sweet', 'cozy', 'romance', 'plenty', 'seems',
+  'until', 'meets', 'single', 'escape', 'fresh', 'late', 'encounter', 'takes', 'taking', 'setting', 'set',
+  'shop', 'local', 'wedding', 'family', 'second', 'chance', 'moment', 'moments', 'perfect', 'daughter', 'daughters',
+  'divorce', 'inn', 'breakfast', 'bed', 'holiday', 'heart', 'kiss', 'fall', 'falling', 'summer', 'winter',
+  'together', 'feel', 'feels', 'feeling', 'deal', 'dating', 'fake',
   // Spanish
   'el', 'los', 'las', 'unos', 'unas', 'por', 'para', 'sin', 'sobre', 'entre', 'hasta',
   'desde', 'hacia', 'según', 'sus', 'estos', 'estas', 'esos', 'esas',
@@ -640,18 +646,18 @@ export function isItalianText(text: string | null | undefined): boolean {
     if (ITALIAN_STOPWORDS.has(w)) italianCount++;
   }
 
-  // Se contiene più di 2 parole straniere esclusive, NON è italiano (es. inglese, spagnolo, francese, tedesco)
-  if (foreignCount > 2) return false;
+  // Deve contenere almeno 1 parola tipicamente italiana per testi brevissimi, almeno 2 per testi normali
+  if (italianCount < (words.length < 20 ? 1 : 2)) return false;
 
-  // Se contiene 1 o 2 parole straniere (es. titolo originale inglese o nome proprio tipo "New York"),
-  // l'italiano deve dominare nettamente (almeno 3 parole italiane per parola straniera e almeno 3 parole italiane)
+  // Se contiene parole straniere (termini inglesi, loanword, citazioni o lingua estera):
+  // 1. Il conteggio straniero NON può mai eguagliare o superare quello italiano (in testi inglesi foreign >> italian)
+  // 2. Le parole italiane devono dominare nettamente (almeno 1.5x quelle straniere e almeno 3 parole italiane)
   if (foreignCount > 0) {
-    return italianCount >= foreignCount * 3 && italianCount >= 3;
+    if (foreignCount >= italianCount) return false;
+    return italianCount >= foreignCount * 1.5 && italianCount >= 3;
   }
 
-  // Nessuna parola straniera rilevata: deve contenere almeno 1 parola tipica italiana per testi brevi,
-  // o almeno 2 per testi normali
-  return italianCount >= (words.length < 15 ? 1 : 2);
+  return true;
 }
 
 /**
@@ -673,7 +679,7 @@ export function detectLanguage(text: string | null | undefined): 'it' | 'en' | '
   }
 
   if (itCount >= 3 && itCount > enCount * 1.5) return 'it';
-  if (enCount >= 3 && enCount > itCount) return 'en';
+  if (enCount >= 2 && enCount > itCount) return 'en';
   return 'other';
 }
 
@@ -720,25 +726,25 @@ function getTitleVariants(rawTitle: string): string[] {
       .replace(/\(\s*\)/g, '')
   );
 
+  // Separa su ':', ' - ', ' – ', '—', '/', '(', o su punto seguito da spazio o lettera
+  const parts = rawTitle
+    .split(/(?:\s*[:\-–—/()]\s*|\.\s+|\s*\.\s*(?=[A-Za-z]))/)
+    .map((p) => sanitizeQuery(p))
+    .filter((p) => p.length >= 2);
+
+  // Se il titolo contiene un sottotitolo o parti, la parte principale va al primo posto
+  if (parts.length > 1 && parts[0].length >= 3 && !variants.includes(parts[0])) {
+    variants.push(parts[0]);
+  }
+
   // Titolo intero
   const full = sanitizeQuery(rawTitle);
-  if (full) {
+  if (full && !variants.includes(full)) {
     variants.push(full);
   }
 
   if (withoutVol && withoutVol.length >= 2 && !variants.includes(withoutVol)) {
     variants.push(withoutVol);
-  }
-
-  // Separa su ':', ' - ', ' – ', '('
-  const parts = rawTitle
-    .split(/\s*[:\-–—(]\s*/)
-    .map((p) => sanitizeQuery(p))
-    .filter((p) => p.length >= 2);
-
-  // Se il titolo contiene un sottotitolo separato da ':' o '-', inserisce prima la parte principale
-  if (parts.length > 1 && parts[0].length >= 3 && !variants.includes(parts[0])) {
-    variants.unshift(parts[0]);
   }
 
   // Variante senza numero finale (es. "Harry Potter 1" -> "Harry Potter")
@@ -847,18 +853,34 @@ function isTitleCompatible(queryTitle: string, candidateTitle: string): boolean 
   }
 
   // Separa eventuale sottotitolo o indicazione volume prima di normalizzare
-  const candMain = normalizeForCompare(
-    candidateTitle
-      .split(/\s*[:\-–—(]\s*/)[0]
-      .replace(/\b(vol\.?|volume|tomo|parte|libro|ediz|edizione|integrale)\s*\d*\b/gi, '')
-  );
-  const queryMain = normalizeForCompare(
-    queryTitle
-      .split(/\s*[:\-–—(]\s*/)[0]
-      .replace(/\b(vol\.?|volume|tomo|parte|libro|ediz|edizione|integrale)\s*\d*\b/gi, '')
-  );
+  const candParts = candidateTitle
+    .split(/(?:\s*[:\-–—/()]\s*|\.\s+|\s*\.\s*(?=[A-Za-z]))/)
+    .map((p) =>
+      normalizeForCompare(
+        p.replace(/\b(vol\.?|volume|tomo|parte|libro|ediz|edizione|integrale)\s*\d*\b/gi, '')
+      )
+    )
+    .filter(Boolean);
 
-  if (candMain === queryMain || candMain === normQuery) return true;
+  const queryParts = queryTitle
+    .split(/(?:\s*[:\-–—/()]\s*|\.\s+|\s*\.\s*(?=[A-Za-z]))/)
+    .map((p) =>
+      normalizeForCompare(
+        p.replace(/\b(vol\.?|volume|tomo|parte|libro|ediz|edizione|integrale)\s*\d*\b/gi, '')
+      )
+    )
+    .filter(Boolean);
+
+  const candMain = candParts[0] || normCand;
+  const queryMain = queryParts[0] || normQuery;
+
+  if (candMain === queryMain || candMain === normQuery || queryMain === normCand) return true;
+  if (candParts.some((cp) => cp === queryMain || cp === normQuery)) return true;
+  if (queryParts.some((qp) => qp === candMain || qp === normCand)) return true;
+
+  // Se uno include l'altro all'inizio (es. "Felicità e altri disastri" vs "Felicità e altri disastri...")
+  if (normQuery.startsWith(candMain) && candMain.length >= 6) return true;
+  if (normCand.startsWith(queryMain) && queryMain.length >= 6) return true;
 
   // Per titoli corti (<= 5 caratteri o 1 parola), DEVE esserci coincidenza del titolo principale
   if (normQuery.length <= 5 || !normQuery.includes(' ')) {
@@ -1169,6 +1191,7 @@ async function fetchDetailsFromGoogleBooks(
   let bestWithPlot: BookDetails | null = null;
   let bestQualityScore = 0;
   let bestPartial: BookDetails | null = null;
+  let bestFallbackDesc: string | null = null;
   const volumeIdsToInspect: string[] = [];
 
   const seenQueries = new Set<string>();
@@ -1212,8 +1235,11 @@ async function fetchDetailsFromGoogleBooks(
           }
         }
 
-        // Accetta SOLO ED ESCLUSIVAMENTE trame verificate in lingua italiana
+        // Accetta trame verificate in lingua italiana, registrando l'originale come fallback
         const validItalianDesc = rawDesc && isItalianText(rawDesc) ? rawDesc : null;
+        if (!validItalianDesc && rawDesc && rawDesc.length >= 40 && !bestFallbackDesc) {
+          bestFallbackDesc = rawDesc;
+        }
 
         // Se il libro combacia ma la lista non ha la descrizione completa, salviamo l'ID per lookup diretto
         if (
@@ -1349,7 +1375,11 @@ async function fetchDetailsFromGoogleBooks(
     }
   }
 
-  return bestWithPlot || bestPartial;
+  const finalResult = bestWithPlot || bestPartial;
+  if (finalResult && !finalResult.description && bestFallbackDesc) {
+    finalResult.fallbackDescription = bestFallbackDesc;
+  }
+  return finalResult;
 }
 
 /**
@@ -1377,6 +1407,7 @@ async function fetchDetailsFromAppleBooks(
 
   let bestMatch: BookDetails | null = null;
   let bestQualityScore = 0;
+  let bestAppleFallback: string | null = null;
 
   for (const term of searchTerms) {
     try {
@@ -1402,8 +1433,11 @@ async function fetchDetailsFromAppleBooks(
         const desc = item.description ? cleanPlotText(item.description) : null;
         if (!desc || desc.length <= 25) continue;
 
-        // Scarta categoricamente trame non in italiano
+        // Traccia l'originale come fallback se non è in italiano
         if (!isItalianText(desc)) {
+          if (!bestAppleFallback && desc.length >= 40) {
+            bestAppleFallback = desc;
+          }
           continue;
         }
 
@@ -1436,6 +1470,10 @@ async function fetchDetailsFromAppleBooks(
     } catch {
       // continua
     }
+  }
+
+  if (bestMatch && !bestMatch.description && bestAppleFallback) {
+    bestMatch.fallbackDescription = bestAppleFallback;
   }
 
   return bestMatch;
@@ -1731,15 +1769,11 @@ export async function fetchBookDetails(
 
   if (!forceRefresh) {
     const cached = detailsCache.get(cacheKey);
-    if (cached && cached.description && isItalianText(cached.description)) {
+    if (cached && cached.description) {
       return cached;
     }
     const stored = loadStoredDetailsCache();
-    if (
-      stored[cacheKey] &&
-      stored[cacheKey].description &&
-      isItalianText(stored[cacheKey].description)
-    ) {
+    if (stored[cacheKey] && stored[cacheKey].description) {
       detailsCache.set(cacheKey, stored[cacheKey]);
       return stored[cacheKey];
     }
@@ -1817,8 +1851,18 @@ export async function fetchBookDetails(
     }
   }
 
-  // Salviamo in cache solo se abbiamo una trama italiana verificata al 100%
-  if (merged.description && isItalianText(merged.description)) {
+  // 3. Se dopo aver interrogato tutte le fonti non esiste una trama italiana nativa,
+  // verifichiamo se è disponibile la sinossi in lingua originale (inglese) da Google o Apple Books
+  if (!merged.description) {
+    const fallbackDesc = google?.fallbackDescription || apple?.fallbackDescription;
+    if (fallbackDesc && fallbackDesc.length >= 35) {
+      merged.description = `[🇬🇧 Sinossi in lingua originale]\n\n${fallbackDesc}`;
+      merged.source = google?.fallbackDescription ? 'Google Books' : 'Apple Books';
+    }
+  }
+
+  // Salviamo in cache se abbiamo una trama verificata
+  if (merged.description) {
     detailsCache.set(cacheKey, merged);
     saveDetailsToStorage(cacheKey, merged);
   }
@@ -2081,10 +2125,15 @@ export async function searchBookPlotsOnline(
     // 2. Google Books API
     (async () => {
       try {
-        const searchTerms = [
-          cleanAuthor ? `intitle:${primaryTitle} inauthor:${cleanAuthor}` : primaryTitle,
-          clean,
-        ];
+        const searchTerms = Array.from(
+          new Set([
+            cleanAuthor ? `intitle:${primaryTitle} inauthor:${cleanAuthor}` : primaryTitle,
+            cleanAuthor ? `${primaryTitle} ${cleanAuthor}` : primaryTitle,
+            clean,
+            primaryTitle,
+            ...titleVariants.slice(1, 3).map((v) => (cleanAuthor ? `${v} ${cleanAuthor}` : v)),
+          ].filter(Boolean))
+        );
         let items: any[] = [];
 
         for (const st of searchTerms) {

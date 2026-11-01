@@ -22,6 +22,7 @@ import {
   syncBookPagesToSupabase,
   syncBookReadPagesToSupabase,
 } from '@/lib/bookDates';
+import { getStoredWantPriority, saveStoredWantPriority } from '@/lib/bookPriority';
 
 interface BackupManagerProps {
   books: Book[];
@@ -34,6 +35,7 @@ interface BackupFilePayload {
   version?: number;
   exported_at?: string;
   reading_goals?: ReadingGoals;
+  want_priority?: string[];
   books: Array<{
     id?: string;
     title: string;
@@ -109,6 +111,7 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
         version: 1,
         exported_at: new Date().toISOString(),
         reading_goals: goals,
+        want_priority: getStoredWantPriority(),
         books: books.map((b) => ({
           id: b.id,
           title: b.title,
@@ -321,6 +324,14 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           data: { reading_goals: mergedGoals },
         });
         localStorage.setItem('reading_goals', JSON.stringify(mergedGoals));
+      }
+
+      // Ripristina l'ordine di priorità della lista da leggere
+      if (Array.isArray(payload.want_priority)) {
+        await supabase.auth.updateUser({
+          data: { want_priority: payload.want_priority },
+        });
+        saveStoredWantPriority(payload.want_priority);
       }
 
       setNotification({

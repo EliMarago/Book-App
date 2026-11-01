@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Sun,
   Moon,
-  Layers,
   ArrowUpDown,
   ChevronDown,
   Database,
@@ -46,6 +45,8 @@ import { ReadBooksByYear } from './ReadBooksByYear';
 import { ReadingChallenge } from './ReadingChallenge';
 import { BackupManager } from './BackupManager';
 import { useReadingGoals } from '@/hooks/useReadingGoals';
+import { useBookPriority } from '@/hooks/useBookPriority';
+import { orderWantBooks } from '@/lib/bookPriority';
 import { useToast } from './Toast';
 import { LibrarySkeleton } from './Skeletons';
 import { SORT_OPTIONS, sortBooks, getStoredSort, storeSort, type SortKey } from '@/lib/sortBooks';
@@ -59,6 +60,7 @@ export function Dashboard() {
   const { signOut, user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { toast } = useToast();
+  const { priorityOrder, setPriority, sortWantBooks, shiftBook } = useBookPriority();
   const [rawBooks, setBooks] = useState<Book[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const pendingDeletes = useRef<Map<string, { book: Book; timer: ReturnType<typeof setTimeout> }>>(new Map());
@@ -362,15 +364,25 @@ export function Dashboard() {
     [books, search, sortBy]
   );
 
-  const wantBooks = useMemo(
-    () => sortBooks(books.filter((b) => b.status === 'want' && searchFilter(b)), sortBy),
-    [books, search, sortBy]
-  );
+  const wantBooks = useMemo(() => {
+    const filtered = books.filter((b) => b.status === 'want' && searchFilter(b));
+    if (sortBy === 'title' || sortBy === 'author' || sortBy === 'rating' || sortBy === 'oldest') {
+      return sortBooks(filtered, sortBy, priorityOrder);
+    }
+    return orderWantBooks(filtered, priorityOrder);
+  }, [books, search, sortBy, priorityOrder]);
 
   const completedBooks = useMemo(
     () => sortBooks(books.filter((b) => b.status === 'completed' && searchFilter(b)), sortBy),
     [books, search, sortBy]
   );
+
+  const inspectingWantRank = useMemo(() => {
+    if (!inspectingBook || inspectingBook.status !== 'want') return undefined;
+    const sorted = sortWantBooks(rawBooks.filter((b) => b.status === 'want'));
+    const idx = sorted.findIndex((b) => b.id === inspectingBook.id);
+    return idx >= 0 ? idx + 1 : undefined;
+  }, [inspectingBook, rawBooks, sortWantBooks]);
 
 
   const totalPagesReading = useMemo(
@@ -616,6 +628,11 @@ export function Dashboard() {
             onEditBook={handleOpenEditBook}
             onAddBook={() => setShowAddModal(true)}
             onSelectTab={handleSelectTab}
+            priorityOrder={priorityOrder}
+            onUpdatePriorityOrder={(newOrder) => {
+              setPriority(newOrder);
+              toast({ message: 'Ordine di lettura aggiornato', type: 'success' });
+            }}
           />
         ) : activeTab === 'completed' ? (
           /* VISTA: Libri Letti suddivisi e raggruppati per Anno */
@@ -731,10 +748,19 @@ export function Dashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                {wantBooks.map((book) => (
+                {wantBooks.map((book, idx) => (
                   <BookCard
                     key={book.id}
                     book={book}
+                    priorityRank={idx + 1}
+                    totalWantCount={wantBooks.length}
+                    onShiftPriority={(direction) => {
+                      shiftBook(wantBooks, book.id, direction);
+                      if (sortBy !== 'priority') {
+                        setSortBy('priority');
+                        storeSort('priority');
+                      }
+                    }}
                     onUpdate={handleUpdateBook}
                     onDelete={handleDeleteBook}
                     onEdit={handleOpenEditBook}
@@ -828,10 +854,19 @@ export function Dashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                      {wantBooks.map((book) => (
+                      {wantBooks.map((book, idx) => (
                         <BookCard
                           key={book.id}
                           book={book}
+                          priorityRank={idx + 1}
+                          totalWantCount={wantBooks.length}
+                          onShiftPriority={(direction) => {
+                            shiftBook(wantBooks, book.id, direction);
+                            if (sortBy !== 'priority') {
+                              setSortBy('priority');
+                              storeSort('priority');
+                            }
+                          }}
                           onUpdate={handleUpdateBook}
                           onDelete={handleDeleteBook}
                           onEdit={handleOpenEditBook}
@@ -1044,6 +1079,19 @@ export function Dashboard() {
             setInspectingBook(null);
             handleDeleteBook(id);
           }}
+          priorityRank={inspectingWantRank}
+          totalWantCount={wantBooks.length}
+          onShiftPriority={
+            inspectingBook.status === 'want'
+              ? (direction) => {
+                  shiftBook(wantBooks, inspectingBook.id, direction);
+                  if (sortBy !== 'priority') {
+                    setSortBy('priority');
+                    storeSort('priority');
+                  }
+                }
+              : undefined
+          }
         />
       )}
 

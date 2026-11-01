@@ -9,9 +9,11 @@ import {
   StickyNote,
   Layers,
   BookMarked,
+  ArrowUpDown,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
+import { orderWantBooks, reorderBookIds, shiftBookPosition } from '@/lib/bookPriority';
 
 // Palette predefinita per i dorsi dei libri quando non c'è una copertina
 const SPINE_PALETTES = [
@@ -165,7 +167,9 @@ interface BookshelfViewProps {
   onDeleteBook: (id: string) => void;
   onEditBook: (book: Book) => void;
   onAddBook: () => void;
-  onSelectTab: (tab: 'all' | 'reading' | 'completed' | 'want') => void;
+  onSelectTab?: (tab: 'all' | 'reading' | 'completed' | 'want') => void;
+  priorityOrder?: string[];
+  onUpdatePriorityOrder?: (newOrder: string[]) => void;
 }
 
 export function BookshelfView({
@@ -179,7 +183,9 @@ export function BookshelfView({
   onDeleteBook,
   onEditBook,
   onAddBook,
-  onSelectTab,
+  onSelectTab: _onSelectTab,
+  priorityOrder = [],
+  onUpdatePriorityOrder,
 }: BookshelfViewProps) {
   // Stile di visualizzazione dello scaffale: Copertine frontali o Dorsi verticali
   const [shelfStyle, setShelfStyle] = useState<'covers' | 'spines'>(() => {
@@ -204,6 +210,36 @@ export function BookshelfView({
 
   // Palette dinamica estratta dalle copertine dei libri
   const coverColors = useCoverSpineColors(books);
+
+  // Stato per la modalità di riordino manuale e drag & drop
+  const [isReorderingWant, setIsReorderingWant] = useState(false);
+  const [draggedBookId, setDraggedBookId] = useState<string | null>(null);
+  const [dragOverBookId, setDragOverBookId] = useState<string | null>(null);
+
+  // Libri "Da leggere" ordinati secondo la priorità personalizzata
+  const orderedWantBooks = useMemo(() => {
+    return orderWantBooks(wantBooks, priorityOrder);
+  }, [wantBooks, priorityOrder]);
+
+  // Gestione deterministica del drag & drop basata esattamente sui libri presenti a schermo
+  const handleDropReorder = (sourceId: string, targetId: string) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const nextOrder = reorderBookIds(orderedWantBooks, sourceId, targetId);
+    onUpdatePriorityOrder?.(nextOrder);
+  };
+
+  // Gestione spostamento rapido (frecce ‹ e ›)
+  const handleShift = (bookId: string, direction: 'left' | 'right' | 'first' | 'last') => {
+    const nextOrder = shiftBookPosition(orderedWantBooks, bookId, direction);
+    onUpdatePriorityOrder?.(nextOrder);
+  };
+
+  // Posizione di priorità del libro attualmente ispezionato
+  const inspectingRank = useMemo(() => {
+    if (!inspectingBook || inspectingBook.status !== 'want') return undefined;
+    const idx = orderedWantBooks.findIndex((b) => b.id === inspectingBook.id);
+    return idx >= 0 ? idx + 1 : undefined;
+  }, [inspectingBook, orderedWantBooks]);
 
   // Raggruppamento dei ripiani dello scaffale
   const shelfSections = useMemo(() => {
@@ -239,9 +275,9 @@ export function BookshelfView({
         {
           id: 'want',
           shelfLabel: 'Ripiano',
-          title: 'Prossime Letture (Da Leggere)',
+          title: 'Da Leggere',
           icon: Bookmark,
-          books: wantBooks,
+          books: orderedWantBooks,
           accent: 'sky' as const,
         },
       ];
@@ -304,13 +340,13 @@ export function BookshelfView({
         accent: 'amber',
       });
     }
-    if (wantBooks.length > 0) {
+    if (orderedWantBooks.length > 0) {
       sections.push({
         id: 'want',
         shelfLabel: 'Ripiano II',
-        title: 'Prossime Letture',
+        title: 'Da Leggere',
         icon: Bookmark,
-        books: wantBooks,
+        books: orderedWantBooks,
         accent: 'sky',
       });
     }
@@ -337,7 +373,7 @@ export function BookshelfView({
     }
 
     return sections;
-  }, [activeTab, books, readingBooks, completedBooks, wantBooks, searchQuery]);
+  }, [activeTab, books, readingBooks, completedBooks, orderedWantBooks, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -430,44 +466,138 @@ export function BookshelfView({
               return (
                 <div key={section.id} className="relative">
                   {/* Intestazione del ripiano coerente con i font e il design dell'app */}
-                  <div className="flex items-center justify-between gap-2 mb-4 px-2 pb-2.5 border-b border-stone-800/80 light:border-stone-300/70">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${accentBadge}`}
-                      >
-                        <SectionIcon size={16} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
+                  <div className="mb-4 px-2 pb-2.5 border-b border-stone-800/80 light:border-stone-300/70">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                        <div
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl border flex items-center justify-center shrink-0 ${accentBadge}`}
+                        >
+                          <SectionIcon size={15} />
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                           <span
-                            className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${accentBadge}`}
+                            className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0 ${accentBadge}`}
                           >
                             {section.shelfLabel}
                           </span>
-                          <h3 className="font-serif text-base sm:text-lg font-bold text-stone-100 light:text-stone-900 truncate">
+                          <h3 className="font-serif text-sm sm:text-base md:text-lg font-bold text-stone-100 light:text-stone-900 whitespace-nowrap">
                             {section.title}
                           </h3>
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {section.id === 'want' && section.books.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsReorderingWant((v) => !v)}
+                            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                              isReorderingWant
+                                ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
+                                : 'bg-stone-850/80 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400 hover:bg-sky-500/10'
+                            }`}
+                            title="Trascina o usa le frecce per posizionare i libri in base all'ordine di lettura"
+                          >
+                            <ArrowUpDown size={12} />
+                            <span>{isReorderingWant ? 'Fine' : 'Riordina priorità'}</span>
+                          </button>
+                        )}
+                        <span className="text-xs font-sans font-semibold px-2.5 py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
+                          {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
+                        </span>
+                      </div>
                     </div>
 
-                    <span className="text-xs font-sans font-semibold px-2.5 py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
-                      {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
-                    </span>
+                    {/* Su mobile: pulsante di riordino su riga dedicata per evitare qualsiasi sovrapposizione o troncamento del titolo */}
+                    {section.id === 'want' && section.books.length > 1 && (
+                      <div className="sm:hidden flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-stone-800/40 light:border-stone-200/50">
+                        <span className="text-[11px] text-sky-400 light:text-sky-700 font-medium flex items-center gap-1">
+                          <Bookmark size={12} />
+                          Priorità di lettura
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsReorderingWant((v) => !v)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                            isReorderingWant
+                              ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
+                              : 'bg-stone-850 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400'
+                          }`}
+                        >
+                          <ArrowUpDown size={12} />
+                          <span>{isReorderingWant ? 'Fine' : 'Sposta / Riordina'}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Messaggio guida quando la modalità riordino è attiva */}
+                  {section.id === 'want' && isReorderingWant && (
+                    <div className="mx-2 mb-3 px-3 py-2 rounded-xl bg-sky-950/60 light:bg-sky-50 border border-sky-500/30 flex items-center justify-between gap-3 text-xs text-sky-200 light:text-sky-900 shadow-inner">
+                      <div className="flex items-center gap-2">
+                        <Bookmark size={14} className="shrink-0 text-sky-400" />
+                        <span>
+                          <strong>Ordine di lettura:</strong> trascina i libri o usa le frecce <strong>‹</strong> e <strong>›</strong> per decidere quale leggerai prima (il <strong>#1</strong> è il prossimo).
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsReorderingWant(false)}
+                        className="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs"
+                      >
+                        Salva ordine
+                      </button>
+                    </div>
+                  )}
 
                   {/* LIBRI APPOGGIATI SUL RIPIANO */}
                   {shelfStyle === 'covers' ? (
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
                     <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-5 items-end px-2 pt-4 pb-2 min-h-[220px]">
-                      {section.books.map((book) => {
+                      {section.books.map((book, bookIdx) => {
                         const spine = getBookSpineStyle(book.id, book.title);
+                        const isWantSection = section.id === 'want';
+                        const priorityRank = isWantSection ? bookIdx + 1 : null;
+                        const isFirst = isWantSection && bookIdx === 0;
+                        const isLast = isWantSection && bookIdx === section.books.length - 1;
 
                         return (
                           <div
                             key={book.id}
                             role="button"
                             tabIndex={0}
+                            draggable={isWantSection}
+                            onDragStart={(e) => {
+                              if (!isWantSection) return;
+                              e.dataTransfer.setData('text/plain', book.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                              setDraggedBookId(book.id);
+                            }}
+                            onDragOver={(e) => {
+                              if (!isWantSection) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              if (dragOverBookId !== book.id) setDragOverBookId(book.id);
+                            }}
+                            onDragLeave={(e) => {
+                              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                              if (dragOverBookId === book.id) setDragOverBookId(null);
+                            }}
+                            onDrop={(e) => {
+                              if (!isWantSection) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const sourceId = e.dataTransfer.getData('text/plain') || draggedBookId;
+                              if (sourceId && sourceId !== book.id) {
+                                handleDropReorder(sourceId, book.id);
+                              }
+                              setDraggedBookId(null);
+                              setDragOverBookId(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedBookId(null);
+                              setDragOverBookId(null);
+                            }}
                             onClick={() => setInspectingBook(book)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
@@ -475,8 +605,12 @@ export function BookshelfView({
                                 setInspectingBook(book);
                               }
                             }}
-                            className="group relative flex flex-col items-center cursor-pointer transition-all duration-300 hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl"
-                            title={`${book.title} — ${book.author}`}
+                            className={`group relative flex flex-col items-center cursor-pointer transition-all duration-300 hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl ${
+                              draggedBookId === book.id ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                            } ${
+                              dragOverBookId === book.id ? 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2 scale-105' : ''
+                            }`}
+                            title={`${isWantSection ? `[Priorità #${priorityRank}] ` : ''}${book.title} — ${book.author}`}
                           >
                             {/* Libro appoggiato sullo scaffale */}
                             <div className="relative w-full aspect-[2/3] max-w-[150px] rounded-r-lg rounded-l-xs overflow-hidden shadow-2xl transition-all group-hover:shadow-[0_20px_25px_-5px_rgba(245,158,11,0.25)] border-r-2 border-stone-200/30">
@@ -534,6 +668,21 @@ export function BookshelfView({
                                 </div>
                               )}
 
+                              {/* Badge priorità sulla copertina se ripiano da leggere */}
+                              {isWantSection && priorityRank !== null && (
+                                <div className="absolute top-2 left-2 z-30 pointer-events-none">
+                                  {priorityRank === 1 ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200 flex items-center gap-1">
+                                      ★ #1 Prossimo
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-950/85 text-sky-300 border border-sky-400/50 shadow-md">
+                                      #{priorityRank}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
                               {/* Barra avanzamento pagine in basso se in lettura */}
                               {book.status === 'reading' && book.pages && book.pages > 0 && (
                                 <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
@@ -553,6 +702,49 @@ export function BookshelfView({
                                   <span>{book.notes_count}</span>
                                 </div>
                               ) : null}
+
+                              {/* Controlli rapidi di riordino sulla copertina */}
+                              {isWantSection && section.books.length > 1 && (
+                                <div
+                                  className={`absolute bottom-2 left-2 right-2 z-30 flex items-center justify-center gap-1 transition-opacity duration-200 ${
+                                    isReorderingWant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={isFirst}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleShift(book.id, 'left');
+                                    }}
+                                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                                      isFirst
+                                        ? 'opacity-20 bg-black/60 text-stone-400 cursor-not-allowed'
+                                        : 'bg-stone-900/95 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
+                                    }`}
+                                    title="Sposta prima"
+                                  >
+                                    ‹
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLast}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleShift(book.id, 'right');
+                                    }}
+                                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                                      isLast
+                                        ? 'opacity-20 bg-black/60 text-stone-400 cursor-not-allowed'
+                                        : 'bg-stone-900/95 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
+                                    }`}
+                                    title="Sposta dopo"
+                                  >
+                                    ›
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* Ombra di contatto sotto il libro appoggiato sullo scaffale */}
@@ -574,9 +766,14 @@ export function BookshelfView({
                   ) : (
                     /* 2. VISTA DORSI DEI LIBRI VERTICALI (LIBRERIA CLASSICA) */
                     <div className="flex items-end gap-1 sm:gap-2 px-2 sm:px-4 pt-6 pb-2 overflow-x-auto scrollbar-thin min-h-[240px]">
-                      {section.books.map((book) => {
+                      {section.books.map((book, bookIdx) => {
                         const dynamicSpine = book.cover_url ? coverColors.get(book.cover_url) : null;
                         const spine = getBookSpineStyle(book.id, book.title);
+
+                        const isWantSection = section.id === 'want';
+                        const priorityRank = isWantSection ? bookIdx + 1 : null;
+                        const isFirst = isWantSection && bookIdx === 0;
+                        const isLast = isWantSection && bookIdx === section.books.length - 1;
 
                         // Calcola spessore del dorso in base alle pagine (classi valide Tailwind v3)
                         let spineWidth = 'w-10 sm:w-11';
@@ -598,6 +795,42 @@ export function BookshelfView({
                             key={book.id}
                             role="button"
                             tabIndex={0}
+                            draggable={isWantSection}
+                            onDragStart={(e) => {
+                              if (!isWantSection) return;
+                              e.dataTransfer.setData('text/plain', book.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                              setDraggedBookId(book.id);
+                            }}
+                            onDragOver={(e) => {
+                              if (!isWantSection) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              if (dragOverBookId !== book.id) {
+                                setDragOverBookId(book.id);
+                              }
+                            }}
+                            onDragLeave={(e) => {
+                              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                              if (dragOverBookId === book.id) {
+                                setDragOverBookId(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              if (!isWantSection) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const sourceId = e.dataTransfer.getData('text/plain') || draggedBookId;
+                              if (sourceId && sourceId !== book.id) {
+                                handleDropReorder(sourceId, book.id);
+                              }
+                              setDraggedBookId(null);
+                              setDragOverBookId(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedBookId(null);
+                              setDragOverBookId(null);
+                            }}
                             onClick={() => setInspectingBook(book)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
@@ -609,10 +842,14 @@ export function BookshelfView({
                               background: dynamicSpine ? dynamicSpine.bgGradient : undefined,
                               borderColor: dynamicSpine ? dynamicSpine.border : undefined,
                             }}
-                            className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-3 px-1 cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                            className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-2 px-1 cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                               dynamicSpine ? '' : `bg-gradient-to-r ${spine.bg} ${spine.border}`
-                            } border-t border-b-2 shadow-lg select-none overflow-hidden`}
-                            title={`${book.title} — ${book.author}`}
+                            } border-t border-b-2 shadow-lg select-none overflow-hidden ${
+                              draggedBookId === book.id ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                            } ${
+                              dragOverBookId === book.id ? 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2' : ''
+                            }`}
+                            title={`${isWantSection ? `[Priorità #${priorityRank}] ` : ''}${book.title} — ${book.author}`}
                           >
                             {/* Texture sfumata prelevata direttamente dalla copertina */}
                             {book.cover_url && (
@@ -639,10 +876,31 @@ export function BookshelfView({
 
                             {/* Capitello superiore del libro */}
                             <div
-                              className={`h-1 rounded-full mx-auto w-4/5 mb-1 z-10 ${
+                              className={`h-1 rounded-full mx-auto w-4/5 mb-0.5 z-10 ${
                                 dynamicSpine?.isLight ? 'bg-stone-900/30' : 'bg-amber-100/40 opacity-70'
                               }`}
                             />
+
+                            {/* Badge priorità visibile sul dorso per i libri da leggere */}
+                            {isWantSection && priorityRank !== null && (
+                              <div className="z-20 mx-auto my-0.5 flex flex-col items-center">
+                                {priorityRank === 1 ? (
+                                  <span
+                                    className="px-1 py-0.5 rounded text-[8.5px] font-black tracking-tight bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200/80 flex items-center gap-0.5"
+                                    title="Priorità #1: la prossima lettura da iniziare!"
+                                  >
+                                    ★ 1°
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="px-1 py-0.5 rounded text-[8px] font-bold tracking-tight bg-black/60 text-sky-300 border border-sky-400/40 shadow-xs"
+                                    title={`Priorità #${priorityRank} da leggere`}
+                                  >
+                                    #{priorityRank}
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
                             {/* Titolo e autore verticali lungo il dorso */}
                             <div className="flex-1 flex items-center justify-center overflow-hidden my-1 z-10">
@@ -659,7 +917,7 @@ export function BookshelfView({
                             </div>
 
                             {/* Parte inferiore: Sigillo o pagine */}
-                            <div className="flex flex-col items-center gap-1 mt-auto z-10">
+                            <div className="flex flex-col items-center gap-0.5 mt-auto z-10">
                               {book.status === 'completed' && (
                                 <Trophy
                                   size={11}
@@ -673,6 +931,51 @@ export function BookshelfView({
                               >
                                 {book.pages ? `${book.pages}p` : '•'}
                               </span>
+
+                              {/* Controlli di spostamento rapido priorità ‹ e › sul dorso */}
+                              {isWantSection && section.books.length > 1 && (
+                                <div
+                                  className={`flex items-center justify-center gap-0.5 mt-1 transition-opacity duration-200 ${
+                                    isReorderingWant ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={isFirst}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleShift(book.id, 'left');
+                                    }}
+                                    aria-label="Sposta a sinistra"
+                                    className={`w-4 h-4 rounded text-[10px] font-black leading-none flex items-center justify-center transition-all ${
+                                      isFirst
+                                        ? 'opacity-20 text-stone-400 cursor-not-allowed bg-black/40'
+                                        : 'bg-stone-900/90 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
+                                    }`}
+                                    title="Sposta prima (aumenta priorità)"
+                                  >
+                                    ‹
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLast}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleShift(book.id, 'right');
+                                    }}
+                                    aria-label="Sposta a destra"
+                                    className={`w-4 h-4 rounded text-[10px] font-black leading-none flex items-center justify-center transition-all ${
+                                      isLast
+                                        ? 'opacity-20 text-stone-400 cursor-not-allowed bg-black/40'
+                                        : 'bg-stone-900/90 text-amber-300 hover:bg-amber-500 hover:text-stone-950 active:scale-90 cursor-pointer shadow-md'
+                                    }`}
+                                    title="Sposta dopo (diminuisci priorità)"
+                                  >
+                                    ›
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* Nervature orizzontali da legatoria classica */}
@@ -717,6 +1020,13 @@ export function BookshelfView({
             onDeleteBook(id);
             setInspectingBook(null);
           }}
+          priorityRank={inspectingRank}
+          totalWantCount={orderedWantBooks.length}
+          onShiftPriority={
+            inspectingBook.status === 'want'
+              ? (dir) => handleShift(inspectingBook.id, dir)
+              : undefined
+          }
         />
       )}
     </div>

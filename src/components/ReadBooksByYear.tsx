@@ -13,6 +13,7 @@ import {
 import type { Book } from '@/lib/supabase';
 import type { ReadingGoals } from '@/hooks/useReadingGoals';
 import { BookCard } from './BookCard';
+import { MonthlyReadingStats } from './MonthlyReadingStats';
 import { sortBooks, type SortKey } from '@/lib/sortBooks';
 import { matchesBookSearch } from '@/lib/bookSearch';
 
@@ -38,6 +39,7 @@ export function ReadBooksByYear({
   sortBy = 'recent',
 }: ReadBooksByYearProps) {
   const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [collapsedYears, setCollapsedYears] = useState<Record<string, boolean>>({});
 
   // Filtra per ricerca su titolo, autore e metadati del libro
@@ -230,10 +232,31 @@ export function ReadBooksByYear({
         </div>
       </div>
 
+      {/* Sezione Conteggio Libri Letti in un Mese (Prospetto Mensile 12 Mesi) */}
+      <MonthlyReadingStats
+        books={filteredBooks}
+        selectedYear={selectedYear}
+        onSelectYear={(yr) => {
+          setSelectedYear(yr);
+          setSelectedMonth(null);
+        }}
+        selectedMonth={selectedMonth}
+        onSelectMonth={(m) => setSelectedMonth(m)}
+        availableYears={groupedData.sortedYears}
+      />
+
       {/* Raggruppamento effettivo per Anno */}
       <div className="space-y-6">
         {yearsToRender.map((year) => {
-          const yearBooks = groupedData.groups[year];
+          const allYearBooks = groupedData.groups[year] || [];
+          const yearBooks =
+            selectedMonth === null
+              ? allYearBooks
+              : allYearBooks.filter((b) => {
+                  if (!b.read_at) return false;
+                  const d = new Date(b.read_at);
+                  return !isNaN(d.getTime()) && d.getMonth() === selectedMonth;
+                });
           const isCollapsed = Boolean(collapsedYears[year]);
           const yearPages = yearBooks.reduce((acc, b) => acc + (b.pages || 0), 0);
 
@@ -324,18 +347,35 @@ export function ReadBooksByYear({
               {/* Griglia libri dell'anno */}
               {!isCollapsed && (
                 <div className="p-2.5 sm:p-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {yearBooks.map((book) => (
-                      <BookCard
-                        key={book.id}
-                        book={book}
-                        onUpdate={onUpdate}
-                        onDelete={onDelete}
-                        onEdit={onEdit}
-                        onInspect={onInspect}
-                      />
-                    ))}
-                  </div>
+                  {yearBooks.length === 0 ? (
+                    <div className="py-8 px-4 text-center bg-stone-900/30 light:bg-stone-50/50 rounded-xl border border-dashed border-stone-800 light:border-stone-200">
+                      <p className="text-xs sm:text-sm text-stone-400 light:text-stone-600">
+                        Nessun libro completato nel mese selezionato per l'{year === 'Senza data' ? 'archivio senza data' : `anno ${year}`}.
+                      </p>
+                      {selectedMonth !== null && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMonth(null)}
+                          className="mt-2 text-xs font-semibold text-emerald-400 light:text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          Mostra tutti i libri dell'anno
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                      {yearBooks.map((book) => (
+                        <BookCard
+                          key={book.id}
+                          book={book}
+                          onUpdate={onUpdate}
+                          onDelete={onDelete}
+                          onEdit={onEdit}
+                          onInspect={onInspect}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

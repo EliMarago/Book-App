@@ -34,6 +34,9 @@ export function BookCard({
   onEdit,
   onInspect,
   highlight = false,
+  priorityRank,
+  totalWantCount,
+  onShiftPriority,
 }: {
   book: Book;
   onUpdate: (book: Book) => void;
@@ -41,6 +44,9 @@ export function BookCard({
   onEdit: (book: Book) => void;
   onInspect?: (book: Book) => void;
   highlight?: boolean;
+  priorityRank?: number;
+  totalWantCount?: number;
+  onShiftPriority?: (direction: 'left' | 'right' | 'first') => void;
 }) {
   const { toast } = useToast();
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -274,6 +280,48 @@ export function BookCard({
         </select>
         <ChevronDown size={12} className="absolute right-2 pointer-events-none opacity-70 shrink-0" />
       </div>
+
+      {/* Priorità per i libri da leggere con controlli rapidi */}
+      {book.status === 'want' && priorityRank !== undefined && (
+        <div className="shrink-0 inline-flex items-center gap-1">
+          <span
+            className={`h-7 lg:h-8 inline-flex items-center gap-1 text-xs font-bold px-2.5 rounded-full border shadow-xs ${
+              priorityRank === 1
+                ? 'bg-amber-500/20 text-amber-300 light:text-amber-800 border-amber-500/40 ring-1 ring-amber-400/40'
+                : 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
+            }`}
+            title={
+              priorityRank === 1
+                ? 'Priorità #1: la tua prossima lettura in programma!'
+                : `Priorità #${priorityRank} nella lista da leggere`
+            }
+          >
+            {priorityRank === 1 ? '★ #1 Prossimo' : `#${priorityRank}`}
+          </span>
+          {onShiftPriority && totalWantCount && totalWantCount > 1 && (
+            <div className="inline-flex items-center rounded-full bg-stone-850 light:bg-stone-100 border border-stone-700 light:border-stone-300 p-0.5">
+              <button
+                type="button"
+                disabled={priorityRank === 1}
+                onClick={() => onShiftPriority('left')}
+                className="w-5 h-6 rounded-l-full flex items-center justify-center text-xs font-bold text-stone-300 light:text-stone-700 hover:text-amber-400 disabled:opacity-20 cursor-pointer"
+                title="Sposta prima (aumenta priorità)"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                disabled={priorityRank === totalWantCount}
+                onClick={() => onShiftPriority('right')}
+                className="w-5 h-6 rounded-r-full flex items-center justify-center text-xs font-bold text-stone-300 light:text-stone-700 hover:text-amber-400 disabled:opacity-20 cursor-pointer"
+                title="Sposta dopo (diminuisci priorità)"
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Badge Data di lettura */}
       {book.read_at ? (
@@ -522,6 +570,21 @@ export function BookCard({
                   <Sparkles size={9} />
                   <span>Cerca</span>
                 </div>
+              </div>
+            )}
+
+            {/* Badge priorità sulla copertina per i libri da leggere */}
+            {book.status === 'want' && priorityRank !== undefined && (
+              <div className="absolute top-1 left-1 z-10 pointer-events-none">
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-black shadow-md ${
+                    priorityRank === 1
+                      ? 'bg-amber-400 text-stone-950 ring-1 ring-amber-200'
+                      : 'bg-stone-900/90 text-sky-300 border border-sky-400/50'
+                  }`}
+                >
+                  #{priorityRank}
+                </span>
               </div>
             )}
             <ImageOff size={24} className="text-stone-600 light:text-stone-400 hidden" />

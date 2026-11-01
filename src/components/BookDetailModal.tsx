@@ -46,6 +46,9 @@ interface BookDetailModalProps {
   onUpdateBook: (book: Book) => void;
   onEditBook: (book: Book) => void;
   onDeleteBook: (id: string) => void;
+  priorityRank?: number;
+  totalWantCount?: number;
+  onShiftPriority?: (direction: 'left' | 'right' | 'first' | 'last') => void;
 }
 
 export function BookDetailModal({
@@ -54,6 +57,9 @@ export function BookDetailModal({
   onUpdateBook,
   onEditBook,
   onDeleteBook,
+  priorityRank,
+  totalWantCount,
+  onShiftPriority,
 }: BookDetailModalProps) {
   const [book, setBook] = useState<Book>(initialBook);
   const [bookDetails, setBookDetails] = useState<BookDetails | null>(() => {
@@ -355,7 +361,7 @@ export function BookDetailModal({
             className="relative px-3.5 pt-2.5 pb-3.5 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white overflow-hidden"
           >
             {/* Indicatore visivo di trascinamento verso il basso su mobile */}
-            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-2.5 sm:hidden" />
+            { /*<div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-2.5 sm:hidden" />*/}
 
             {/* Copertina 3D + Info Principali + Pulsante Chiudi prominente */}
             <div className="relative z-10 flex items-start gap-3 sm:gap-4">
@@ -593,11 +599,10 @@ export function BookDetailModal({
               ) : bookDetails?.description ? (
                 <div>
                   <p
-                    className={`text-xs sm:text-sm text-stone-200 light:text-stone-700 leading-relaxed whitespace-pre-line ${
-                      !plotExpanded && bookDetails.description.length > 260
+                    className={`text-xs sm:text-sm text-stone-200 light:text-stone-700 leading-relaxed whitespace-pre-line ${!plotExpanded && bookDetails.description.length > 260
                         ? 'line-clamp-4 sm:line-clamp-5'
                         : ''
-                    }`}
+                      }`}
                   >
                     {bookDetails.description}
                   </p>
@@ -677,15 +682,14 @@ export function BookDetailModal({
                         key={opt.value}
                         type="button"
                         onClick={() => handleStatusChange(opt.value)}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
-                          active
+                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${active
                             ? opt.value === 'reading'
                               ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/40'
                               : opt.value === 'completed'
                                 ? 'bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border-emerald-500/40'
                                 : 'bg-sky-500/20 light:bg-sky-100 text-sky-300 light:text-sky-800 border-sky-500/40'
                             : 'bg-stone-900/70 light:bg-white text-stone-400 light:text-stone-600 border-stone-750 light:border-stone-200 hover:text-stone-200'
-                        }`}
+                          }`}
                       >
                         {opt.label}
                       </button>
@@ -693,6 +697,66 @@ export function BookDetailModal({
                   })}
                 </div>
               </div>
+
+              {/* Controllo Priorità se il libro è nella lista Da Leggere */}
+              {book.status === 'want' && priorityRank !== undefined && (
+                <div className="p-2.5 rounded-xl bg-sky-950/40 light:bg-sky-50 border border-sky-500/25 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-xs shadow-xs ${
+                        priorityRank === 1
+                          ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-stone-950 ring-1 ring-amber-300'
+                          : 'bg-sky-500/20 text-sky-300 light:text-sky-800 border border-sky-500/30'
+                      }`}
+                    >
+                      #{priorityRank}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-stone-100 light:text-stone-900 block truncate">
+                        {priorityRank === 1 ? '★ Prossima lettura in programma' : `Priorità #${priorityRank} nella lista da leggere`}
+                      </span>
+                      <p className="text-[11px] text-stone-400 light:text-stone-600 truncate">
+                        {priorityRank === 1
+                          ? 'Questo è il 1° libro che leggerai'
+                          : `Posizione ${priorityRank} di ${totalWantCount || 'varie'} libri da leggere`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {onShiftPriority && totalWantCount && totalWantCount > 1 && (
+                    <div className="flex items-center gap-1.5 self-end xs:self-auto shrink-0">
+                      {priorityRank !== 1 && (
+                        <button
+                          type="button"
+                          onClick={() => onShiftPriority('first')}
+                          className="px-2 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-stone-950 transition-colors cursor-pointer"
+                          title="Metti come prima lettura assoluta"
+                        >
+                          ★ 1°
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={priorityRank === 1}
+                        onClick={() => onShiftPriority('left')}
+                        className="w-7 h-7 rounded-lg bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 text-stone-200 light:text-stone-800 hover:border-amber-500/50 disabled:opacity-20 flex items-center justify-center text-sm font-bold cursor-pointer"
+                        title="Sposta prima (aumenta priorità)"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        disabled={priorityRank === totalWantCount}
+                        onClick={() => onShiftPriority('right')}
+                        className="w-7 h-7 rounded-lg bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 text-stone-200 light:text-stone-800 hover:border-amber-500/50 disabled:opacity-20 flex items-center justify-center text-sm font-bold cursor-pointer"
+                        title="Sposta dopo (diminuisci priorità)"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Valutazione con stelle */}
               <div className="flex items-center justify-between">
@@ -866,11 +930,10 @@ export function BookDetailModal({
                     <button
                       type="button"
                       onClick={() => setSelectedSourceFilter('all')}
-                      className={`px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer ${
-                        selectedSourceFilter === 'all'
+                      className={`px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer ${selectedSourceFilter === 'all'
                           ? 'bg-amber-500 text-stone-950 font-bold'
                           : 'bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400'
-                      }`}
+                        }`}
                     >
                       Tutti ({searchResults.length})
                     </button>
@@ -882,11 +945,10 @@ export function BookDetailModal({
                           key={src}
                           type="button"
                           onClick={() => setSelectedSourceFilter(src)}
-                          className={`px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer ${
-                            selectedSourceFilter === src
+                          className={`px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer ${selectedSourceFilter === src
                               ? 'bg-amber-500 text-stone-950 font-bold'
                               : 'bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400'
-                          }`}
+                            }`}
                         >
                           {src} {count > 0 && `(${count})`}
                         </button>
@@ -898,22 +960,20 @@ export function BookDetailModal({
                     <button
                       type="button"
                       onClick={() => setSelectedLangFilter('all')}
-                      className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
-                        selectedLangFilter === 'all'
+                      className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${selectedLangFilter === 'all'
                           ? 'bg-stone-700 light:bg-stone-300 text-amber-400 font-bold'
                           : 'bg-stone-800/80 light:bg-stone-200 text-stone-400 light:text-stone-600 hover:text-amber-400'
-                      }`}
+                        }`}
                     >
                       Tutte le lingue
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedLangFilter('it')}
-                      className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
-                        selectedLangFilter === 'it'
+                      className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${selectedLangFilter === 'it'
                           ? 'bg-emerald-600/30 text-emerald-300 font-bold border border-emerald-500/40'
                           : 'bg-stone-800/80 light:bg-stone-200 text-stone-400 light:text-stone-600 hover:text-emerald-400'
-                      }`}
+                        }`}
                     >
                       Solo 🇮🇹 Italiano
                     </button>
@@ -985,15 +1045,14 @@ export function BookDetailModal({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                                res.source === 'Google Books'
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${res.source === 'Google Books'
                                   ? 'bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/30'
                                   : res.source === 'Apple Books'
-                                  ? 'bg-rose-500/15 text-rose-300 light:text-rose-800 border-rose-500/30'
-                                  : res.source === 'Wikipedia IT'
-                                  ? 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
-                                  : 'bg-purple-500/15 text-purple-300 light:text-purple-800 border-purple-500/30'
-                              }`}
+                                    ? 'bg-rose-500/15 text-rose-300 light:text-rose-800 border-rose-500/30'
+                                    : res.source === 'Wikipedia IT'
+                                      ? 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
+                                      : 'bg-purple-500/15 text-purple-300 light:text-purple-800 border-purple-500/30'
+                                }`}
                             >
                               {res.source}
                             </span>
