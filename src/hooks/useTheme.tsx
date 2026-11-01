@@ -57,8 +57,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     const metaStatusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
     if (metaStatusBar) {
-      metaStatusBar.setAttribute('content', theme === 'light' ? 'default' : 'black-translucent');
+      metaStatusBar.setAttribute('content', 'default');
     }
+    document.body.style.backgroundColor = theme === 'light' ? '#fcfbfa' : '#1c1917';
   }, [theme]);
 
   return (

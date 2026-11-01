@@ -415,12 +415,9 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-900 via-stone-850 to-stone-900 light:from-[#fcfbfa] light:via-[#f7f4ed] light:to-[#fcfbfa] text-stone-100 light:text-stone-900 transition-colors duration-200">
-      {/* Copertura fissa e opaca per la Safe Area / Status Bar iOS (impedisce a WebKit di generare la sfocatura di sistema) */}
-      <div className="ios-status-bar-fill" aria-hidden="true" />
-
-      {/* Header principale solido e nitido: scorre naturalmente senza bloccarsi né creare aloni sfocati */}
-      <header className="relative z-30 bg-stone-900 light:bg-[#fcfbfa] border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
+    <div className="min-h-screen bg-stone-900 light:bg-[#fcfbfa] text-stone-100 light:text-stone-900 transition-colors duration-200">
+      {/* Header principale solido, nitido e sticky: estende il colore solido sotto la Safe Area / Status Bar senza sfocature */}
+      <header className="sticky top-0 z-40 bg-stone-900 light:bg-[#fcfbfa] border-b border-stone-800 light:border-stone-200/80 transition-colors duration-200 pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/15 light:bg-amber-500/15 border border-amber-500/30 light:border-amber-500/30 text-amber-400 light:text-amber-600 shrink-0 shadow-xs">

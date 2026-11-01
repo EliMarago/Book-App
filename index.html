@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#fcfbfa" media="(prefers-color-scheme: light)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Bookshelf" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -34,14 +34,14 @@
           document.documentElement.classList.add('dark');
           document.documentElement.setAttribute('data-theme', 'dark');
           if (metaTheme) metaTheme.setAttribute('content', '#1c1917');
-          if (metaStatus) metaStatus.setAttribute('content', 'black-translucent');
+          if (metaStatus) metaStatus.setAttribute('content', 'default');
         }
       } catch (e) { }
     })();
   </script>
 </head>
 
-<body>
+<body style="background-color: #1c1917;">
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
