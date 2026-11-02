@@ -705,9 +705,6 @@ export function BookshelfView({
                               ) : null}
                             </div>
 
-                            {/* Ombra di contatto sotto il libro appoggiato sullo scaffale */}
-                            <div className="w-4/5 h-2 bg-black/80 blur-xs rounded-full mt-1.5 transition-all group-hover:scale-125 group-hover:opacity-40" />
-
                             {/* Titolo e autore sotto la copertina */}
                             <div className="text-center mt-2 px-1 w-full max-w-[160px]">
                               <p className="font-serif text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-1 group-hover:text-amber-400 transition-colors">
