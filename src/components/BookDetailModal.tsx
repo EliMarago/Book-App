@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Flame,
@@ -81,6 +81,19 @@ export function BookDetailModal({
   const [plotExpanded, setPlotExpanded] = useState(false);
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
+
+  // Paragrafi formattati della trama per una lettura ariosa e confortevole stile libro
+  const plotParagraphs = useMemo<string[]>(() => {
+    if (!bookDetails?.description) return [];
+    const raw = bookDetails.description.trim();
+    if (/\n\s*\n/.test(raw)) {
+      return raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    }
+    if (raw.includes('\n')) {
+      return raw.split('\n').map((p) => p.trim()).filter(Boolean);
+    }
+    return [raw];
+  }, [bookDetails?.description]);
 
   const { toast } = useToast();
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -598,19 +611,29 @@ export function BookDetailModal({
                 </div>
               ) : bookDetails?.description ? (
                 <div>
-                  <p
-                    className={`text-xs sm:text-sm text-stone-200 light:text-stone-700 leading-relaxed whitespace-pre-line ${!plotExpanded && bookDetails.description.length > 260
-                        ? 'line-clamp-4 sm:line-clamp-5'
-                        : ''
+                  <div className="relative">
+                    <div
+                      className={`space-y-3 font-serif text-[13px] sm:text-[13.5px] text-stone-200 light:text-stone-800 leading-[1.72] tracking-[0.01em] transition-all duration-300 ${
+                        !plotExpanded && bookDetails.description.length > 280
+                          ? 'max-h-36 sm:max-h-40 overflow-hidden'
+                          : ''
                       }`}
-                  >
-                    {bookDetails.description}
-                  </p>
-                  {bookDetails.description.length > 260 && (
+                    >
+                      {plotParagraphs.map((paragraph, idx) => (
+                        <p key={idx} className="whitespace-pre-line">
+                          {paragraph}
+                        </p>
+                      ))}
+                    </div>
+                    {!plotExpanded && bookDetails.description.length > 280 && (
+                      <div className="absolute bottom-0 left-0 right-0 h-14 bg-gradient-to-t from-stone-850 light:from-stone-50 to-transparent pointer-events-none" />
+                    )}
+                  </div>
+                  {bookDetails.description.length > 280 && (
                     <button
                       type="button"
                       onClick={() => setPlotExpanded((prev) => !prev)}
-                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 light:text-amber-700 hover:text-amber-300 cursor-pointer"
+                      className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 light:text-amber-700 hover:text-amber-300 cursor-pointer select-none"
                     >
                       {plotExpanded ? (
                         <>
@@ -1095,7 +1118,7 @@ export function BookDetailModal({
 
                       {res.description && (
                         <div className="space-y-2">
-                          <p className="text-xs text-stone-300 light:text-stone-600 line-clamp-4 leading-relaxed bg-stone-900/60 light:bg-white p-2.5 rounded-xl border border-stone-800/80 light:border-stone-200/80">
+                          <p className="font-serif text-[12.5px] text-stone-200 light:text-stone-800 line-clamp-4 leading-relaxed tracking-[0.01em] bg-stone-900/60 light:bg-white p-3 rounded-xl border border-stone-800/80 light:border-stone-200/80 whitespace-pre-line">
                             {res.description}
                           </p>
                           <button
@@ -1180,7 +1203,7 @@ export function BookDetailModal({
                 onChange={(e) => setCustomPlotText(e.target.value)}
                 placeholder="Incolla o scrivi qui la trama del libro..."
                 rows={8}
-                className="w-full p-3 bg-stone-850 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm leading-relaxed focus:outline-none focus:border-amber-500/60 resize-y"
+                className="w-full p-3.5 bg-stone-850 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 font-serif text-[13px] sm:text-sm leading-relaxed focus:outline-none focus:border-amber-500/60 resize-y"
                 autoFocus
               />
 

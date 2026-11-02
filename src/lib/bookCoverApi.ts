@@ -1134,6 +1134,9 @@ function cleanPlotText(raw: string): string {
   text = text.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
   text = text.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 
+  // Separa frasi incollate senza spazio dopo la punteggiatura (es. "storia.La" -> "storia. La")
+  text = text.replace(/([a-zà-öø-ÿ0-9][.!?…»])([A-ZÀ-ÖØ])/g, '$1 $2');
+
   return text
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
