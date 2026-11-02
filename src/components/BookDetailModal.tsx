@@ -36,6 +36,7 @@ import {
   searchBookPlotsOnline,
   saveManualBookPlot,
   clearCachedBookDetails,
+  formatPlotIntoParagraphs,
   type BookDetails,
   type PlotSearchResult,
 } from '@/lib/bookCoverApi';
@@ -82,18 +83,11 @@ export function BookDetailModal({
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
 
-  // Paragrafi formattati della trama per una lettura ariosa e confortevole stile libro
-  const plotParagraphs = useMemo<string[]>(() => {
-    if (!bookDetails?.description) return [];
-    const raw = bookDetails.description.trim();
-    if (/\n\s*\n/.test(raw)) {
-      return raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-    }
-    if (raw.includes('\n')) {
-      return raw.split('\n').map((p) => p.trim()).filter(Boolean);
-    }
-    return [raw];
-  }, [bookDetails?.description]);
+  // Paragrafi formattati della trama per una lettura ariosa e confortevole con a capo dedicati
+  const plotParagraphs = useMemo<string[]>(
+    () => formatPlotIntoParagraphs(bookDetails?.description),
+    [bookDetails?.description]
+  );
 
   const { toast } = useToast();
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -138,7 +132,8 @@ export function BookDetailModal({
       toast({ message: 'Questa voce non include un testo di trama', type: 'info' });
       return;
     }
-    const updated = saveManualBookPlot(book.title, book.author, result.description, {
+    const formattedDesc = formatPlotIntoParagraphs(result.description).join('\n\n');
+    const updated = saveManualBookPlot(book.title, book.author, formattedDesc, {
       publisher: result.publisher || bookDetails?.publisher || null,
       publishedDate: result.publishedDate || bookDetails?.publishedDate || null,
       categories:
@@ -152,7 +147,7 @@ export function BookDetailModal({
     });
     setBookDetails(updated);
 
-    await syncBookPlotToSupabase(book.id, result.description);
+    await syncBookPlotToSupabase(book.id, formattedDesc);
 
     let updatedPages = book.pages;
     if ((!book.pages || book.pages <= 0) && result.pageCount && result.pageCount > 0) {
@@ -160,7 +155,7 @@ export function BookDetailModal({
       updatedPages = result.pageCount;
     }
 
-    const updatedBook = { ...book, plot: result.description, pages: updatedPages };
+    const updatedBook = { ...book, plot: formattedDesc, pages: updatedPages };
     setBook(updatedBook);
     onUpdateBook(updatedBook);
 
@@ -169,7 +164,8 @@ export function BookDetailModal({
   };
 
   const handleOpenEditPlot = () => {
-    setCustomPlotText(bookDetails?.description || book.plot || '');
+    const text = bookDetails?.description || book.plot || '';
+    setCustomPlotText(formatPlotIntoParagraphs(text).join('\n\n'));
     setShowEditPlotModal(true);
   };
 
@@ -179,13 +175,14 @@ export function BookDetailModal({
       toast({ message: 'Inserisci un testo per la trama', type: 'info' });
       return;
     }
-    const updated = saveManualBookPlot(book.title, book.author, trimmed, {
+    const formatted = formatPlotIntoParagraphs(trimmed).join('\n\n');
+    const updated = saveManualBookPlot(book.title, book.author, formatted, {
       source: 'Google Books',
     });
     setBookDetails(updated);
 
-    await syncBookPlotToSupabase(book.id, trimmed);
-    const updatedBook = { ...book, plot: trimmed };
+    await syncBookPlotToSupabase(book.id, formatted);
+    const updatedBook = { ...book, plot: formatted };
     setBook(updatedBook);
     onUpdateBook(updatedBook);
 
@@ -613,17 +610,30 @@ export function BookDetailModal({
                 <div>
                   <div className="relative">
                     <div
-                      className={`space-y-3 font-serif text-[13px] sm:text-[13.5px] text-stone-200 light:text-stone-800 leading-[1.72] tracking-[0.01em] transition-all duration-300 ${
+                      className={`space-y-4 font-serif text-[13px] sm:text-[13.5px] text-stone-200 light:text-stone-850 leading-[1.8] tracking-[0.015em] transition-all duration-300 ${
                         !plotExpanded && bookDetails.description.length > 280
-                          ? 'max-h-36 sm:max-h-40 overflow-hidden'
+                          ? 'max-h-36 sm:max-h-44 overflow-hidden'
                           : ''
                       }`}
                     >
-                      {plotParagraphs.map((paragraph, idx) => (
-                        <p key={idx} className="whitespace-pre-line">
-                          {paragraph}
-                        </p>
-                      ))}
+                      {plotParagraphs.map((paragraph, idx) => {
+                        const isQuote =
+                          paragraph.startsWith('«') ||
+                          paragraph.startsWith('"') ||
+                          paragraph.startsWith('“');
+                        return (
+                          <p
+                            key={idx}
+                            className={`whitespace-pre-line ${
+                              isQuote
+                                ? 'italic text-amber-300/90 light:text-amber-900 border-l-2 border-amber-500/40 pl-3 py-1 my-1'
+                                : ''
+                            }`}
+                          >
+                            {paragraph}
+                          </p>
+                        );
+                      })}
                     </div>
                     {!plotExpanded && bookDetails.description.length > 280 && (
                       <div className="absolute bottom-0 left-0 right-0 h-14 bg-gradient-to-t from-stone-850 light:from-stone-50 to-transparent pointer-events-none" />
@@ -1118,9 +1128,11 @@ export function BookDetailModal({
 
                       {res.description && (
                         <div className="space-y-2">
-                          <p className="font-serif text-[12.5px] text-stone-200 light:text-stone-800 line-clamp-4 leading-relaxed tracking-[0.01em] bg-stone-900/60 light:bg-white p-3 rounded-xl border border-stone-800/80 light:border-stone-200/80 whitespace-pre-line">
-                            {res.description}
-                          </p>
+                          <div className="font-serif text-[12.5px] text-stone-200 light:text-stone-850 line-clamp-5 leading-[1.75] tracking-[0.015em] bg-stone-900/60 light:bg-white p-3 rounded-xl border border-stone-800/80 light:border-stone-200/80 space-y-2">
+                            {formatPlotIntoParagraphs(res.description).slice(0, 3).map((p, idx) => (
+                              <p key={idx}>{p}</p>
+                            ))}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleApplyPlot(res)}
@@ -1195,14 +1207,29 @@ export function BookDetailModal({
             </div>
 
             <div className="p-4 space-y-3">
-              <p className="text-xs text-stone-400 light:text-stone-600">
-                Puoi incollare la trama da un sito, riassunto o retro di copertina:
-              </p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs text-stone-400 light:text-stone-600">
+                  Puoi incollare la trama da un sito, riassunto o retro di copertina:
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customPlotText.trim()) return;
+                    setCustomPlotText(formatPlotIntoParagraphs(customPlotText).join('\n\n'));
+                    toast({ message: 'Paragrafi e spazi a capo formattati!', type: 'success' });
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-400 light:text-amber-700 hover:text-amber-300 bg-amber-500/15 light:bg-amber-100 hover:bg-amber-500/25 px-2.5 py-1 rounded-lg border border-amber-500/30 transition-all cursor-pointer shrink-0 active:scale-95 shadow-xs"
+                  title="Aggiungi automaticamente gli spazi e vai a capo tra i paragrafi"
+                >
+                  <Sparkles size={12} />
+                  <span>Formatta a capo</span>
+                </button>
+              </div>
               <textarea
                 value={customPlotText}
                 onChange={(e) => setCustomPlotText(e.target.value)}
                 placeholder="Incolla o scrivi qui la trama del libro..."
-                rows={8}
+                rows={10}
                 className="w-full p-3.5 bg-stone-850 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 font-serif text-[13px] sm:text-sm leading-relaxed focus:outline-none focus:border-amber-500/60 resize-y"
                 autoFocus
               />

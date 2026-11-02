@@ -1093,7 +1093,79 @@ function normalizeCategoriesToItalian(rawCategories: string[]): string[] {
 }
 
 /**
- * Pulisce e formatta il testo della trama rimuovendo tag HTML ed entità
+ * Riconosce e struttura la trama in paragrafi naturali, ariosi e ben spaziati
+ * spezzando muri di testo continui in blocchi di lettura confortevoli con a capo dedicati.
+ */
+export function formatPlotIntoParagraphs(text: string | null | undefined): string[] {
+  if (!text) return [];
+  let raw = text.trim().replace(/\r\n/g, '\n');
+
+  // Separa frasi incollate senza spazio dopo la punteggiatura (es. "storia.La" -> "storia. La")
+  raw = raw.replace(/([a-zà-öø-ÿ0-9][.!?…»])([A-ZÀ-ÖØ])/g, '$1 $2');
+
+  // Isola citazioni tra virgolette caporali «...» o doppi apici come paragrafi dedicati
+  raw = raw.replace(/([.!?])\s*(«[^»]+»)/g, '$1\n\n$2');
+  raw = raw.replace(/(«[^»]+»)\s*([A-ZÀ-ÖØ])/g, '$1\n\n$2');
+
+  // Riconosce slogan iniziali brevi (es. 1-3 frasi brevi sotto i 130 caratteri totali seguiti da punto)
+  const taglineMatch = raw.match(/^((?:[^.!?]+[.!?]+\s*){1,3})(?=[A-ZÀ-ÖØ])/);
+  if (taglineMatch && taglineMatch[1] && taglineMatch[1].length < 130 && taglineMatch[1].length > 25) {
+    const after = raw.slice(taglineMatch[1].length);
+    if (after.length > 100 && !taglineMatch[1].includes('\n')) {
+      raw = taglineMatch[1].trim() + '\n\n' + after.trim();
+    }
+  }
+
+  // Suddivisione iniziale sui doppi a capo
+  let initialChunks = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+  // Se è tutto su righe singole (senza doppi a capo)
+  if (initialChunks.length === 1 && raw.split('\n').filter((p) => p.trim().length > 0).length >= 2) {
+    initialChunks = raw.split('\n').map((p) => p.trim()).filter(Boolean);
+  }
+
+  const finalParas: string[] = [];
+
+  for (const chunk of initialChunks) {
+    // Se il blocco è già di lunghezza confortevole (<= 320 caratteri), lo teniamo
+    if (chunk.length <= 320) {
+      finalParas.push(chunk);
+      continue;
+    }
+
+    // Se è un blocco lungo continuo senza a capo, spezziamo su frasi complete
+    const sentences = chunk.match(/[^.!?…]+(?:[.!?…]+["'»]?\s*|$)/g) || [chunk];
+    let currentPara = '';
+
+    for (let i = 0; i < sentences.length; i++) {
+      const s = sentences[i].trim();
+      if (!s) continue;
+
+      if (!currentPara) {
+        currentPara = s;
+      } else {
+        const potentialLen = currentPara.length + 1 + s.length;
+        // Spezza se superiamo ~220 caratteri e abbiamo già almeno una frase completa
+        if (potentialLen > 220 && currentPara.length >= 110) {
+          finalParas.push(currentPara);
+          currentPara = s;
+        } else {
+          currentPara += ' ' + s;
+        }
+      }
+    }
+
+    if (currentPara.trim()) {
+      finalParas.push(currentPara.trim());
+    }
+  }
+
+  return finalParas.filter(Boolean);
+}
+
+/**
+ * Pulisce e formatta il testo della trama rimuovendo tag HTML ed entità,
+ * garantendo spazi e a capo nitidi tra i paragrafi.
  */
 function cleanPlotText(raw: string): string {
   if (!raw) return '';
@@ -1134,13 +1206,8 @@ function cleanPlotText(raw: string): string {
   text = text.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
   text = text.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 
-  // Separa frasi incollate senza spazio dopo la punteggiatura (es. "storia.La" -> "storia. La")
-  text = text.replace(/([a-zà-öø-ÿ0-9][.!?…»])([A-ZÀ-ÖØ])/g, '$1 $2');
-
-  return text
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  const paras = formatPlotIntoParagraphs(text);
+  return paras.join('\n\n');
 }
 
 /**
