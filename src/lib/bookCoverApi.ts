@@ -12,6 +12,11 @@ export function getGoogleBooksUrl(query: string, extraParams = ''): string {
   return GOOGLE_BOOKS_API_KEY ? `${base}&key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}` : base;
 }
 
+export function getGoogleBooksVolumeUrl(volumeId: string): string {
+  const base = `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volumeId)}`;
+  return GOOGLE_BOOKS_API_KEY ? `${base}?key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}` : base;
+}
+
 /**
  * Pulisce la stringa rimuovendo caratteri speciali che potrebbero disturbare le ricerche
  */
@@ -1202,12 +1207,19 @@ async function fetchDetailsFromGoogleBooks(
     seenQueries.add(specKey);
 
     try {
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(spec.q)}${
-        spec.langRestrict ? `&langRestrict=${spec.langRestrict}` : ''
-      }&maxResults=20`;
+      const extra = `${spec.langRestrict ? `&langRestrict=${spec.langRestrict}` : ''}&maxResults=20`;
+      const url = getGoogleBooksUrl(encodeURIComponent(spec.q), extra);
 
-      const res = await fetchWithTimeout(url, 4500);
-      if (res.status === 429 || res.status === 403) break;
+      let res = await fetchWithTimeout(url, 4500);
+      // Fallback trasparente: se l'API key è bloccata per restrizione Referrer non ancora estesa a mobile/prod, prova senza chiave
+      if (res.status === 403 && GOOGLE_BOOKS_API_KEY) {
+        const fallbackUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(spec.q)}${extra}`;
+        const fallbackRes = await fetchWithTimeout(fallbackUrl, 4500).catch(() => null);
+        if (fallbackRes && fallbackRes.ok) {
+          res = fallbackRes;
+        }
+      }
+      if (res.status === 429) break;
       if (!res.ok) continue;
 
       const data = await res.json();
@@ -1334,10 +1346,15 @@ async function fetchDetailsFromGoogleBooks(
   if ((!bestWithPlot?.description || bestWithPlot.description.length < 100) && volumeIdsToInspect.length > 0) {
     const detailResults = await Promise.allSettled(
       volumeIdsToInspect.slice(0, 5).map(async (volId) => {
-        const res = await fetchWithTimeout(
-          `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volId)}`,
-          3500
-        );
+        const url = getGoogleBooksVolumeUrl(volId);
+        let res = await fetchWithTimeout(url, 3500);
+        if (res.status === 403 && GOOGLE_BOOKS_API_KEY) {
+          const fallbackRes = await fetchWithTimeout(
+            `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volId)}`,
+            3500
+          ).catch(() => null);
+          if (fallbackRes && fallbackRes.ok) res = fallbackRes;
+        }
         if (!res.ok) return null;
         return res.json();
       })
@@ -2139,11 +2156,21 @@ export async function searchBookPlotsOnline(
         for (const st of searchTerms) {
           let url = getGoogleBooksUrl(encodeURIComponent(st), '&maxResults=10&langRestrict=it');
           let res = await fetchWithTimeout(url, 3500);
+          if (res.status === 403 && GOOGLE_BOOKS_API_KEY) {
+            const fbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(st)}&maxResults=10&langRestrict=it`;
+            const fbRes = await fetchWithTimeout(fbUrl, 3500).catch(() => null);
+            if (fbRes && fbRes.ok) res = fbRes;
+          }
           let data = res.ok ? await res.json() : null;
 
           if (!data?.items || data.items.length === 0) {
             url = getGoogleBooksUrl(encodeURIComponent(st), '&maxResults=10');
             res = await fetchWithTimeout(url, 3500);
+            if (res.status === 403 && GOOGLE_BOOKS_API_KEY) {
+              const fbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(st)}&maxResults=10`;
+              const fbRes = await fetchWithTimeout(fbUrl, 3500).catch(() => null);
+              if (fbRes && fbRes.ok) res = fbRes;
+            }
             data = res.ok ? await res.json() : null;
           }
 
@@ -2165,10 +2192,15 @@ export async function searchBookPlotsOnline(
           await Promise.allSettled(
             missingDescIds.map(async (id) => {
               try {
-                const detailRes = await fetchWithTimeout(
-                  getGoogleBooksUrl('', `&id=${encodeURIComponent(id)}`),
-                  3000
-                );
+                const url = getGoogleBooksVolumeUrl(id);
+                let detailRes = await fetchWithTimeout(url, 3000);
+                if (detailRes.status === 403 && GOOGLE_BOOKS_API_KEY) {
+                  const fb = await fetchWithTimeout(
+                    `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(id)}`,
+                    3000
+                  ).catch(() => null);
+                  if (fb && fb.ok) detailRes = fb;
+                }
                 if (detailRes.ok) {
                   const detailData = await detailRes.json();
                   if (detailData?.volumeInfo?.description) {
