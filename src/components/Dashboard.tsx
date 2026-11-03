@@ -52,6 +52,7 @@ import { orderWantBooks } from '@/lib/bookPriority';
 import { useToast } from './Toast';
 import { LibrarySkeleton } from './Skeletons';
 import { SORT_OPTIONS, sortBooks, getStoredSort, storeSort, type SortKey } from '@/lib/sortBooks';
+import { APP_VERSION_LABEL } from '@/version';
 
 // Tempo a disposizione per annullare l'eliminazione di un libro
 const UNDO_DELETE_MS = 6000;
@@ -1122,18 +1123,23 @@ export function Dashboard() {
 
         {/* Footer elegante con link per la gestione dati e backup */}
         <div className="mt-14 pt-6 border-t border-stone-800/80 light:border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 light:text-stone-400">
-          <div className="flex items-center gap-2">
-            <span className="font-serif italic text-stone-400 light:text-stone-600">Bookshelf</span>
-            <span>·</span>
+          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start text-stone-400 light:text-stone-500">
+            <span className="font-serif italic font-medium text-stone-300 light:text-stone-700">Bookshelf</span>
+            <span className="text-stone-600 light:text-stone-300">·</span>
             <span>{stats.total} {stats.total === 1 ? 'libro registrato' : 'libri registrati'}</span>
+            <span className="text-stone-600 light:text-stone-300">·</span>
+            <span className="font-mono text-[11px] text-stone-500 light:text-stone-400 select-none">
+              {APP_VERSION_LABEL}
+            </span>
           </div>
 
           <button
+            type="button"
             onClick={() => setShowBackupModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-850/80 light:bg-stone-100 hover:bg-stone-800 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 transition-all cursor-pointer shadow-xs active:scale-95"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-850 light:bg-stone-100 hover:bg-stone-800 light:hover:bg-stone-200 text-stone-200 light:text-stone-800 border border-stone-750 light:border-stone-300 transition-all cursor-pointer shadow-xs active:scale-95 group font-medium"
             title="Esporta o ripristina la libreria in formato JSON"
           >
-            <Database size={13} className="text-amber-400 light:text-amber-600" />
+            <Database size={13} className="text-amber-400 light:text-amber-600 group-hover:scale-110 transition-transform" />
             <span>Gestione Backup e Dati JSON</span>
           </button>
         </div>

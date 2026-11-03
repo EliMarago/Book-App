@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { APP_VERSION_LABEL } from '@/version';
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'update-password';
 
@@ -403,9 +404,12 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           </form>
 
           {/* Dettaglio di stile decorativo */}
-          <div className="mt-6 pt-5 border-t border-stone-800/60 light:border-stone-200/60 text-center">
+          <div className="mt-6 pt-5 border-t border-stone-800/60 light:border-stone-200/60 text-center space-y-2">
             <p className="font-serif italic text-xs text-stone-400 light:text-stone-600">
               «Un lettore vive mille vite prima di morire.»
+            </p>
+            <p className="font-mono text-[10px] text-stone-500 light:text-stone-400 tracking-wider">
+              Bookshelf {APP_VERSION_LABEL}
             </p>
           </div>
         </div>
