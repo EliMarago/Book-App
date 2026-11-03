@@ -515,57 +515,56 @@ export function BookshelfView({
   return (
     <div className="space-y-6">
       {/* BARRA CONTROLLI DELLO SCAFFALE */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-850/80 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-3 sm:px-4 shadow-sm">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-300 light:text-stone-700">
-          <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
-            <Library size={16} />
+      <div className="flex flex-col gap-2.5 bg-stone-850/80 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
+              <Library size={15} />
+            </div>
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <span className="font-serif font-bold text-xs xs:text-sm sm:text-base text-stone-100 light:text-stone-900 truncate">
+                Scaffale Virtuale
+              </span>
+              <span className="hidden xs:inline text-stone-500 light:text-stone-400 text-[11px] sm:text-xs shrink-0">
+                · {books.length} {books.length === 1 ? 'libro' : 'libri'}
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="font-serif font-bold text-stone-100 light:text-stone-900">
-              Scaffale Virtuale
-            </span>
-            <span className="hidden xs:inline text-stone-500 light:text-stone-400 text-xs ml-2">
-              · {books.length} {books.length === 1 ? 'libro disposto' : 'libri disposti'}
-            </span>
-          </div>
-        </div>
 
-        {/* Toggle Stile Scaffale: Copertine vs Dorsi */}
-        <div className="flex items-center gap-1.5 self-end sm:self-auto bg-stone-900/90 light:bg-stone-100 p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs">
-          <span className="text-[11px] text-stone-500 light:text-stone-400 font-medium px-1.5 hidden md:inline">
-            Visualizza:
-          </span>
-          <button
-            type="button"
-            onClick={() => handleShelfStyleChange('covers')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-              shelfStyle === 'covers'
-                ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-            }`}
-            title="Mostra copertine frontali dei libri sullo scaffale"
-          >
-            <BookOpen size={13} />
-            <span>Copertine</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleShelfStyleChange('spines')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-              shelfStyle === 'spines'
-                ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-            }`}
-            title="Mostra i dorsi dei libri come in una vera libreria fisica"
-          >
-            <Layers size={13} />
-            <span>Dorsi</span>
-          </button>
+          {/* Toggle Stile Scaffale: Copertine vs Dorsi */}
+          <div className="flex items-center gap-1 bg-stone-900/90 light:bg-stone-100 p-0.5 sm:p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => handleShelfStyleChange('covers')}
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                shelfStyle === 'covers'
+                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+              }`}
+              title="Mostra copertine frontali dei libri sullo scaffale"
+            >
+              <BookOpen size={13} />
+              <span>Copertine</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleShelfStyleChange('spines')}
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                shelfStyle === 'spines'
+                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+              }`}
+              title="Mostra i dorsi dei libri come in una vera libreria fisica"
+            >
+              <Layers size={13} />
+              <span>Dorsi</span>
+            </button>
+          </div>
         </div>
 
         {/* Filtro Anno Dinamico nella vista Libri Letti: si aggiorna da solo ogni anno */}
         {activeTab === 'completed' && availableYears.length > 0 && (
-          <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin pt-2.5 border-t border-stone-800/60 light:border-stone-200/60">
+          <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin pt-2 border-t border-stone-800/60 light:border-stone-200/60 overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
             <span className="text-[11px] font-medium text-stone-400 light:text-stone-600 flex items-center gap-1 shrink-0 mr-1">
               <Calendar size={12} className="text-emerald-400 light:text-emerald-600" />
               Anno:
@@ -573,13 +572,13 @@ export function BookshelfView({
             <button
               type="button"
               onClick={() => setSelectedYear('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer border ${
+              className={`px-2.5 py-0.5 sm:py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer border ${
                 selectedYear === 'all'
                   ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-xs'
                   : 'bg-stone-900/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-white light:hover:text-stone-950'
               }`}
             >
-              Tutti gli anni ({completedBooks.length})
+              Tutti ({completedBooks.length})
             </button>
             {availableYears.map((year) => {
               const count = completedBooks.filter(
@@ -591,7 +590,7 @@ export function BookshelfView({
                   key={year}
                   type="button"
                   onClick={() => setSelectedYear(year)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer border flex items-center gap-1.5 ${
+                  className={`px-2.5 py-0.5 sm:py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer border flex items-center gap-1.5 ${
                     isSelected
                       ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-xs'
                       : 'bg-stone-900/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-white light:hover:text-stone-950'
@@ -799,7 +798,9 @@ export function BookshelfView({
                         const spine = getBookSpineStyle(book.id, book.title);
                         const isWantSection = section.id === 'want';
                         const isBestSection = section.id === 'best-completed';
-                        const isDraggable = isWantSection || isBestSection;
+                        const isDraggable =
+                          (isWantSection && isReorderingWant) ||
+                          (isBestSection && isReorderingBest);
                         const priorityRank = isWantSection ? bookIdx + 1 : null;
                         const bestRank = isBestSection ? bookIdx + 1 : null;
 
@@ -867,7 +868,7 @@ export function BookshelfView({
                                 setInspectingBook(book);
                               }
                             }}
-                            className={`group relative flex flex-col items-center cursor-pointer transition-all duration-300 hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl ${
+                            className={`group relative flex flex-col items-center cursor-pointer transition-all duration-300 hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[140px] xs:max-w-[150px] mx-auto ${
                               isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
                             } ${
                               isDragOver
@@ -885,7 +886,7 @@ export function BookshelfView({
                             }${book.title} — ${book.author}`}
                           >
                             {/* Libro appoggiato sullo scaffale */}
-                            <div className="relative w-full aspect-[2/3] max-w-[150px] rounded-r-lg rounded-l-xs overflow-hidden shadow-2xl transition-all group-hover:shadow-[0_20px_25px_-5px_rgba(245,158,11,0.25)] border-r-2 border-stone-200/30">
+                            <div className="relative w-full aspect-[2/3] rounded-r-lg rounded-l-xs overflow-hidden shadow-2xl transition-all group-hover:shadow-[0_20px_25px_-5px_rgba(245,158,11,0.25)] border-r-2 border-stone-200/30">
                               {/* Effetto costa e piega copertina sinistra */}
                               <div className="absolute top-0 left-0 bottom-0 w-3 bg-gradient-to-r from-white/20 via-transparent to-black/40 z-20 pointer-events-none" />
 
@@ -1000,8 +1001,8 @@ export function BookshelfView({
                               ) : null}
                             </div>
 
-                            {/* Titolo e autore sotto la copertina */}
-                            <div className="text-center mt-1.5 px-0.5 w-full max-w-[150px]">
+                            {/* Titolo e autore sotto la copertina con altezza uniforme per allineare perfettamente tutte le copertine */}
+                            <div className="text-center mt-2 px-0.5 w-full h-[46px] xs:h-[50px] flex flex-col justify-start overflow-hidden">
                               <p className="font-serif text-[11px] xs:text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words">
                                 {book.title}
                               </p>
@@ -1015,14 +1016,16 @@ export function BookshelfView({
                     </div>
                   ) : (
                     /* 2. VISTA DORSI DEI LIBRI VERTICALI (LIBRERIA CLASSICA) */
-                    <div className="flex items-end gap-1 sm:gap-2 px-2 sm:px-4 pt-6 pb-2 overflow-x-auto scrollbar-thin min-h-[240px]">
+                    <div className="flex items-end gap-1 sm:gap-2 px-2 sm:px-4 pt-6 pb-2 overflow-x-auto scrollbar-thin min-h-[240px] overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
                       {section.books.map((book, bookIdx) => {
                         const dynamicSpine = book.cover_url ? coverColors.get(book.cover_url) : null;
                         const spine = getBookSpineStyle(book.id, book.title);
 
                         const isWantSection = section.id === 'want';
                         const isBestSection = section.id === 'best-completed';
-                        const isDraggable = isWantSection || isBestSection;
+                        const isDraggable =
+                          (isWantSection && isReorderingWant) ||
+                          (isBestSection && isReorderingBest);
                         const priorityRank = isWantSection ? bookIdx + 1 : null;
                         const bestRank = isBestSection ? bookIdx + 1 : null;
 
@@ -1108,6 +1111,7 @@ export function BookshelfView({
                             style={{
                               background: dynamicSpine ? dynamicSpine.bgGradient : undefined,
                               borderColor: dynamicSpine ? dynamicSpine.border : undefined,
+                              touchAction: isDraggable ? 'none' : 'pan-x pan-y',
                             }}
                             className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-2 px-1 cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                               dynamicSpine ? '' : `bg-gradient-to-r ${spine.bg} ${spine.border}`
