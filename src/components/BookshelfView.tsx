@@ -11,10 +11,11 @@ import {
   BookMarked,
   ArrowUpDown,
   Pencil,
+  Crown,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
-import { orderWantBooks, reorderBookIds, shiftBookPosition } from '@/lib/bookPriority';
+import { orderWantBooks, orderBestBooks, reorderBookIds, shiftBookPosition } from '@/lib/bookPriority';
 
 // Palette predefinita per i dorsi dei libri quando non c'è una copertina
 const SPINE_PALETTES = [
@@ -171,6 +172,8 @@ interface BookshelfViewProps {
   onSelectTab?: (tab: 'all' | 'reading' | 'completed' | 'want') => void;
   priorityOrder?: string[];
   onUpdatePriorityOrder?: (newOrder: string[]) => void;
+  bestBooksOrder?: string[];
+  onUpdateBestBooksOrder?: (newOrder: string[]) => void;
 }
 
 export function BookshelfView({
@@ -187,6 +190,8 @@ export function BookshelfView({
   onSelectTab: _onSelectTab,
   priorityOrder = [],
   onUpdatePriorityOrder,
+  bestBooksOrder = [],
+  onUpdateBestBooksOrder,
 }: BookshelfViewProps) {
   // Stile di visualizzazione dello scaffale: Copertine frontali o Dorsi verticali
   const [shelfStyle, setShelfStyle] = useState<'covers' | 'spines'>(() => {
@@ -212,21 +217,38 @@ export function BookshelfView({
   // Palette dinamica estratta dalle copertine dei libri
   const coverColors = useCoverSpineColors(books);
 
-  // Stato per la modalità di riordino manuale e drag & drop
+  // Stato per la modalità di riordino manuale e drag & drop libri da leggere
   const [isReorderingWant, setIsReorderingWant] = useState(false);
   const [draggedBookId, setDraggedBookId] = useState<string | null>(null);
   const [dragOverBookId, setDragOverBookId] = useState<string | null>(null);
+
+  // Stato per la modalità di riordino manuale e drag & drop classifica migliori libri letti
+  const [isReorderingBest, setIsReorderingBest] = useState(false);
+  const [draggedBestBookId, setDraggedBestBookId] = useState<string | null>(null);
+  const [dragOverBestBookId, setDragOverBestBookId] = useState<string | null>(null);
 
   // Libri "Da leggere" ordinati secondo la priorità personalizzata
   const orderedWantBooks = useMemo(() => {
     return orderWantBooks(wantBooks, priorityOrder);
   }, [wantBooks, priorityOrder]);
 
+  // Libri completati ordinati per il ripiano d'onore "I Migliori Libri Letti"
+  const orderedBestBooks = useMemo(() => {
+    return orderBestBooks(completedBooks, bestBooksOrder);
+  }, [completedBooks, bestBooksOrder]);
+
   // Gestione deterministica del drag & drop basata esattamente sui libri presenti a schermo
   const handleDropReorder = (sourceId: string, targetId: string) => {
     if (!sourceId || !targetId || sourceId === targetId) return;
     const nextOrder = reorderBookIds(orderedWantBooks, sourceId, targetId);
     onUpdatePriorityOrder?.(nextOrder);
+  };
+
+  // Gestione deterministica drag & drop per la classifica dei migliori libri letti
+  const handleBestDropReorder = (sourceId: string, targetId: string) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const nextOrder = reorderBookIds(orderedBestBooks, sourceId, targetId);
+    onUpdateBestBooksOrder?.(nextOrder);
   };
 
   // Gestione spostamento rapido (frecce ‹ e ›)
@@ -285,6 +307,27 @@ export function BookshelfView({
     }
 
     if (activeTab === 'completed') {
+      const sections: Array<{
+        id: string;
+        shelfLabel: string;
+        title: string;
+        icon: typeof Flame;
+        books: Book[];
+        accent: 'amber' | 'sky' | 'emerald';
+      }> = [];
+
+      // Ripiano d'onore in cima con la classifica dei migliori libri letti ordinabili via Drag & Drop
+      if (orderedBestBooks.length > 0) {
+        sections.push({
+          id: 'best-completed',
+          shelfLabel: "Ripiano d'Onore",
+          title: 'I Migliori Libri Letti',
+          icon: Crown,
+          books: orderedBestBooks,
+          accent: 'amber',
+        });
+      }
+
       // Raggruppa per anno
       const byYear: Record<string, Book[]> = {};
       completedBooks.forEach((b) => {
@@ -299,7 +342,7 @@ export function BookshelfView({
         return Number(b) - Number(a);
       });
 
-      if (sortedYears.length === 0) {
+      if (sortedYears.length === 0 && sections.length === 0) {
         return [
           {
             id: 'completed-empty',
@@ -312,14 +355,18 @@ export function BookshelfView({
         ];
       }
 
-      return sortedYears.map((year) => ({
-        id: `completed-${year}`,
-        shelfLabel: 'Ripiano',
-        title: year === 'Senza data' ? 'Letti (Data non specificata)' : `Anno ${year}`,
-        icon: Trophy,
-        books: byYear[year],
-        accent: 'emerald' as const,
-      }));
+      sortedYears.forEach((year) => {
+        sections.push({
+          id: `completed-${year}`,
+          shelfLabel: 'Ripiano',
+          title: year === 'Senza data' ? 'Letti (Data non specificata)' : `Anno ${year}`,
+          icon: Trophy,
+          books: byYear[year],
+          accent: 'emerald',
+        });
+      });
+
+      return sections;
     }
 
     // Default: 'all' -> mostra ripiani divisi per stato
@@ -351,13 +398,25 @@ export function BookshelfView({
         accent: 'sky',
       });
     }
-    if (completedBooks.length > 0) {
+    if (orderedBestBooks.length > 0) {
+      sections.push({
+        id: 'best-completed',
+        shelfLabel: "Ripiano d'Onore",
+        title: 'I Migliori Libri Letti',
+        icon: Crown,
+        books: orderedBestBooks,
+        accent: 'amber',
+      });
+    }
+    const bestIds = new Set(orderedBestBooks.map((b) => b.id));
+    const otherCompleted = completedBooks.filter((b) => !bestIds.has(b.id));
+    if (otherCompleted.length > 0) {
       sections.push({
         id: 'completed',
-        shelfLabel: 'Ripiano III',
-        title: 'Libri Completati',
+        shelfLabel: 'Ripiano IV',
+        title: 'Altri Libri Completati',
         icon: Trophy,
-        books: completedBooks,
+        books: otherCompleted,
         accent: 'emerald',
       });
     }
@@ -374,7 +433,7 @@ export function BookshelfView({
     }
 
     return sections;
-  }, [activeTab, books, readingBooks, completedBooks, orderedWantBooks, searchQuery]);
+  }, [activeTab, books, readingBooks, completedBooks, orderedWantBooks, orderedBestBooks, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -503,6 +562,21 @@ export function BookshelfView({
                             <span>{isReorderingWant ? 'Fine' : 'Modifica ordine'}</span>
                           </button>
                         )}
+                        {section.id === 'best-completed' && section.books.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsReorderingBest((v) => !v)}
+                            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                              isReorderingBest
+                                ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
+                                : 'bg-stone-850/80 light:bg-white text-amber-400 light:text-amber-700 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/10'
+                            }`}
+                            title="Modifica classifica dei migliori libri con Drag and Drop"
+                          >
+                            <Crown size={12} />
+                            <span>{isReorderingBest ? 'Fine' : 'Modifica classifica'}</span>
+                          </button>
+                        )}
                         <span className="text-xs font-sans font-semibold px-2.5 py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
                           {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
                         </span>
@@ -530,6 +604,27 @@ export function BookshelfView({
                         </button>
                       </div>
                     )}
+
+                    {section.id === 'best-completed' && section.books.length > 1 && (
+                      <div className="sm:hidden flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-stone-800/40 light:border-stone-200/50">
+                        <span className="text-[11px] text-amber-400 light:text-amber-700 font-medium flex items-center gap-1">
+                          <Crown size={12} />
+                          Classifica d'Onore
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsReorderingBest((v) => !v)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                            isReorderingBest
+                              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
+                              : 'bg-stone-850 light:bg-white text-amber-400 light:text-amber-700 border border-amber-500/30 hover:border-amber-400'
+                          }`}
+                        >
+                          <Crown size={12} />
+                          <span>{isReorderingBest ? 'Fine' : 'Modifica classifica'}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Messaggio guida quando la modalità riordino è attiva */}
@@ -551,6 +646,24 @@ export function BookshelfView({
                     </div>
                   )}
 
+                  {section.id === 'best-completed' && isReorderingBest && (
+                    <div className="mx-2 mb-3 px-3 py-2 rounded-xl bg-amber-950/60 light:bg-amber-50 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-200 light:text-amber-950 shadow-inner">
+                      <div className="flex items-center gap-2">
+                        <Crown size={14} className="shrink-0 text-amber-400" />
+                        <span>
+                          <strong>Classifica Top Libri:</strong> trascina e rilascia per decidere il podio dei tuoi libri preferiti (👑 <strong>#1</strong> è il migliore in assoluto).
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsReorderingBest(false)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs"
+                      >
+                        Salva classifica
+                      </button>
+                    </div>
+                  )}
+
                   {/* LIBRI APPOGGIATI SUL RIPIANO */}
                   {shelfStyle === 'covers' ? (
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
@@ -558,46 +671,67 @@ export function BookshelfView({
                       {section.books.map((book, bookIdx) => {
                         const spine = getBookSpineStyle(book.id, book.title);
                         const isWantSection = section.id === 'want';
+                        const isBestSection = section.id === 'best-completed';
+                        const isDraggable = isWantSection || isBestSection;
                         const priorityRank = isWantSection ? bookIdx + 1 : null;
-                        const isFirst = isWantSection && bookIdx === 0;
-                        const isLast = isWantSection && bookIdx === section.books.length - 1;
+                        const bestRank = isBestSection ? bookIdx + 1 : null;
+
+                        const isBeingDragged =
+                          (isWantSection && draggedBookId === book.id) ||
+                          (isBestSection && draggedBestBookId === book.id);
+                        const isDragOver =
+                          (isWantSection && dragOverBookId === book.id) ||
+                          (isBestSection && dragOverBestBookId === book.id);
 
                         return (
                           <div
                             key={book.id}
                             role="button"
                             tabIndex={0}
-                            draggable={isWantSection}
+                            draggable={isDraggable}
                             onDragStart={(e) => {
-                              if (!isWantSection) return;
+                              if (!isDraggable) return;
                               e.dataTransfer.setData('text/plain', book.id);
                               e.dataTransfer.effectAllowed = 'move';
-                              setDraggedBookId(book.id);
+                              if (isBestSection) setDraggedBestBookId(book.id);
+                              else if (isWantSection) setDraggedBookId(book.id);
                             }}
                             onDragOver={(e) => {
-                              if (!isWantSection) return;
+                              if (!isDraggable) return;
                               e.preventDefault();
                               e.dataTransfer.dropEffect = 'move';
-                              if (dragOverBookId !== book.id) setDragOverBookId(book.id);
+                              if (isBestSection) {
+                                if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
+                              } else if (isWantSection) {
+                                if (dragOverBookId !== book.id) setDragOverBookId(book.id);
+                              }
                             }}
                             onDragLeave={(e) => {
                               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                              if (dragOverBookId === book.id) setDragOverBookId(null);
+                              if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
+                              else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
                             }}
                             onDrop={(e) => {
-                              if (!isWantSection) return;
+                              if (!isDraggable) return;
                               e.preventDefault();
                               e.stopPropagation();
-                              const sourceId = e.dataTransfer.getData('text/plain') || draggedBookId;
+                              const sourceId =
+                                e.dataTransfer.getData('text/plain') ||
+                                (isBestSection ? draggedBestBookId : draggedBookId);
                               if (sourceId && sourceId !== book.id) {
-                                handleDropReorder(sourceId, book.id);
+                                if (isBestSection) handleBestDropReorder(sourceId, book.id);
+                                else if (isWantSection) handleDropReorder(sourceId, book.id);
                               }
                               setDraggedBookId(null);
                               setDragOverBookId(null);
+                              setDraggedBestBookId(null);
+                              setDragOverBestBookId(null);
                             }}
                             onDragEnd={() => {
                               setDraggedBookId(null);
                               setDragOverBookId(null);
+                              setDraggedBestBookId(null);
+                              setDragOverBestBookId(null);
                             }}
                             onClick={() => setInspectingBook(book)}
                             onKeyDown={(e) => {
@@ -607,11 +741,21 @@ export function BookshelfView({
                               }
                             }}
                             className={`group relative flex flex-col items-center cursor-pointer transition-all duration-300 hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl ${
-                              draggedBookId === book.id ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                              isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
                             } ${
-                              dragOverBookId === book.id ? 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2 scale-105' : ''
+                              isDragOver
+                                ? isBestSection
+                                  ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.7)] -translate-y-2 scale-105'
+                                  : 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2 scale-105'
+                                : ''
                             }`}
-                            title={`${isWantSection ? `[Priorità #${priorityRank}] ` : ''}${book.title} — ${book.author}`}
+                            title={`${
+                              isBestSection
+                                ? `[👑 #${bestRank} Top Libro] `
+                                : isWantSection
+                                  ? `[Priorità #${priorityRank}] `
+                                  : ''
+                            }${book.title} — ${book.author}`}
                           >
                             {/* Libro appoggiato sullo scaffale */}
                             <div className="relative w-full aspect-[2/3] max-w-[150px] rounded-r-lg rounded-l-xs overflow-hidden shadow-2xl transition-all group-hover:shadow-[0_20px_25px_-5px_rgba(245,158,11,0.25)] border-r-2 border-stone-200/30">
@@ -662,10 +806,34 @@ export function BookshelfView({
                                 />
                               )}
 
-                              {/* Sigillo di completamento per i letti */}
-                              {book.status === 'completed' && (
+                              {/* Sigillo di completamento per i letti (se non nel ripiano classifica d'onore) */}
+                              {book.status === 'completed' && !isBestSection && (
                                 <div className="absolute top-1.5 left-2 z-30 pointer-events-none w-5 h-5 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-md">
                                   <Trophy size={11} />
+                                </div>
+                              )}
+
+                              {/* Badge classifica ripiano d'onore dei migliori libri letti */}
+                              {isBestSection && bestRank !== null && (
+                                <div className="absolute top-2 left-2 z-30 pointer-events-none">
+                                  {bestRank === 1 ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1">
+                                      <Crown size={11} className="text-stone-950 fill-stone-950" />
+                                      #1 Top
+                                    </span>
+                                  ) : bestRank === 2 ? (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-0.5">
+                                      🥈 #2
+                                    </span>
+                                  ) : bestRank === 3 ? (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-700 text-amber-100 border border-amber-500/50 shadow-md flex items-center gap-0.5">
+                                      🥉 #3
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md">
+                                      ⭐ #{bestRank}
+                                    </span>
+                                  )}
                                 </div>
                               )}
 
@@ -726,9 +894,17 @@ export function BookshelfView({
                         const spine = getBookSpineStyle(book.id, book.title);
 
                         const isWantSection = section.id === 'want';
+                        const isBestSection = section.id === 'best-completed';
+                        const isDraggable = isWantSection || isBestSection;
                         const priorityRank = isWantSection ? bookIdx + 1 : null;
-                        const isFirst = isWantSection && bookIdx === 0;
-                        const isLast = isWantSection && bookIdx === section.books.length - 1;
+                        const bestRank = isBestSection ? bookIdx + 1 : null;
+
+                        const isBeingDragged =
+                          (isWantSection && draggedBookId === book.id) ||
+                          (isBestSection && draggedBestBookId === book.id);
+                        const isDragOver =
+                          (isWantSection && dragOverBookId === book.id) ||
+                          (isBestSection && dragOverBestBookId === book.id);
 
                         // Calcola spessore del dorso in base alle pagine (classi valide Tailwind v3)
                         let spineWidth = 'w-10 sm:w-11';
@@ -750,41 +926,50 @@ export function BookshelfView({
                             key={book.id}
                             role="button"
                             tabIndex={0}
-                            draggable={isWantSection}
+                            draggable={isDraggable}
                             onDragStart={(e) => {
-                              if (!isWantSection) return;
+                              if (!isDraggable) return;
                               e.dataTransfer.setData('text/plain', book.id);
                               e.dataTransfer.effectAllowed = 'move';
-                              setDraggedBookId(book.id);
+                              if (isBestSection) setDraggedBestBookId(book.id);
+                              else if (isWantSection) setDraggedBookId(book.id);
                             }}
                             onDragOver={(e) => {
-                              if (!isWantSection) return;
+                              if (!isDraggable) return;
                               e.preventDefault();
                               e.dataTransfer.dropEffect = 'move';
-                              if (dragOverBookId !== book.id) {
-                                setDragOverBookId(book.id);
+                              if (isBestSection) {
+                                if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
+                              } else if (isWantSection) {
+                                if (dragOverBookId !== book.id) setDragOverBookId(book.id);
                               }
                             }}
                             onDragLeave={(e) => {
                               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                              if (dragOverBookId === book.id) {
-                                setDragOverBookId(null);
-                              }
+                              if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
+                              else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
                             }}
                             onDrop={(e) => {
-                              if (!isWantSection) return;
+                              if (!isDraggable) return;
                               e.preventDefault();
                               e.stopPropagation();
-                              const sourceId = e.dataTransfer.getData('text/plain') || draggedBookId;
+                              const sourceId =
+                                e.dataTransfer.getData('text/plain') ||
+                                (isBestSection ? draggedBestBookId : draggedBookId);
                               if (sourceId && sourceId !== book.id) {
-                                handleDropReorder(sourceId, book.id);
+                                if (isBestSection) handleBestDropReorder(sourceId, book.id);
+                                else if (isWantSection) handleDropReorder(sourceId, book.id);
                               }
                               setDraggedBookId(null);
                               setDragOverBookId(null);
+                              setDraggedBestBookId(null);
+                              setDragOverBestBookId(null);
                             }}
                             onDragEnd={() => {
                               setDraggedBookId(null);
                               setDragOverBookId(null);
+                              setDraggedBestBookId(null);
+                              setDragOverBestBookId(null);
                             }}
                             onClick={() => setInspectingBook(book)}
                             onKeyDown={(e) => {
@@ -800,11 +985,21 @@ export function BookshelfView({
                             className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-2 px-1 cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                               dynamicSpine ? '' : `bg-gradient-to-r ${spine.bg} ${spine.border}`
                             } border-t border-b-2 shadow-lg select-none overflow-hidden ${
-                              draggedBookId === book.id ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                              isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
                             } ${
-                              dragOverBookId === book.id ? 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2' : ''
+                              isDragOver
+                                ? isBestSection
+                                  ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.7)] -translate-y-2'
+                                  : 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2'
+                                : ''
                             }`}
-                            title={`${isWantSection ? `[Priorità #${priorityRank}] ` : ''}${book.title} — ${book.author}`}
+                            title={`${
+                              isBestSection
+                                ? `[👑 #${bestRank} Top Libro] `
+                                : isWantSection
+                                  ? `[Priorità #${priorityRank}] `
+                                  : ''
+                            }${book.title} — ${book.author}`}
                           >
                             {/* Texture sfumata prelevata direttamente dalla copertina */}
                             {book.cover_url && (
@@ -835,6 +1030,42 @@ export function BookshelfView({
                                 dynamicSpine?.isLight ? 'bg-stone-900/30' : 'bg-amber-100/40 opacity-70'
                               }`}
                             />
+
+                            {/* Badge classifica ripiano d'onore per i migliori libri */}
+                            {isBestSection && bestRank !== null && (
+                              <div className="z-20 mx-auto my-0.5 flex flex-col items-center">
+                                {bestRank === 1 ? (
+                                  <span
+                                    className="px-1 py-0.5 rounded text-[8.5px] font-black tracking-tight bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200/80 flex items-center gap-0.5"
+                                    title="Classifica #1: Il tuo miglior libro in assoluto!"
+                                  >
+                                    <Crown size={9} className="text-stone-950 fill-stone-950" />
+                                    1°
+                                  </span>
+                                ) : bestRank === 2 ? (
+                                  <span
+                                    className="px-1 py-0.5 rounded text-[8px] font-bold tracking-tight bg-stone-200 text-stone-900 border border-white shadow-xs"
+                                    title="Classifica #2"
+                                  >
+                                    🥈 2°
+                                  </span>
+                                ) : bestRank === 3 ? (
+                                  <span
+                                    className="px-1 py-0.5 rounded text-[8px] font-bold tracking-tight bg-amber-700 text-amber-100 border border-amber-500/50 shadow-xs"
+                                    title="Classifica #3"
+                                  >
+                                    🥉 3°
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="px-1 py-0.5 rounded text-[8px] font-bold tracking-tight bg-black/60 text-amber-300 border border-amber-400/40 shadow-xs"
+                                    title={`Classifica #${bestRank}`}
+                                  >
+                                    #{bestRank}
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
                             {/* Badge priorità visibile sul dorso per i libri da leggere */}
                             {isWantSection && priorityRank !== null && (

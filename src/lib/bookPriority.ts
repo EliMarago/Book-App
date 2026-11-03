@@ -1,6 +1,101 @@
 import { supabase, type Book } from '@/lib/supabase';
 
 const STORAGE_KEY = 'books_want_priority';
+const BEST_STORAGE_KEY = 'books_best_order';
+
+/**
+ * Recupera l'ordine personalizzato della classifica dei migliori libri letti da localStorage.
+ */
+export function getStoredBestBooksOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(BEST_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Salva l'ordine della classifica dei migliori libri letti in localStorage.
+ */
+export function saveStoredBestBooksOrder(order: string[]): void {
+  try {
+    localStorage.setItem(BEST_STORAGE_KEY, JSON.stringify(order));
+  } catch (e) {
+    console.error('Errore nel salvataggio della classifica dei migliori libri in localStorage:', e);
+  }
+}
+
+/**
+ * Sincronizza l'ordine della classifica dei migliori libri su Supabase nei metadati dell'utente.
+ */
+export async function syncBestBooksOrderToSupabase(order: string[]): Promise<void> {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      data: { best_books_order: order },
+    });
+    if (error) {
+      console.warn('Errore salvataggio classifica su Supabase:', error);
+    }
+  } catch (e) {
+    console.warn('Eccezione durante sync classifica su Supabase:', e);
+  }
+}
+
+/**
+ * Ordina i libri letti per la classifica d'onore dei "Migliori Libri Letti".
+ * I libri presenti nell'array bestOrder mantengono esattamente la posizione scelta dall'utente.
+ * Per i libri non ancora ordinati manualmente:
+ * - Vengono inclusi i libri con valutazione >= 4 (o tutti i libri letti se non ce ne sono con >= 4),
+ *   ordinati in ordine decrescente di rating (5 stelle prima, poi 4) e data di lettura più recente.
+ */
+export function orderBestBooks(completedBooks: Book[], bestOrder: string[]): Book[] {
+  if (!completedBooks || completedBooks.length === 0) return [];
+
+  const completedMap = new Map<string, Book>();
+  completedBooks.forEach((b) => completedMap.set(b.id, b));
+
+  const result: Book[] = [];
+  const addedIds = new Set<string>();
+
+  // 1. Aggiungi i libri secondo l'ordine personalizzato memorizzato
+  if (Array.isArray(bestOrder)) {
+    bestOrder.forEach((id) => {
+      const book = completedMap.get(id);
+      if (book && !addedIds.has(id)) {
+        result.push(book);
+        addedIds.add(id);
+      }
+    });
+  }
+
+  // 2. Tra i rimanenti, prendi i libri con rating >= 4 (o tutti se nessuno ha rating >= 4)
+  const remaining = completedBooks.filter((b) => !addedIds.has(b.id));
+  const highRated = remaining.filter((b) => (b.rating || 0) >= 4);
+  const candidates = highRated.length > 0 ? highRated : remaining;
+
+  candidates.sort((a, b) => {
+    // Rating più alto prima
+    const ratingDiff = (b.rating || 0) - (a.rating || 0);
+    if (ratingDiff !== 0) return ratingDiff;
+
+    // Data di lettura più recente
+    const dateA = a.read_at ? new Date(a.read_at).getTime() : 0;
+    const dateB = b.read_at ? new Date(b.read_at).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  candidates.forEach((b) => {
+    if (!addedIds.has(b.id)) {
+      result.push(b);
+      addedIds.add(b.id);
+    }
+  });
+
+  return result;
+}
 
 /**
  * Recupera l'ordine di priorità dei libri da leggere salvato in localStorage.

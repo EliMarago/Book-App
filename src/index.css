@@ -69,6 +69,16 @@
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background-color: #1c1917 !important;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+    filter: none !important;
+  }
+
+  header h1 {
+    filter: none !important;
+    text-shadow: none !important;
+    -webkit-font-smoothing: antialiased;
   }
 
   .light header,

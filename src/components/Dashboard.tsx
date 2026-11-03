@@ -62,7 +62,15 @@ export function Dashboard() {
   const { signOut, user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { toast } = useToast();
-  const { priorityOrder, setPriority, sortWantBooks, shiftBook, reorderOnDrop } = useBookPriority();
+  const {
+    priorityOrder,
+    setPriority,
+    sortWantBooks,
+    shiftBook,
+    reorderOnDrop,
+    bestBooksOrder,
+    setBestBooksOrder,
+  } = useBookPriority();
   const [isReorderingWantCards, setIsReorderingWantCards] = useState(false);
   const [draggedCardBookId, setDraggedCardBookId] = useState<string | null>(null);
   const [dragOverCardBookId, setDragOverCardBookId] = useState<string | null>(null);
@@ -653,6 +661,11 @@ export function Dashboard() {
             onUpdatePriorityOrder={(newOrder) => {
               setPriority(newOrder);
               toast({ message: 'Ordine di lettura aggiornato', type: 'success' });
+            }}
+            bestBooksOrder={bestBooksOrder}
+            onUpdateBestBooksOrder={(newOrder) => {
+              setBestBooksOrder(newOrder);
+              toast({ message: 'Classifica dei migliori libri aggiornata', type: 'success' });
             }}
           />
         ) : activeTab === 'completed' ? (
