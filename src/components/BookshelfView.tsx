@@ -12,6 +12,7 @@ import {
   ArrowUpDown,
   Pencil,
   Crown,
+  Calendar,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
@@ -227,6 +228,21 @@ export function BookshelfView({
   const [draggedBestBookId, setDraggedBestBookId] = useState<string | null>(null);
   const [dragOverBestBookId, setDragOverBestBookId] = useState<string | null>(null);
 
+  // Filtro rapido per anno nella visualizzazione dei libri completati
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+
+  // Anni disponibili calcolati dinamicamente dai libri completati (ordinati decrescenti: il più recente in cima)
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<string>();
+    completedBooks.forEach((b) => {
+      if (b.read_at) {
+        const d = new Date(b.read_at);
+        if (!isNaN(d.getTime())) yearsSet.add(d.getFullYear().toString());
+      }
+    });
+    return Array.from(yearsSet).sort((a, b) => Number(b) - Number(a));
+  }, [completedBooks]);
+
   // Libri "Da leggere" ordinati secondo la priorità personalizzata
   const orderedWantBooks = useMemo(() => {
     return orderWantBooks(wantBooks, priorityOrder);
@@ -316,33 +332,73 @@ export function BookshelfView({
         accent: 'amber' | 'sky' | 'emerald';
       }> = [];
 
+      // Filtra i libri se è selezionato un anno specifico
+      const activeCompleted =
+        selectedYear === 'all'
+          ? completedBooks
+          : completedBooks.filter((b) => {
+              if (!b.read_at) return selectedYear === 'Senza data';
+              const d = new Date(b.read_at);
+              return !isNaN(d.getTime()) && d.getFullYear().toString() === selectedYear;
+            });
+
+      const yearOrderedBest = orderBestBooks(activeCompleted, bestBooksOrder);
+
       // Ripiano d'onore in cima con la classifica dei migliori libri letti ordinabili via Drag & Drop
-      if (orderedBestBooks.length > 0) {
+      if (yearOrderedBest.length > 0) {
         sections.push({
           id: 'best-completed',
           shelfLabel: "Ripiano d'Onore",
-          title: 'I Migliori Libri Letti',
+          title:
+            selectedYear === 'all'
+              ? 'I Migliori Libri Letti (Classifica Generale)'
+              : `I Migliori Libri del ${selectedYear}`,
           icon: Crown,
-          books: orderedBestBooks,
+          books: yearOrderedBest,
           accent: 'amber',
         });
       }
 
-      // Raggruppa per anno
-      const byYear: Record<string, Book[]> = {};
-      completedBooks.forEach((b) => {
-        const y = b.read_at ? new Date(b.read_at).getFullYear().toString() : 'Senza data';
-        if (!byYear[y]) byYear[y] = [];
-        byYear[y].push(b);
-      });
+      if (selectedYear !== 'all') {
+        // Mostra tutti i libri letti di quest'anno specifico
+        if (activeCompleted.length > 0) {
+          sections.push({
+            id: `completed-${selectedYear}`,
+            shelfLabel: 'Ripiano',
+            title: `Tutti i Libri Letti nel ${selectedYear}`,
+            icon: Trophy,
+            books: activeCompleted,
+            accent: 'emerald',
+          });
+        }
+      } else {
+        // Raggruppa per anno
+        const byYear: Record<string, Book[]> = {};
+        completedBooks.forEach((b) => {
+          const y = b.read_at ? new Date(b.read_at).getFullYear().toString() : 'Senza data';
+          if (!byYear[y]) byYear[y] = [];
+          byYear[y].push(b);
+        });
 
-      const sortedYears = Object.keys(byYear).sort((a, b) => {
-        if (a === 'Senza data') return 1;
-        if (b === 'Senza data') return -1;
-        return Number(b) - Number(a);
-      });
+        const sortedYears = Object.keys(byYear).sort((a, b) => {
+          if (a === 'Senza data') return 1;
+          if (b === 'Senza data') return -1;
+          return Number(b) - Number(a);
+        });
 
-      if (sortedYears.length === 0 && sections.length === 0) {
+        sortedYears.forEach((year) => {
+          sections.push({
+            id: `completed-${year}`,
+            shelfLabel: 'Ripiano',
+            title: year === 'Senza data' ? 'Letti (Data non specificata)' : `Anno ${year}`,
+            icon: Trophy,
+            books: byYear[year],
+            accent: 'emerald',
+          });
+        });
+      }
+
+      if (sections.length === 0) {
         return [
           {
             id: 'completed-empty',
@@ -355,21 +411,10 @@ export function BookshelfView({
         ];
       }
 
-      sortedYears.forEach((year) => {
-        sections.push({
-          id: `completed-${year}`,
-          shelfLabel: 'Ripiano',
-          title: year === 'Senza data' ? 'Letti (Data non specificata)' : `Anno ${year}`,
-          icon: Trophy,
-          books: byYear[year],
-          accent: 'emerald',
-        });
-      });
-
       return sections;
     }
 
-    // Default: 'all' -> mostra ripiani divisi per stato
+    // Default: 'all' -> mostra ripiani divisi per stato e per anno per i completati
     const sections: Array<{
       id: string;
       shelfLabel: string;
@@ -408,18 +453,31 @@ export function BookshelfView({
         accent: 'amber',
       });
     }
-    const bestIds = new Set(orderedBestBooks.map((b) => b.id));
-    const otherCompleted = completedBooks.filter((b) => !bestIds.has(b.id));
-    if (otherCompleted.length > 0) {
+
+    // Suddividi i libri completati per anno (il più recente in alto)
+    const byYearAll: Record<string, Book[]> = {};
+    completedBooks.forEach((b) => {
+      const y = b.read_at ? new Date(b.read_at).getFullYear().toString() : 'Senza data';
+      if (!byYearAll[y]) byYearAll[y] = [];
+      byYearAll[y].push(b);
+    });
+
+    const sortedYearsAll = Object.keys(byYearAll).sort((a, b) => {
+      if (a === 'Senza data') return 1;
+      if (b === 'Senza data') return -1;
+      return Number(b) - Number(a);
+    });
+
+    sortedYearsAll.forEach((year, idx) => {
       sections.push({
-        id: 'completed',
-        shelfLabel: 'Ripiano IV',
-        title: 'Altri Libri Completati',
+        id: `completed-year-${year}`,
+        shelfLabel: `Ripiano ${year}`,
+        title: year === 'Senza data' ? 'Completati (Data non specificata)' : `Completati nel ${year}`,
         icon: Trophy,
-        books: otherCompleted,
+        books: byYearAll[year],
         accent: 'emerald',
       });
-    }
+    });
 
     if (sections.length === 0) {
       sections.push({
@@ -433,7 +491,16 @@ export function BookshelfView({
     }
 
     return sections;
-  }, [activeTab, books, readingBooks, completedBooks, orderedWantBooks, orderedBestBooks, searchQuery]);
+  }, [
+    activeTab,
+    books,
+    readingBooks,
+    completedBooks,
+    orderedWantBooks,
+    orderedBestBooks,
+    searchQuery,
+    selectedYear,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -485,6 +552,56 @@ export function BookshelfView({
             <span>Dorsi</span>
           </button>
         </div>
+
+        {/* Filtro Anno Dinamico nella vista Libri Letti: si aggiorna da solo ogni anno */}
+        {activeTab === 'completed' && availableYears.length > 0 && (
+          <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin pt-2.5 border-t border-stone-800/60 light:border-stone-200/60">
+            <span className="text-[11px] font-medium text-stone-400 light:text-stone-600 flex items-center gap-1 shrink-0 mr-1">
+              <Calendar size={12} className="text-emerald-400 light:text-emerald-600" />
+              Anno:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedYear('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer border ${
+                selectedYear === 'all'
+                  ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-xs'
+                  : 'bg-stone-900/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-white light:hover:text-stone-950'
+              }`}
+            >
+              Tutti gli anni ({completedBooks.length})
+            </button>
+            {availableYears.map((year) => {
+              const count = completedBooks.filter(
+                (b) => b.read_at && new Date(b.read_at).getFullYear().toString() === year
+              ).length;
+              const isSelected = selectedYear === year;
+              return (
+                <button
+                  key={year}
+                  type="button"
+                  onClick={() => setSelectedYear(year)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer border flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-emerald-500 text-stone-950 border-emerald-400 font-semibold shadow-xs'
+                      : 'bg-stone-900/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-white light:hover:text-stone-950'
+                  }`}
+                >
+                  <span>{year}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full tabular-nums ${
+                      isSelected
+                        ? 'bg-stone-950/20 text-stone-950'
+                        : 'bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* STRUTTURA DELLA LIBRERIA A SCAFFALI IN LEGNO */}
