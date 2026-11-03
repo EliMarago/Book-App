@@ -13,6 +13,7 @@ import {
   Pencil,
   Crown,
   Calendar,
+  ArrowRight,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
@@ -188,7 +189,7 @@ export function BookshelfView({
   onDeleteBook,
   onEditBook,
   onAddBook,
-  onSelectTab: _onSelectTab,
+  onSelectTab,
   priorityOrder = [],
   onUpdatePriorityOrder,
   bestBooksOrder = [],
@@ -228,8 +229,8 @@ export function BookshelfView({
   const [draggedBestBookId, setDraggedBestBookId] = useState<string | null>(null);
   const [dragOverBestBookId, setDragOverBestBookId] = useState<string | null>(null);
 
-  // Filtro rapido per anno nella visualizzazione dei libri completati
-  const [selectedYear, setSelectedYear] = useState<string>('all');
+  // Anno solare corrente (es. 2026)
+  const currentYear = useMemo(() => new Date().getFullYear().toString(), []);
 
   // Anni disponibili calcolati dinamicamente dai libri completati (ordinati decrescenti: il più recente in cima)
   const availableYears = useMemo(() => {
@@ -242,6 +243,20 @@ export function BookshelfView({
     });
     return Array.from(yearsSet).sort((a, b) => Number(b) - Number(a));
   }, [completedBooks]);
+
+  // Filtro rapido per anno nella visualizzazione dei libri completati:
+  // Si imposta di default sull'anno più recente disponibile (es. 2026) per una vista ordinata e pulita
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+
+  useEffect(() => {
+    if (availableYears.length > 0 && selectedYear === 'all') {
+      if (availableYears.includes(currentYear)) {
+        setSelectedYear(currentYear);
+      } else if (availableYears[0]) {
+        setSelectedYear(availableYears[0]);
+      }
+    }
+  }, [availableYears, currentYear]);
 
   // Libri "Da leggere" ordinati secondo la priorità personalizzata
   const orderedWantBooks = useMemo(() => {
@@ -414,7 +429,7 @@ export function BookshelfView({
       return sections;
     }
 
-    // Default: 'all' -> mostra ripiani divisi per stato e per anno per i completati
+    // Default: 'all' -> Vetrina curata e snella (In lettura, Da leggere, Podio d'onore e Ultime letture)
     const sections: Array<{
       id: string;
       shelfLabel: string;
@@ -449,35 +464,30 @@ export function BookshelfView({
         shelfLabel: "Ripiano d'Onore",
         title: 'I Migliori Libri Letti',
         icon: Crown,
-        books: orderedBestBooks,
+        books: orderedBestBooks.slice(0, 10),
         accent: 'amber',
       });
     }
 
-    // Suddividi i libri completati per anno (il più recente in alto)
-    const byYearAll: Record<string, Book[]> = {};
-    completedBooks.forEach((b) => {
-      const y = b.read_at ? new Date(b.read_at).getFullYear().toString() : 'Senza data';
-      if (!byYearAll[y]) byYearAll[y] = [];
-      byYearAll[y].push(b);
-    });
+    // Ultime letture completate (fino a 6 libri) per mantenere la vetrina piacevole e veloce
+    const recentCompleted = [...completedBooks]
+      .sort((a, b) => {
+        const dateA = a.read_at ? new Date(a.read_at).getTime() : 0;
+        const dateB = b.read_at ? new Date(b.read_at).getTime() : 0;
+        return dateB - dateA;
+      })
+      .slice(0, 6);
 
-    const sortedYearsAll = Object.keys(byYearAll).sort((a, b) => {
-      if (a === 'Senza data') return 1;
-      if (b === 'Senza data') return -1;
-      return Number(b) - Number(a);
-    });
-
-    sortedYearsAll.forEach((year, idx) => {
+    if (recentCompleted.length > 0) {
       sections.push({
-        id: `completed-year-${year}`,
-        shelfLabel: `Ripiano ${year}`,
-        title: year === 'Senza data' ? 'Completati (Data non specificata)' : `Completati nel ${year}`,
+        id: 'recent-completed',
+        shelfLabel: 'Ripiano III',
+        title: 'Ultime Letture Completate',
         icon: Trophy,
-        books: byYearAll[year],
+        books: recentCompleted,
         accent: 'emerald',
       });
-    });
+    }
 
     if (sections.length === 0) {
       sections.push({
@@ -1260,6 +1270,33 @@ export function BookshelfView({
           </div>
         )}
       </div>
+
+      {/* Collegamento rapido all'Archivio Annuale completo quando ci si trova nella vista generale "Tutti" */}
+      {activeTab === 'all' && completedBooks.length > 0 && onSelectTab && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-850/80 light:bg-white p-4 rounded-2xl border border-stone-800 light:border-stone-200 shadow-sm text-center sm:text-left animate-fade-up">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0">
+              <Trophy size={20} />
+            </div>
+            <div>
+              <h4 className="font-serif font-bold text-sm text-stone-100 light:text-stone-900 leading-tight">
+                Archivio Storico delle Letture ({completedBooks.length} {completedBooks.length === 1 ? 'libro letto' : 'libri letti'})
+              </h4>
+              <p className="text-xs text-stone-400 light:text-stone-600 mt-0.5">
+                Esplora lo scaffale organizzato per singolo anno con le classifiche dedicate.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSelectTab('completed')}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+          >
+            <span>Apri Archivio Anni</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
 
       {/* SCHEDA LIBRO COMPLETA (QUANDO SI APRE UN LIBRO DALLO SCAFFALE) */}
       {inspectingBook && (
