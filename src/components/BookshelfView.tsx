@@ -366,8 +366,8 @@ export function BookshelfView({
           shelfLabel: "Ripiano d'Onore",
           title:
             selectedYear === 'all'
-              ? 'I Migliori Libri Letti (Classifica Generale)'
-              : `I Migliori Libri del ${selectedYear}`,
+              ? 'I Migliori Libri Letti'
+              : `I Migliori del ${selectedYear}`,
           icon: Crown,
           books: yearOrderedBest,
           accent: 'amber',
@@ -379,8 +379,8 @@ export function BookshelfView({
         if (activeCompleted.length > 0) {
           sections.push({
             id: `completed-${selectedYear}`,
-            shelfLabel: 'Ripiano',
-            title: `Tutti i Libri Letti nel ${selectedYear}`,
+            shelfLabel: selectedYear === 'Senza data' ? 'Ripiano' : `Anno ${selectedYear}`,
+            title: selectedYear === 'Senza data' ? 'Libri Senza Data' : `Libri del ${selectedYear}`,
             icon: Trophy,
             books: activeCompleted,
             accent: 'emerald',
@@ -404,8 +404,8 @@ export function BookshelfView({
         sortedYears.forEach((year) => {
           sections.push({
             id: `completed-${year}`,
-            shelfLabel: 'Ripiano',
-            title: year === 'Senza data' ? 'Letti (Data non specificata)' : `Anno ${year}`,
+            shelfLabel: year === 'Senza data' ? 'Ripiano' : `Anno ${year}`,
+            title: year === 'Senza data' ? 'Data non specificata' : `Libri del ${year}`,
             icon: Trophy,
             books: byYear[year],
             accent: 'emerald',
@@ -481,8 +481,8 @@ export function BookshelfView({
     if (recentCompleted.length > 0) {
       sections.push({
         id: 'recent-completed',
-        shelfLabel: 'Ripiano III',
-        title: 'Ultime Letture Completate',
+        shelfLabel: 'Ripiano Recenti',
+        title: 'Ultime Letture',
         icon: Trophy,
         books: recentCompleted,
         accent: 'emerald',
@@ -652,28 +652,28 @@ export function BookshelfView({
 
               return (
                 <div key={section.id} className="relative">
-                  {/* Intestazione del ripiano coerente con i font e il design dell'app */}
-                  <div className="mb-4 px-2 pb-2.5 border-b border-stone-800/80 light:border-stone-300/70">
+                  {/* Intestazione del ripiano con tipografia fluida e responsive per mobile */}
+                  <div className="mb-3.5 sm:mb-4 px-1 sm:px-2 pb-2.5 border-b border-stone-800/80 light:border-stone-300/70">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                         <div
                           className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl border flex items-center justify-center shrink-0 ${accentBadge}`}
                         >
-                          <SectionIcon size={15} />
+                          <SectionIcon size={14} className="sm:w-[15px] sm:h-[15px]" />
                         </div>
-                        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <div className="flex flex-wrap sm:flex-nowrap items-baseline sm:items-center gap-1.5 sm:gap-2 min-w-0">
                           <span
-                            className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0 ${accentBadge}`}
+                            className={`text-[9px] sm:text-[10px] font-sans font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-md border shrink-0 ${accentBadge}`}
                           >
                             {section.shelfLabel}
                           </span>
-                          <h3 className="font-serif text-sm sm:text-base md:text-lg font-bold text-stone-100 light:text-stone-900 whitespace-nowrap">
+                          <h3 className="font-serif text-xs xs:text-sm sm:text-base md:text-lg font-bold text-stone-100 light:text-stone-900 leading-snug line-clamp-1 sm:line-clamp-2 break-words">
                             {section.title}
                           </h3>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         {section.id === 'want' && section.books.length > 1 && (
                           <button
                             type="button"
@@ -704,50 +704,50 @@ export function BookshelfView({
                             <span>{isReorderingBest ? 'Fine' : 'Modifica classifica'}</span>
                           </button>
                         )}
-                        <span className="text-xs font-sans font-semibold px-2.5 py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
-                          {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
+                        <span className="text-[10px] sm:text-xs font-sans font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border border-stone-700/70 light:border-stone-300/80 shrink-0 whitespace-nowrap">
+                          {section.books.length} <span className="hidden xs:inline">{section.books.length === 1 ? 'volume' : 'volumi'}</span><span className="xs:hidden">vol.</span>
                         </span>
                       </div>
                     </div>
 
                     {/* Su mobile: pulsante di riordino su riga dedicata per evitare qualsiasi sovrapposizione o troncamento del titolo */}
                     {section.id === 'want' && section.books.length > 1 && (
-                      <div className="sm:hidden flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-stone-800/40 light:border-stone-200/50">
-                        <span className="text-[11px] text-sky-400 light:text-sky-700 font-medium flex items-center gap-1">
-                          <Bookmark size={12} />
+                      <div className="sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t border-stone-800/40 light:border-stone-200/50">
+                        <span className="text-[11px] text-sky-400 light:text-sky-700 font-medium flex items-center gap-1 truncate">
+                          <Bookmark size={11} className="shrink-0" />
                           Priorità di lettura
                         </span>
                         <button
                           type="button"
                           onClick={() => setIsReorderingWant((v) => !v)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${
                             isReorderingWant
                               ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
                               : 'bg-stone-850 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400'
                           }`}
                         >
-                          <Pencil size={12} />
+                          <Pencil size={11} />
                           <span>{isReorderingWant ? 'Fine' : 'Modifica ordine'}</span>
                         </button>
                       </div>
                     )}
 
                     {section.id === 'best-completed' && section.books.length > 1 && (
-                      <div className="sm:hidden flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-stone-800/40 light:border-stone-200/50">
-                        <span className="text-[11px] text-amber-400 light:text-amber-700 font-medium flex items-center gap-1">
-                          <Crown size={12} />
-                          Classifica d'Onore
+                      <div className="sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t border-stone-800/40 light:border-stone-200/50">
+                        <span className="text-[11px] text-amber-400 light:text-amber-700 font-medium flex items-center gap-1 truncate">
+                          <Crown size={11} className="shrink-0" />
+                          Classifica personale
                         </span>
                         <button
                           type="button"
                           onClick={() => setIsReorderingBest((v) => !v)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${
                             isReorderingBest
                               ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
                               : 'bg-stone-850 light:bg-white text-amber-400 light:text-amber-700 border border-amber-500/30 hover:border-amber-400'
                           }`}
                         >
-                          <Crown size={12} />
+                          <Crown size={11} />
                           <span>{isReorderingBest ? 'Fine' : 'Modifica classifica'}</span>
                         </button>
                       </div>
@@ -756,17 +756,17 @@ export function BookshelfView({
 
                   {/* Messaggio guida quando la modalità riordino è attiva */}
                   {section.id === 'want' && isReorderingWant && (
-                    <div className="mx-2 mb-3 px-3 py-2 rounded-xl bg-sky-950/60 light:bg-sky-50 border border-sky-500/30 flex items-center justify-between gap-3 text-xs text-sky-200 light:text-sky-900 shadow-inner">
-                      <div className="flex items-center gap-2">
-                        <Bookmark size={14} className="shrink-0 text-sky-400" />
-                        <span>
-                          <strong>Ordine di lettura:</strong> trascina e rilascia i libri per decidere quale leggerai prima (il <strong>#1</strong> è il prossimo).
+                    <div className="mx-1 sm:mx-2 mb-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-sky-950/60 light:bg-sky-50 border border-sky-500/30 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 text-xs text-sky-200 light:text-sky-900 shadow-inner">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <Bookmark size={14} className="shrink-0 text-sky-400 mt-0.5 xs:mt-0" />
+                        <span className="text-[11px] sm:text-xs leading-snug">
+                          <strong>Ordine di lettura:</strong> trascina i libri per posizionarli (★ <strong>#1</strong> è il prossimo).
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsReorderingWant(false)}
-                        className="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs"
+                        className="w-full xs:w-auto px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs text-center"
                       >
                         Salva ordine
                       </button>
@@ -774,17 +774,17 @@ export function BookshelfView({
                   )}
 
                   {section.id === 'best-completed' && isReorderingBest && (
-                    <div className="mx-2 mb-3 px-3 py-2 rounded-xl bg-amber-950/60 light:bg-amber-50 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-200 light:text-amber-950 shadow-inner">
-                      <div className="flex items-center gap-2">
-                        <Crown size={14} className="shrink-0 text-amber-400" />
-                        <span>
-                          <strong>Classifica Top Libri:</strong> trascina e rilascia per decidere il podio dei tuoi libri preferiti (👑 <strong>#1</strong> è il migliore in assoluto).
+                    <div className="mx-1 sm:mx-2 mb-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-amber-950/60 light:bg-amber-50 border border-amber-500/30 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 text-xs text-amber-200 light:text-amber-950 shadow-inner">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <Crown size={14} className="shrink-0 text-amber-400 mt-0.5 xs:mt-0" />
+                        <span className="text-[11px] sm:text-xs leading-snug">
+                          <strong>Classifica Top:</strong> trascina i libri per decidere il podio (👑 <strong>#1</strong> è il preferito).
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsReorderingBest(false)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs"
+                        className="w-full xs:w-auto px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs text-center"
                       >
                         Salva classifica
                       </button>
@@ -908,10 +908,10 @@ export function BookshelfView({
                                     Bookshelf
                                   </div>
                                   <div className="my-auto text-center px-1">
-                                    <h4 className="font-serif font-bold text-xs sm:text-sm text-amber-100 leading-snug line-clamp-3">
+                                    <h4 className="font-serif font-bold text-[10.5px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
                                       {book.title}
                                     </h4>
-                                    <p className="text-[10px] text-amber-200/80 mt-1 font-sans truncate">
+                                    <p className="text-[9.5px] sm:text-[10px] text-amber-200/80 mt-1 font-sans truncate">
                                       {book.author}
                                     </p>
                                   </div>
@@ -942,22 +942,22 @@ export function BookshelfView({
 
                               {/* Badge classifica ripiano d'onore dei migliori libri letti */}
                               {isBestSection && bestRank !== null && (
-                                <div className="absolute top-2 left-2 z-30 pointer-events-none">
+                                <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
                                   {bestRank === 1 ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1">
-                                      <Crown size={11} className="text-stone-950 fill-stone-950" />
+                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1">
+                                      <Crown size={10} className="text-stone-950 fill-stone-950" />
                                       #1 Top
                                     </span>
                                   ) : bestRank === 2 ? (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-0.5">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9px] font-bold bg-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-0.5">
                                       🥈 #2
                                     </span>
                                   ) : bestRank === 3 ? (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-700 text-amber-100 border border-amber-500/50 shadow-md flex items-center gap-0.5">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9px] font-bold bg-amber-700 text-amber-100 border border-amber-500/50 shadow-md flex items-center gap-0.5">
                                       🥉 #3
                                     </span>
                                   ) : (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md">
                                       ⭐ #{bestRank}
                                     </span>
                                   )}
@@ -966,13 +966,13 @@ export function BookshelfView({
 
                               {/* Badge priorità sulla copertina se ripiano da leggere */}
                               {isWantSection && priorityRank !== null && (
-                                <div className="absolute top-2 left-2 z-30 pointer-events-none">
+                                <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
                                   {priorityRank === 1 ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200 flex items-center gap-1">
+                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200 flex items-center gap-1">
                                       ★ #1 Prossimo
                                     </span>
                                   ) : (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-950/85 text-sky-300 border border-sky-400/50 shadow-md">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9px] font-bold bg-sky-950/85 text-sky-300 border border-sky-400/50 shadow-md">
                                       #{priorityRank}
                                     </span>
                                   )}
@@ -993,19 +993,19 @@ export function BookshelfView({
 
                               {/* Badge note se presenti */}
                               {book.notes_count && book.notes_count > 0 ? (
-                                <div className="absolute bottom-2 right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[9px] font-bold flex items-center gap-0.5 shadow-md">
-                                  <StickyNote size={9} />
+                                <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[8.5px] sm:text-[9px] font-bold flex items-center gap-0.5 shadow-md">
+                                  <StickyNote size={8} />
                                   <span>{book.notes_count}</span>
                                 </div>
                               ) : null}
                             </div>
 
                             {/* Titolo e autore sotto la copertina */}
-                            <div className="text-center mt-2 px-1 w-full max-w-[160px]">
-                              <p className="font-serif text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-1 group-hover:text-amber-400 transition-colors">
+                            <div className="text-center mt-1.5 px-0.5 w-full max-w-[150px]">
+                              <p className="font-serif text-[11px] xs:text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words">
                                 {book.title}
                               </p>
-                              <p className="font-sans text-[11px] sm:text-xs text-stone-400 light:text-stone-600 truncate mt-0.5">
+                              <p className="font-sans text-[10px] sm:text-[11px] text-stone-400 light:text-stone-500 truncate mt-0.5">
                                 {book.author}
                               </p>
                             </div>
@@ -1221,9 +1221,9 @@ export function BookshelfView({
                                 style={{
                                   textShadow: dynamicSpine ? dynamicSpine.textShadow : undefined,
                                 }}
-                                className={`writing-vertical-rl font-serif font-bold text-[11px] sm:text-xs tracking-wide ${
+                                className={`writing-vertical-rl font-serif font-bold text-[10px] sm:text-[11px] md:text-xs tracking-wide ${
                                   dynamicSpine ? dynamicSpine.textColor : spine.text
-                                } truncate max-h-[140px] drop-shadow-xs`}
+                                } truncate max-h-[130px] sm:max-h-[155px] drop-shadow-xs`}
                               >
                                 {book.title}
                               </span>
@@ -1273,26 +1273,26 @@ export function BookshelfView({
 
       {/* Collegamento rapido all'Archivio Annuale completo quando ci si trova nella vista generale "Tutti" */}
       {activeTab === 'all' && completedBooks.length > 0 && onSelectTab && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-850/80 light:bg-white p-4 rounded-2xl border border-stone-800 light:border-stone-200 shadow-sm text-center sm:text-left animate-fade-up">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0">
-              <Trophy size={20} />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-stone-850/80 light:bg-white p-3.5 sm:p-4 rounded-2xl border border-stone-800 light:border-stone-200 shadow-sm text-left animate-fade-up">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0">
+              <Trophy size={18} />
             </div>
-            <div>
-              <h4 className="font-serif font-bold text-sm text-stone-100 light:text-stone-900 leading-tight">
-                Archivio Storico delle Letture ({completedBooks.length} {completedBooks.length === 1 ? 'libro letto' : 'libri letti'})
+            <div className="min-w-0">
+              <h4 className="font-serif font-bold text-xs xs:text-sm sm:text-base text-stone-100 light:text-stone-900 leading-snug line-clamp-1">
+                Archivio Storico ({completedBooks.length} {completedBooks.length === 1 ? 'libro letto' : 'libri letti'})
               </h4>
-              <p className="text-xs text-stone-400 light:text-stone-600 mt-0.5">
-                Esplora lo scaffale organizzato per singolo anno con le classifiche dedicate.
+              <p className="text-[11px] sm:text-xs text-stone-400 light:text-stone-600 mt-0.5 line-clamp-1 xs:line-clamp-2">
+                Consulta lo scaffale diviso anno per anno con le classifiche dedicate.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onSelectTab('completed')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
           >
-            <span>Apri Archivio Anni</span>
+            <span>Apri Archivio</span>
             <ArrowRight size={14} />
           </button>
         </div>
