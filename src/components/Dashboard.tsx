@@ -1189,9 +1189,9 @@ export function Dashboard() {
       {/* Barra di Navigazione Mobile: capsula flottante con indicatore della sezione attiva e contatori */}
       <nav
         aria-label="Navigazione rapida mobile"
-        className="sm:hidden fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.6rem,calc(env(safe-area-inset-bottom,0px)+0.25rem))] pointer-events-none"
+        className="sm:hidden fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(0.5rem,calc(env(safe-area-inset-bottom,0px)+0.25rem))] pointer-events-none"
       >
-        <div className="pointer-events-auto max-w-md mx-auto grid grid-cols-5 items-center h-[62px] px-1.5 rounded-[26px] border border-white/[0.07] light:border-stone-200/90 bg-stone-900/[0.94] light:bg-white/[0.95] backdrop-blur-md shadow-[0_10px_30px_-8px_rgba(0,0,0,0.65)] light:shadow-[0_10px_30px_-10px_rgba(120,90,60,0.35)]">
+        <div className="pointer-events-auto max-w-lg mx-auto grid grid-cols-[1fr_1fr_64px_1fr_1fr] items-center h-[70px] px-1 rounded-[28px] border border-white/[0.07] light:border-stone-200/90 bg-stone-900/[0.94] light:bg-white/[0.95] backdrop-blur-md shadow-[0_10px_30px_-8px_rgba(0,0,0,0.65)] light:shadow-[0_10px_30px_-10px_rgba(120,90,60,0.35)]">
           {([
             { key: 'all', label: 'Tutti', Icon: BookOpen, count: 0 },
             { key: 'reading', label: 'In lettura', Icon: Flame, count: stats.reading },
@@ -1208,7 +1208,7 @@ export function Dashboard() {
                       triggerHaptic();
                       setShowAddModal(true);
                     }}
-                    className="w-12 h-12 rounded-[18px] bg-gradient-to-b from-[#fbb034] to-[#e8890b] text-stone-950 flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(245,158,11,0.6),inset_0_1px_0_rgba(255,255,255,0.45)] active:scale-90 transition-transform duration-150 cursor-pointer"
+                    className="w-[52px] h-[52px] rounded-[19px] bg-gradient-to-b from-[#fbb034] to-[#e8890b] text-stone-950 flex items-center justify-center shadow-[0_6px_16px_-4px_rgba(245,158,11,0.6),inset_0_1px_0_rgba(255,255,255,0.45)] active:scale-90 transition-transform duration-150 cursor-pointer"
                     title="Aggiungi nuovo libro"
                     aria-label="Aggiungi libro"
                   >
@@ -1225,25 +1225,25 @@ export function Dashboard() {
                 type="button"
                 onClick={() => handleSelectTab(tab.key, true)}
                 aria-current={isActive ? 'page' : undefined}
-                className={`group flex flex-col items-center justify-center gap-0.5 h-full cursor-pointer select-none transition-colors duration-200 ${
+                className={`group flex flex-col items-center justify-center gap-1 h-full min-w-0 cursor-pointer select-none transition-colors duration-200 ${
                   isActive
                     ? 'text-amber-400 light:text-amber-700'
                     : 'text-stone-400 light:text-stone-500 active:text-stone-200 light:active:text-stone-800'
                 }`}
               >
                 <span
-                  className={`relative flex items-center justify-center w-12 h-7 rounded-full transition-[background-color,transform] duration-200 group-active:scale-90 ${
+                  className={`relative flex items-center justify-center w-14 h-8 rounded-full transition-[background-color,transform] duration-200 group-active:scale-90 ${
                     isActive ? 'bg-amber-500/15 light:bg-amber-100' : 'bg-transparent'
                   }`}
                 >
-                  <Icon size={19} strokeWidth={isActive ? 2.3 : 1.9} />
+                  <Icon size={21} strokeWidth={isActive ? 2.3 : 1.9} />
                   {tab.count > 0 && (
-                    <span className="absolute -top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-stone-950 text-[10px] font-bold leading-4 text-center tabular-nums ring-2 ring-stone-900 light:ring-white">
+                    <span className="absolute -top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-stone-950 text-[10px] font-bold leading-4 text-center tabular-nums ring-2 ring-stone-900 light:ring-white">
                       {tab.count > 99 ? '99+' : tab.count}
                     </span>
                   )}
                 </span>
-                <span className={`text-[11px] leading-none whitespace-nowrap ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                <span className={`text-[11.5px] leading-none whitespace-nowrap tracking-[-0.01em] ${isActive ? 'font-semibold' : 'font-medium'}`}>
                   {tab.label}
                 </span>
               </button>
