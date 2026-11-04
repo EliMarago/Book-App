@@ -18,8 +18,13 @@ function countCompletedInYear(books: Book[], year: number) {
   }).length;
 }
 
+/** Primo anno disponibile per la sfida: l'app è nata nel 2026 */
+const FIRST_CHALLENGE_YEAR = 2026;
+
 export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengeProps) {
   const currentYear = new Date().getFullYear();
+  // Si può navigare solo tra il 2026 e l'anno in corso (niente anni futuri né precedenti all'app)
+  const hasYearNavigation = currentYear > FIRST_CHALLENGE_YEAR;
   const [year, setYear] = useState(currentYear);
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState('');
@@ -77,14 +82,14 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
   return (
     <section
       aria-labelledby="reading-challenge-title"
-      className="relative overflow-hidden mb-6 rounded-2xl border border-amber-500/25 light:border-amber-300/70 bg-gradient-to-br from-amber-950/40 via-stone-850 to-stone-900 light:from-amber-50 light:via-white light:to-orange-50/40 p-4 sm:p-5 shadow-sm"
+      className="relative overflow-hidden mb-4 sm:mb-6 rounded-2xl border border-amber-500/25 light:border-amber-300/70 bg-gradient-to-br from-amber-950/40 via-stone-850 to-stone-900 light:from-amber-50 light:via-white light:to-orange-50/40 p-3.5 sm:p-5 shadow-sm"
     >
       {/* Bagliore decorativo */}
       <div className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-amber-500/10 light:bg-amber-300/20 blur-3xl" />
 
-      <div className="relative flex items-center gap-4 sm:gap-5">
+      <div className="relative flex items-center gap-3.5 sm:gap-5">
         {/* Anello progresso */}
-        <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24">
+        <div className="relative shrink-0 w-16 h-16 sm:w-24 sm:h-24">
           <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
             <circle cx="40" cy="40" r={radius} fill="none" strokeWidth="7" className="stroke-stone-700/60 light:stroke-stone-200" />
             <circle
@@ -102,8 +107,8 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             {goal > 0 ? (
               <>
-                <span className="text-lg sm:text-xl font-bold tabular-nums text-stone-100 light:text-stone-900 leading-none">{percent}%</span>
-                <span className="text-[9px] sm:text-[10px] text-stone-400 light:text-stone-500 mt-0.5">completato</span>
+                <span className="text-[15px] sm:text-xl font-bold tabular-nums text-stone-100 light:text-stone-900 leading-none">{percent}%</span>
+                <span className="hidden sm:block text-[11px] text-stone-400 light:text-stone-500 mt-0.5">completato</span>
               </>
             ) : (
               <Target size={26} className="text-amber-400/70 light:text-amber-600/70" />
@@ -117,25 +122,28 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
             <h2 id="reading-challenge-title" className="font-serif text-base sm:text-lg font-bold text-stone-100 light:text-stone-900 truncate">
               Sfida di Lettura {year}
             </h2>
-            <div className="flex items-center shrink-0 -mr-1">
-              <button
-                id="challenge-prev-year"
-                onClick={() => { setYear((y) => y - 1); setEditing(false); }}
-                className="p-1 rounded-md text-stone-400 light:text-stone-500 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/40 light:hover:bg-amber-100/60 transition-colors cursor-pointer"
-                aria-label="Anno precedente"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                id="challenge-next-year"
-                onClick={() => { setYear((y) => y + 1); setEditing(false); }}
-                disabled={year >= currentYear + 1}
-                className="p-1 rounded-md text-stone-400 light:text-stone-500 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/40 light:hover:bg-amber-100/60 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Anno successivo"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+            {hasYearNavigation && (
+              <div className="flex items-center shrink-0 -mr-1">
+                <button
+                  id="challenge-prev-year"
+                  onClick={() => { setYear((y) => Math.max(FIRST_CHALLENGE_YEAR, y - 1)); setEditing(false); }}
+                  disabled={year <= FIRST_CHALLENGE_YEAR}
+                  className="p-1 rounded-md text-stone-400 light:text-stone-500 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/40 light:hover:bg-amber-100/60 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Anno precedente"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  id="challenge-next-year"
+                  onClick={() => { setYear((y) => Math.min(currentYear, y + 1)); setEditing(false); }}
+                  disabled={year >= currentYear}
+                  className="p-1 rounded-md text-stone-400 light:text-stone-500 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/40 light:hover:bg-amber-100/60 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Anno successivo"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
           {editing ? (
@@ -211,6 +219,21 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                       <span className="text-stone-400 light:text-stone-600">
                         {pace.daysLeft} {pace.daysLeft === 1 ? 'giorno rimasto' : 'giorni rimasti'}
                       </span>
+                    )}
+                    {/* Obiettivo raggiunto nell'anno in corso: proponi di alzarlo */}
+                    {year === currentYear && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInput(String(Math.ceil((read + 5) / 5) * 5));
+                          setEditing(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 light:border-amber-300 bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 font-semibold hover:bg-amber-500/20 light:hover:bg-amber-100 transition-colors cursor-pointer active:scale-95"
+                        title="Imposta un nuovo obiettivo più alto per quest'anno"
+                      >
+                        <TrendingUp size={11} />
+                        Alza l'obiettivo
+                      </button>
                     )}
                   </div>
                 ) : (

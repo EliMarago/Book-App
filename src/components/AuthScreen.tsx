@@ -408,7 +408,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
             <p className="font-serif italic text-xs text-stone-400 light:text-stone-600">
               «Un lettore vive mille vite prima di morire.»
             </p>
-            <p className="font-mono text-[10px] text-stone-500 light:text-stone-400 tracking-wider">
+            <p className="font-mono text-[11px] text-stone-500 light:text-stone-400 tracking-wider">
               Bookshelf {APP_VERSION_LABEL}
             </p>
           </div>

@@ -24,6 +24,7 @@ import {
 import { supabase, type Book } from '@/lib/supabase';
 import { StarRating } from './StarRating';
 import { BookNotesModal } from './BookNotesModal';
+import { FinishBookDialog } from './FinishBookDialog';
 import { useToast } from './Toast';
 import {
   syncBookDateToSupabase,
@@ -299,7 +300,10 @@ export function BookDetailModal({
     onUpdateBook(updated);
   };
 
-  const handleMarkAsFinished = async () => {
+  const [showFinishDialog, setShowFinishDialog] = useState(false);
+
+  /** Completa il libro; se `rating` > 0 salva anche il voto scelto nella finestra "Libro finito" */
+  const handleMarkAsFinished = async (rating = 0) => {
     const now = new Date().toISOString();
     const finalPages = book.pages ?? book.read_pages ?? null;
     await syncBookDateToSupabase(book.id, now);
@@ -308,22 +312,25 @@ export function BookDetailModal({
     }
     await supabase
       .from('books')
-      .update({ status: 'completed', read_at: now, updated_at: now })
+      .update({ status: 'completed', read_at: now, updated_at: now, ...(rating > 0 ? { rating } : {}) })
       .eq('id', book.id);
     const updated: Book = {
       ...book,
       status: 'completed',
       read_at: now,
       read_pages: finalPages,
+      ...(rating > 0 ? { rating } : {}),
     };
     setBook(updated);
     onUpdateBook(updated);
+    toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
   };
 
   const handleStatusChange = async (newStatus: Book['status']) => {
     if (book.status === newStatus) return;
     if (newStatus === 'completed') {
-      await handleMarkAsFinished();
+      // Prima di spostarlo tra i Letti chiede il voto
+      setShowFinishDialog(true);
       return;
     }
     const now = new Date().toISOString();
@@ -353,6 +360,17 @@ export function BookDetailModal({
 
   return createPortal(
     <>
+      {/* Libro finito: chiede il voto e poi lo sposta tra i Letti */}
+      {showFinishDialog && (
+        <FinishBookDialog
+          book={book}
+          onCancel={() => setShowFinishDialog(false)}
+          onConfirm={async (rating) => {
+            await handleMarkAsFinished(rating);
+            setShowFinishDialog(false);
+          }}
+        />
+      )}
       <div
         role="dialog"
         aria-modal="true"
@@ -385,7 +403,7 @@ export function BookDetailModal({
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center p-1.5 text-center bg-stone-850 light:bg-stone-100">
                     <BookMarked size={18} className="text-stone-500 mb-0.5" />
-                    <span className="text-[9px] text-stone-400 leading-tight">
+                    <span className="text-[10px] text-stone-400 leading-tight">
                       No cover
                     </span>
                   </div>
@@ -425,28 +443,28 @@ export function BookDetailModal({
                 {/* Metadati editoriali (Pagine, Anno, Editore, ISBN) */}
                 <div className="flex items-center gap-1 pt-0.5 flex-wrap">
                   {(book.pages || bookDetails?.pageCount) && (
-                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
                       <Layers size={10} className="text-amber-400 light:text-amber-600" />
                       <span>{book.pages || bookDetails?.pageCount} pag.</span>
                     </span>
                   )}
 
                   {bookDetails?.publishedDate && (
-                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
                       <Calendar size={10} className="text-amber-400 light:text-amber-600" />
                       <span>{bookDetails.publishedDate}</span>
                     </span>
                   )}
 
                   {bookDetails?.publisher && (
-                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 max-w-[140px] truncate">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 max-w-[140px] truncate">
                       <Building2 size={10} className="text-amber-400 light:text-amber-600 shrink-0" />
                       <span className="truncate">{bookDetails.publisher}</span>
                     </span>
                   )}
 
                   {bookDetails?.isbn && (
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-500 border border-stone-700/60 light:border-stone-200 tabular-nums">
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-500 border border-stone-700/60 light:border-stone-200 tabular-nums">
                       <Hash size={10} />
                       <span>{bookDetails.isbn}</span>
                     </span>
@@ -459,7 +477,7 @@ export function BookDetailModal({
                     {bookDetails.categories.map((cat, idx) => (
                       <span
                         key={idx}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200"
+                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200"
                       >
                         {cat}
                       </span>
@@ -514,7 +532,7 @@ export function BookDetailModal({
 
                   <button
                     type="button"
-                    onClick={handleMarkAsFinished}
+                    onClick={() => setShowFinishDialog(true)}
                     className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
                   >
                     <CheckCircle2 size={12} />
@@ -535,7 +553,7 @@ export function BookDetailModal({
                     Trama del libro
                   </h4>
                   {bookDetails?.source && bookDetails.description && (
-                    <span className="hidden sm:inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-200/80 text-stone-400 light:text-stone-600 border border-stone-700 light:border-stone-300">
+                    <span className="hidden sm:inline-block text-[11px] font-medium px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-200/80 text-stone-400 light:text-stone-600 border border-stone-700 light:border-stone-300">
                       da {bookDetails.source}
                     </span>
                   )}
@@ -1013,7 +1031,7 @@ export function BookDetailModal({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                <div className="flex items-center justify-end gap-1.5 text-[11px]">
                   <span className="text-stone-500">Query rapida:</span>
                   <button
                     type="button"
@@ -1078,7 +1096,7 @@ export function BookDetailModal({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${res.source === 'Google Books'
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${res.source === 'Google Books'
                                   ? 'bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/30'
                                   : res.source === 'Apple Books'
                                     ? 'bg-rose-500/15 text-rose-300 light:text-rose-800 border-rose-500/30'
@@ -1090,21 +1108,21 @@ export function BookDetailModal({
                               {res.source}
                             </span>
                             {res.language === 'it' ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30">
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30">
                                 🇮🇹 Italiano
                               </span>
                             ) : res.language === 'en' ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 light:text-indigo-800 border border-indigo-500/30">
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 light:text-indigo-800 border border-indigo-500/30">
                                 🇬🇧 Lingua originale
                               </span>
                             ) : null}
                             {res.publishedDate && (
-                              <span className="text-[10px] text-stone-400 light:text-stone-500">
+                              <span className="text-[11px] text-stone-400 light:text-stone-500">
                                 • {res.publishedDate}
                               </span>
                             )}
                             {res.pageCount && (
-                              <span className="text-[10px] text-stone-400 light:text-stone-500">
+                              <span className="text-[11px] text-stone-400 light:text-stone-500">
                                 • {res.pageCount} pag.
                               </span>
                             )}
@@ -1119,7 +1137,7 @@ export function BookDetailModal({
                             </p>
                           )}
                           {res.publisher && (
-                            <p className="text-[10px] text-stone-400 light:text-stone-500 mt-0.5 truncate">
+                            <p className="text-[11px] text-stone-400 light:text-stone-500 mt-0.5 truncate">
                               Editore: {res.publisher}
                             </p>
                           )}

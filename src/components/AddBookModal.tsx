@@ -42,6 +42,10 @@ export function AddBookModal({
   const [pages, setPages] = useState(book?.pages !== undefined && book?.pages !== null ? String(book.pages) : '');
   const [readPages, setReadPages] = useState(book?.read_pages !== undefined && book?.read_pages !== null ? String(book.read_pages) : '');
   const [autoDetectedPages, setAutoDetectedPages] = useState<number | null>(null);
+  // true se l'utente ha scritto le pagine a mano (o se il libro esistente le aveva già): il rilevamento automatico non le sovrascrive
+  const [pagesManual, setPagesManual] = useState(Boolean(book?.pages));
+  const [detectingPages, setDetectingPages] = useState(false);
+  const [pagesNotFound, setPagesNotFound] = useState(false);
   const [status, setStatus] = useState<Book['status']>(
     book?.status ?? initialValues?.status ?? 'want'
   );
@@ -140,6 +144,8 @@ export function AddBookModal({
     if (item.pages && item.pages > 0) {
       setPages(String(item.pages));
       setAutoDetectedPages(item.pages);
+      setPagesManual(false);
+      setPagesNotFound(false);
     }
     if (item.coverUrl) {
       setCoverUrl(item.coverUrl);
@@ -177,9 +183,10 @@ export function AddBookModal({
           setCoverSource('auto');
         }
 
-        if (foundPages.status === 'fulfilled' && foundPages.value && (!pages || pages === '')) {
+        if (foundPages.status === 'fulfilled' && foundPages.value && !pagesManual) {
           setPages(String(foundPages.value));
           setAutoDetectedPages(foundPages.value);
+          setPagesNotFound(false);
         }
       } catch (err) {
         console.error('Errore caricamento automatico:', err);
@@ -189,7 +196,7 @@ export function AddBookModal({
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl, pages]);
+  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl, pagesManual]);
 
   // Cerca manualmente la copertina e le eventuali alternative
   const handleManualSearchCover = async () => {
@@ -209,14 +216,38 @@ export function AddBookModal({
         setCoverSource('auto');
       }
       setAlternativeCovers(alternatives);
-      if (foundPages && (!pages || pages === '')) {
+      if (foundPages && !pagesManual) {
         setPages(String(foundPages));
         setAutoDetectedPages(foundPages);
+        setPagesNotFound(false);
       }
     } catch (err) {
       console.error('Errore ricerca copertina:', err);
     } finally {
       setSearchingCover(false);
+    }
+  };
+
+  // Rileva su richiesta il numero di pagine (sovrascrive sempre il valore attuale)
+  const handleDetectPages = async () => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return;
+    setDetectingPages(true);
+    setPagesNotFound(false);
+    try {
+      const found = await fetchBookPageCount(cleanTitle, author.trim());
+      if (found && found > 0) {
+        setPages(String(found));
+        setAutoDetectedPages(found);
+        setPagesManual(false);
+      } else {
+        setPagesNotFound(true);
+      }
+    } catch (err) {
+      console.error('Errore rilevamento pagine:', err);
+      setPagesNotFound(true);
+    } finally {
+      setDetectingPages(false);
     }
   };
 
@@ -394,10 +425,12 @@ export function AddBookModal({
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl max-h-[82dvh] sm:max-h-[90vh] flex flex-col overflow-hidden overscroll-contain"
+        className="relative bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800/90 light:border-stone-200 max-w-lg w-full shadow-2xl h-[94dvh] sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3.5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+        {/* Maniglia del foglio (solo mobile) */}
+        <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300" aria-hidden="true" />
+        <div className="flex items-center justify-between px-5 pt-6 pb-4 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-600">
               <BookPlus size={20} />
@@ -420,10 +453,10 @@ export function AddBookModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4.5 overflow-y-auto flex-1">
-          <div className="flex gap-4 items-start">
+        <form onSubmit={handleSubmit} className="px-5 pt-5 sm:px-6 sm:pt-6 space-y-6 sm:space-y-5 overflow-y-auto flex-1 flex flex-col">
+          <div className="flex flex-col sm:flex-row gap-5 sm:gap-4 items-center sm:items-start">
             {/* Box Anteprima Copertina */}
-            <div className="relative shrink-0 w-24 h-36 rounded-xl overflow-hidden bg-stone-950 light:bg-stone-100 flex flex-col items-center justify-center shadow-lg border border-stone-800 light:border-stone-200 book-spine-effect group">
+            <div className="relative shrink-0 w-28 h-[168px] sm:w-24 sm:h-36 rounded-xl overflow-hidden bg-stone-950 light:bg-stone-100 flex flex-col items-center justify-center shadow-lg border border-stone-800 light:border-stone-200 book-spine-effect group">
               {coverUrl.trim() ? (
                 <img
                   src={coverUrl.trim()}
@@ -437,7 +470,7 @@ export function AddBookModal({
               ) : (
                 <div className="flex flex-col items-center justify-center p-2 text-center">
                   <BookMarked size={30} className="text-stone-600 light:text-stone-400 mb-1" />
-                  <span className="text-[10px] text-stone-500 light:text-stone-400 leading-tight">
+                  <span className="text-[11px] text-stone-500 light:text-stone-400 leading-tight">
                     Nessuna copertina
                   </span>
                 </div>
@@ -448,14 +481,14 @@ export function AddBookModal({
               {searchingCover && (
                 <div className="absolute inset-0 bg-stone-950/85 light:bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center">
                   <Loader2 size={22} className="animate-spin text-amber-400 light:text-amber-600 mb-1" />
-                  <span className="text-[10px] text-amber-300 light:text-amber-700 font-medium">
+                  <span className="text-[11px] text-amber-300 light:text-amber-700 font-medium">
                     Cerco...
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="flex-1 space-y-3 min-w-0">
+            <div className="flex-1 w-full space-y-4 sm:space-y-3 min-w-0">
               <div className="relative">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1">
                   Titolo *
@@ -471,7 +504,7 @@ export function AddBookModal({
                   onBlur={() => {
                     setTimeout(() => setShowSuggestions(false), 180);
                   }}
-                  className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                  className="w-full px-3.5 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
                   placeholder="Es. Il nome della rosa oppure 'Titolo di Autore'"
                 />
 
@@ -494,7 +527,7 @@ export function AddBookModal({
                 {/* Menu a tendina suggerimenti rapidi in tempo reale */}
                 {!isEditing && showSuggestions && suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-stone-900 light:bg-white border border-stone-700 light:border-stone-200 rounded-2xl shadow-2xl overflow-hidden divide-y divide-stone-800/80 light:divide-stone-100 max-h-60 overflow-y-auto">
-                    <div className="px-3 py-1.5 bg-stone-850/90 light:bg-stone-50 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-amber-400 light:text-amber-700">
+                    <div className="px-3 py-1.5 bg-stone-850/90 light:bg-stone-50 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-amber-400 light:text-amber-700">
                       <span className="flex items-center gap-1">
                         <Sparkles size={10} />
                         Suggerimenti dal catalogo
@@ -552,7 +585,7 @@ export function AddBookModal({
                   required
                   value={author}
                   onChange={(e) => setAuthor(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                  className="w-full px-3.5 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
                   placeholder="Es. Umberto Eco"
                 />
               </div>
@@ -601,7 +634,7 @@ export function AddBookModal({
                   setCoverUrl(e.target.value);
                   setCoverSource('manual');
                 }}
-                className="w-full pl-9 pr-4 py-2 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors text-xs"
+                className="w-full pl-9 pr-4 py-3 sm:py-2 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors text-base sm:text-xs"
                 placeholder="Incolla URL copertina personalizzato..."
               />
             </div>
@@ -653,22 +686,46 @@ export function AddBookModal({
                 <span>Numero di pagine</span>
                 <span className="text-[11px] text-stone-500 font-normal normal-case">(opzionale)</span>
               </label>
-              {autoDetectedPages && (
+              {autoDetectedPages !== null && !pagesManual && String(autoDetectedPages) === pages && (
                 <span className="text-[11px] text-emerald-400 light:text-emerald-700 font-medium flex items-center gap-1 bg-emerald-500/10 light:bg-emerald-50 px-2 py-0.5 rounded border border-emerald-500/20 light:border-emerald-200">
                   <Sparkles size={11} />
-                  {autoDetectedPages} pagine rilevate
+                  Rilevate in automatico
                 </span>
               )}
             </div>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={pages}
-              onChange={(e) => setPages(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
-              placeholder="Es. 384"
-            />
+            <div className="relative">
+              <input
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                value={pages}
+                onChange={(e) => {
+                  setPages(e.target.value);
+                  // Campo svuotato: il rilevamento automatico può tornare a compilarlo
+                  setPagesManual(e.target.value.trim() !== '');
+                  setPagesNotFound(false);
+                }}
+                className="w-full pl-3.5 pr-24 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
+                placeholder={detectingPages || searchingCover ? 'Rilevamento…' : 'Es. 384'}
+              />
+              <button
+                type="button"
+                onClick={handleDetectPages}
+                disabled={detectingPages || !title.trim()}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-amber-400 light:text-amber-700 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 disabled:opacity-40 transition-colors cursor-pointer active:scale-95"
+                title="Rileva il numero di pagine dal catalogo"
+                aria-label="Rileva il numero di pagine"
+              >
+                {detectingPages ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                Rileva
+              </button>
+            </div>
+            {pagesNotFound && (
+              <p className="mt-1.5 text-[11px] text-stone-400 light:text-stone-500">
+                Numero di pagine non trovato: puoi inserirlo a mano.
+              </p>
+            )}
           </div>
 
           {/* Scelta Stato di Lettura */}
@@ -688,7 +745,7 @@ export function AddBookModal({
                   key={opt.value}
                   type="button"
                   onClick={() => setStatus(opt.value)}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`py-3 sm:py-2.5 px-2 sm:px-3 rounded-xl text-sm sm:text-xs font-semibold border transition-all cursor-pointer ${
                     status === opt.value
                       ? opt.value === 'reading'
                         ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/50 ring-1 ring-amber-500/30'
@@ -723,7 +780,7 @@ export function AddBookModal({
                 max={pages ? Number(pages) : undefined}
                 value={readPages}
                 onChange={(e) => setReadPages(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-stone-950/80 light:bg-white border border-amber-500/40 light:border-amber-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                className="w-full px-3.5 py-3 sm:py-2.5 bg-stone-950/80 light:bg-white border border-amber-500/40 light:border-amber-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
                 placeholder={pages ? `Es. 120 su ${pages} pagine` : 'Es. 120'}
               />
               {pages && readPages && Number(pages) > 0 && (
@@ -746,7 +803,7 @@ export function AddBookModal({
                 type="date"
                 value={readAt}
                 onChange={(e) => setReadAt(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm"
+                className="w-full px-3.5 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm"
               />
             </div>
           )}
@@ -757,18 +814,18 @@ export function AddBookModal({
             </div>
           )}
 
-          <div className="flex gap-3 pt-3 border-t border-stone-800 light:border-stone-200">
+          <div className="sticky bottom-0 !mt-auto -mx-5 sm:-mx-6 px-5 sm:px-6 pt-3 pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)+0.5rem))] sm:pb-6 flex gap-3 border-t border-stone-800 light:border-stone-200 bg-stone-900 light:bg-white z-10">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 font-semibold rounded-xl transition-all cursor-pointer text-sm"
+              className="flex-1 py-3.5 sm:py-3 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 font-semibold rounded-xl transition-all cursor-pointer text-sm"
             >
               Annulla
             </button>
             <button
               type="submit"
               disabled={loading || !title.trim() || !author.trim()}
-              className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 text-stone-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-lg shadow-amber-500/20 active:scale-98 text-sm"
+              className="flex-1 py-3.5 sm:py-3 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 text-stone-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-lg shadow-amber-500/20 active:scale-98 text-sm"
             >
               {loading && <Loader2 size={16} className="animate-spin text-stone-950" />}
               {isEditing ? 'Salva modifiche' : 'Aggiungi libro'}

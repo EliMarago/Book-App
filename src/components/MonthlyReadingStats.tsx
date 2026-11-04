@@ -223,7 +223,7 @@ export function MonthlyReadingStats({
                           onSelectYear(yr);
                           onSelectMonth(null);
                         }}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                        className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                           isYrActive
                             ? 'bg-amber-500 text-stone-950 font-bold'
                             : 'text-stone-400 light:text-stone-600 hover:text-stone-200'
@@ -246,7 +246,7 @@ export function MonthlyReadingStats({
               className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border transition-all cursor-pointer shrink-0 active:scale-95 ${
                 selectedMonth === null
                   ? 'bg-amber-500 text-stone-950 border-amber-400 font-bold shadow-xs'
-                  : 'bg-stone-800/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-stone-100'
+                  : 'bg-stone-850/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border-stone-700/80 light:border-stone-300 hover:text-stone-100'
               }`}
             >
               Tutti i mesi ({totalYearBooks})
@@ -269,14 +269,14 @@ export function MonthlyReadingStats({
                       : isCurrent
                       ? 'bg-amber-500/15 light:bg-amber-100 text-amber-300 light:text-amber-900 border-amber-500/40 light:border-amber-300 hover:bg-amber-500/25'
                       : hasBooks
-                      ? 'bg-stone-800/80 light:bg-stone-100 text-stone-200 light:text-stone-800 border-stone-700/80 light:border-stone-300 hover:bg-stone-750 light:hover:bg-stone-200'
+                      ? 'bg-stone-850/80 light:bg-stone-100 text-stone-200 light:text-stone-800 border-stone-700/80 light:border-stone-300 hover:bg-stone-750 light:hover:bg-stone-200'
                       : 'bg-stone-900/40 light:bg-stone-50 text-stone-500 light:text-stone-400 border-stone-800/60 light:border-stone-200/60 hover:bg-stone-800/40'
                   }`}
                   title={`${m.fullName} ${activeYearNum}: ${m.books.length} libri, ${m.pages} pagine`}
                 >
                   <span className="font-semibold">{m.shortName}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full tabular-nums font-bold ${
+                    className={`text-[11px] px-1.5 py-0.2 rounded-full tabular-nums font-bold ${
                       isSelected
                         ? 'bg-stone-950/25 text-stone-950'
                         : hasBooks
@@ -287,7 +287,7 @@ export function MonthlyReadingStats({
                     {m.books.length}
                   </span>
                   {hasBooks && m.pages > 0 && (
-                    <span className={`text-[9px] ${isSelected ? 'text-stone-900' : 'text-stone-400 light:text-stone-500'}`}>
+                    <span className={`text-[10px] ${isSelected ? 'text-stone-900' : 'text-stone-400 light:text-stone-500'}`}>
                       {m.pages}p
                     </span>
                   )}

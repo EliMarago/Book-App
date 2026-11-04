@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   Trash2,
   Loader2,
@@ -19,6 +19,8 @@ import { supabase } from '@/lib/supabase';
 import { syncBookDateToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
 import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
+import { CoverImage } from './CoverImage';
+import { FinishBookDialog } from './FinishBookDialog';
 import { useToast } from './Toast';
 import { BookNotesModal } from './BookNotesModal';
 
@@ -28,7 +30,7 @@ const STATUS_COLORS: Record<Book['status'], string> = {
   want: 'bg-sky-500/15 light:bg-sky-50 text-sky-400 light:text-sky-800 border-sky-500/30 light:border-amber-300',
 };
 
-export function BookCard({
+function BookCardComponent({
   book,
   onUpdate,
   onDelete,
@@ -36,7 +38,6 @@ export function BookCard({
   onInspect,
   highlight = false,
   priorityRank,
-  totalWantCount,
   isDraggable = false,
 }: {
   book: Book;
@@ -182,7 +183,10 @@ export function BookCard({
     }
   };
 
-  const handleMarkAsFinished = async () => {
+  const [showFinishDialog, setShowFinishDialog] = useState(false);
+
+  /** Completa il libro; se `rating` > 0 salva anche il voto scelto nella finestra "Libro finito" */
+  const handleMarkAsFinished = async (rating = 0) => {
     const finalPages = book.pages || book.read_pages || null;
     const readAtDate = new Date().toISOString();
 
@@ -197,6 +201,7 @@ export function BookCard({
       updated_at: readAtDate,
     };
     if (finalPages) updatePayload.read_pages = finalPages;
+    if (rating > 0) updatePayload.rating = rating;
 
     let res = await supabase
       .from('books')
@@ -229,6 +234,7 @@ export function BookCard({
       status: 'completed',
       read_at: readAtDate,
       read_pages: finalPages,
+      ...(rating > 0 ? { rating } : {}),
       notes_count: displayCount,
     });
 
@@ -267,26 +273,33 @@ export function BookCard({
 
   const renderBottomBar = () => (
     <>
+      {/* Riga 1: stato + priorità / data */}
+      <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 min-w-0 max-w-full">
       {/* Selettore Stato del libro */}
       <div className="relative shrink-0 inline-flex items-center">
         <select
           data-compact="true"
           value={book.status}
-          onChange={(e) => handleStatusChange(e.target.value as Book['status'])}
+          onChange={(e) => {
+            const next = e.target.value as Book['status'];
+            // Passando a "Completato" chiede prima il voto
+            if (next === 'completed' && book.status !== 'completed') setShowFinishDialog(true);
+            else handleStatusChange(next);
+          }}
           aria-label="Stato del libro"
-          className={`appearance-none h-7 lg:h-8 text-xs font-semibold pl-2.5 lg:pl-3 pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
+          className={`appearance-none h-7 lg:h-8 text-xs font-semibold pl-2 lg:pl-3 pr-5 lg:pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
         >
           <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
           <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Completato</option>
           <option value="want" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Da leggere</option>
         </select>
-        <ChevronDown size={12} className="absolute right-2 pointer-events-none opacity-70 shrink-0" />
+        <ChevronDown size={12} className="absolute right-1.5 lg:right-2 pointer-events-none opacity-70 shrink-0" />
       </div>
 
       {/* Badge Priorità per i libri da leggere */}
       {book.status === 'want' && priorityRank !== undefined && (
         <span
-          className={`h-7 lg:h-8 shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-2.5 rounded-full border shadow-xs ${
+          className={`h-7 lg:h-8 shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-2 lg:px-2.5 rounded-full border shadow-xs ${
             priorityRank === 1
               ? 'bg-amber-500/20 text-amber-300 light:text-amber-800 border-amber-500/40 ring-1 ring-amber-400/40'
               : 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
@@ -298,34 +311,37 @@ export function BookCard({
           }
         >
           {isDraggable && <GripVertical size={13} className="opacity-70 text-sky-400" />}
-          <span>{priorityRank === 1 ? '★ #1 Prossimo' : `#${priorityRank}`}</span>
+          <span>{priorityRank === 1 ? <>★ #1<span className="hidden lg:inline"> Prossimo</span></> : `#${priorityRank}`}</span>
         </span>
       )}
 
       {/* Badge Data di lettura */}
       {book.read_at ? (
-        <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2.5 lg:px-3 whitespace-nowrap">
-          <Calendar size={12} className="shrink-0" />
+        <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 lg:px-3 whitespace-nowrap">
+          <Calendar size={12} className="shrink-0 hidden lg:inline" />
           <span>
             {new Date(book.read_at).toLocaleDateString('it-IT', {
               day: '2-digit',
               month: 'short',
-              year: 'numeric',
+              year: '2-digit',
             })}
           </span>
         </span>
       ) : null}
+      </div>
 
-      {/* Pulsante Scheda / Trama */}
+      {/* Riga 2: azioni (Scheda + Note), allineate a sinistra sotto la riga 1 */}
+      <div className="inline-flex items-center gap-1.5 shrink-0">
+      {/* Pulsante Scheda / Trama (icona: la scheda si apre anche da copertina e titolo) */}
       {onInspect && (
         <button
           type="button"
           onClick={() => onInspect(book)}
-          className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:border-amber-500/40 hover:text-amber-300 light:hover:text-amber-700 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+          aria-label="Apri Scheda Libro e trama"
+          className="shrink-0 h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-full border border-stone-600 light:border-stone-300 text-amber-400 light:text-amber-600 hover:border-amber-500/40 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer active:scale-95"
           title="Apri Scheda Libro e trama"
         >
-          <BookOpen size={12} className="shrink-0 text-amber-400 light:text-amber-600" />
-          <span>Scheda</span>
+          <BookOpen size={13} className="shrink-0" />
         </button>
       )}
 
@@ -353,6 +369,7 @@ export function BookCard({
               : `${displayCount} note`}
         </span>
       </button>
+      </div>
     </>
   );
 
@@ -361,7 +378,7 @@ export function BookCard({
       {editingProgress ? (
         <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
-            <span className="text-[10px] sm:text-[11px] text-stone-400 light:text-stone-600 font-medium shrink-0">
+            <span className="text-[11px] text-stone-400 light:text-stone-600 font-medium shrink-0">
               Pag.
             </span>
             <input
@@ -379,7 +396,7 @@ export function BookCard({
               placeholder="0"
             />
             {book.pages && book.pages > 0 && (
-              <span className="text-[10px] sm:text-[11px] text-stone-500 light:text-stone-500 font-medium truncate">
+              <span className="text-[11px] text-stone-500 light:text-stone-500 font-medium truncate">
                 / {book.pages}
               </span>
             )}
@@ -403,13 +420,13 @@ export function BookCard({
           </div>
 
           <div className="flex items-center justify-between pt-1 border-t border-amber-500/15 light:border-amber-200/60">
-            <span className="text-[10px] text-stone-400 light:text-stone-500">
+            <span className="text-[11px] text-stone-400 light:text-stone-500">
               Tutto letto?
             </span>
             <button
               type="button"
-              onClick={handleMarkAsFinished}
-              className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 border border-emerald-500/30 light:border-emerald-300 px-2 py-0.5 rounded cursor-pointer transition-colors active:scale-95"
+              onClick={() => setShowFinishDialog(true)}
+              className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 border border-emerald-500/30 light:border-emerald-300 px-2 py-0.5 rounded cursor-pointer transition-colors active:scale-95"
               title="Ho finito di leggere tutto il libro! Segna come Completato"
             >
               <CheckCircle2 size={11} />
@@ -438,7 +455,7 @@ export function BookCard({
                       : 'Imposta pagina letta'}
                 </span>
               </span>
-              <span className="text-stone-400 light:text-stone-500 text-[10px] group-hover/progress:text-amber-300 light:group-hover/progress:text-amber-700 transition-colors font-semibold shrink-0 inline-flex items-center gap-1">
+              <span className="text-stone-400 light:text-stone-500 text-[11px] group-hover/progress:text-amber-300 light:group-hover/progress:text-amber-700 transition-colors font-semibold shrink-0 inline-flex items-center gap-1">
                 <span>
                   {book.pages && book.pages > 0
                     ? `${Math.min(100, Math.round(((book.read_pages || 0) / book.pages) * 100))}%`
@@ -491,7 +508,7 @@ export function BookCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleMarkAsFinished();
+                setShowFinishDialog(true);
               }}
               className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 light:hover:bg-emerald-200 border border-emerald-500/30 light:border-emerald-300 px-3 py-1 rounded-md transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
               title="Ho finito di leggere tutto il libro! Segna come Completato"
@@ -507,7 +524,7 @@ export function BookCard({
 
   return (
     <div
-      className={`group backdrop-blur-sm rounded-2xl border transition-all duration-200 active:scale-[0.99] sm:active:scale-100 ${
+      className={`group rounded-2xl border transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.99] sm:active:scale-100 ${
         highlight
           ? 'bg-gradient-to-br from-amber-950/30 via-stone-850 to-stone-900 light:from-amber-50/70 light:via-white light:to-amber-50/30 border-amber-500/40 light:border-amber-300 shadow-lg shadow-amber-500/5 hover:border-amber-400/60 light:hover:border-amber-400 ring-1 ring-amber-500/20 light:ring-amber-300/40'
           : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:border-stone-700 light:hover:border-stone-300 hover:shadow-md shadow-xs'
@@ -529,10 +546,12 @@ export function BookCard({
             title={book.cover_url ? 'Clicca per aprire la Scheda Libro e la trama' : 'Clicca per cercare la copertina in automatico'}
           >
             {book.cover_url ? (
-              <img
+              <CoverImage
                 src={book.cover_url}
                 alt={`Copertina di ${book.title}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover/cover:scale-105"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover group-hover/cover:scale-105"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -541,11 +560,11 @@ export function BookCard({
             ) : (
               <div className="flex flex-col items-center justify-center p-1.5 text-center">
                 <BookMarked size={28} className="text-stone-600 light:text-stone-400 mb-1" />
-                <span className="text-[9px] sm:text-[10px] text-stone-500 light:text-stone-400 leading-tight">
+                <span className="text-[10.5px] sm:text-[11px] text-stone-500 light:text-stone-400 leading-tight">
                   Nessuna copertina
                 </span>
                 {/* Badge indicatore di ricerca copertina su mobile */}
-                <div className="sm:hidden mt-1.5 flex items-center gap-0.5 text-[9px] font-medium text-amber-400 light:text-amber-700 bg-amber-500/15 light:bg-amber-100 px-1 py-0.5 rounded border border-amber-500/30">
+                <div className="sm:hidden mt-1.5 flex items-center gap-0.5 text-[10px] font-medium text-amber-400 light:text-amber-700 bg-amber-500/15 light:bg-amber-100 px-1 py-0.5 rounded border border-amber-500/30">
                   <Sparkles size={9} />
                   <span>Cerca</span>
                 </div>
@@ -556,7 +575,7 @@ export function BookCard({
             {book.status === 'want' && priorityRank !== undefined && (
               <div className="absolute top-1 left-1 z-10 pointer-events-none">
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[9px] font-black shadow-md ${
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-black shadow-md ${
                     priorityRank === 1
                       ? 'bg-amber-400 text-stone-950 ring-1 ring-amber-200'
                       : 'bg-stone-900/90 text-sky-300 border border-sky-400/50'
@@ -584,7 +603,7 @@ export function BookCard({
                 ) : (
                   <Sparkles size={16} className="text-amber-400 light:text-amber-600 mb-1" />
                 )}
-                <span className="text-[9px] sm:text-[10px] text-amber-300 light:text-amber-800 font-medium leading-tight">
+                <span className="text-[10.5px] sm:text-[11px] text-amber-300 light:text-amber-800 font-medium leading-tight">
                   {autoFetchingCover ? 'Cerco...' : 'Cerca copertina'}
                 </span>
               </button>
@@ -595,7 +614,7 @@ export function BookCard({
           <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
             <div>
               {highlight && (
-                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1">
+                <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1">
                   <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 light:bg-amber-500 animate-pulse inline-block" />
                   <span>In lettura</span>
                 </div>
@@ -615,7 +634,7 @@ export function BookCard({
                   <div className="flex items-center gap-1.5 text-stone-400 light:text-stone-600 text-xs sm:text-sm mt-0.5 flex-wrap">
                     <span className="truncate max-w-[140px] xs:max-w-[190px] sm:max-w-[260px] md:max-w-[160px] lg:max-w-[220px]">{book.author}</span>
                     {book.pages && book.pages > 0 && (
-                      <span className="text-[10px] sm:text-[11px] font-medium text-stone-300 light:text-stone-700 bg-stone-750/70 light:bg-stone-100 px-1.5 py-0.5 rounded border border-stone-600/40 light:border-stone-200 shrink-0 tabular-nums">
+                      <span className="text-[11px] font-medium text-stone-300 light:text-stone-700 bg-stone-750/70 light:bg-stone-100 px-1.5 py-0.5 rounded border border-stone-600/40 light:border-stone-200 shrink-0 tabular-nums">
                         {book.pages} pag.
                       </span>
                     )}
@@ -646,12 +665,15 @@ export function BookCard({
               </div>
             </div>
 
-            <div className="mt-1.5 sm:mt-2">
-              <StarRating value={book.rating} onChange={handleRatingChange} size={18} />
-            </div>
+            {/* Le stelle non servono sui libri ancora da leggere (a meno che non abbiano già un voto) */}
+            {(book.status !== 'want' || book.rating > 0) && (
+              <div className="mt-1.5 sm:mt-2">
+                <StarRating value={book.rating} onChange={handleRatingChange} size={18} />
+              </div>
+            )}
 
             {/* Barra inferiore (Stato, Data, Scheda, Note): sempre sul fondo della colonna destra per equilibrare la copertina */}
-            <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5 sm:pt-3">
+            <div className="mt-auto flex flex-col items-start gap-1.5 pt-2.5 sm:pt-3">
               {renderBottomBar()}
             </div>
           </div>
@@ -664,6 +686,18 @@ export function BookCard({
           </div>
         )}
       </div>
+
+      {/* Libro finito: chiede il voto e poi lo sposta tra i Letti */}
+      {showFinishDialog && (
+        <FinishBookDialog
+          book={book}
+          onCancel={() => setShowFinishDialog(false)}
+          onConfirm={async (rating) => {
+            await handleMarkAsFinished(rating);
+            setShowFinishDialog(false);
+          }}
+        />
+      )}
 
       {/* Modale spaziosa e funzionale per gestione note del libro */}
       {showNotesModal && (
@@ -682,3 +716,6 @@ export function BookCard({
     </div>
   );
 }
+
+// Memo: la scheda si ridisegna solo quando cambiano i suoi dati (non a ogni lettera digitata nella ricerca)
+export const BookCard = memo(BookCardComponent);

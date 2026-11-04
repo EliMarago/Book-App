@@ -506,7 +506,7 @@ export function BookNotesModal({
                 <span>{charCount} caratteri</span>
                 <span className="hidden sm:inline-block">·</span>
                 <span className="hidden sm:inline-block text-[11px] text-stone-500 light:text-stone-400">
-                  Premi <kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[10px]">⌘</kbd>+<kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[10px]">Invio</kbd> per salvare
+                  Premi <kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[11px]">⌘</kbd>+<kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[11px]">Invio</kbd> per salvare
                 </span>
               </div>
 
@@ -568,7 +568,7 @@ export function BookNotesModal({
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-stone-400 hover:text-stone-200"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-stone-400 hover:text-stone-200"
                     >
                       ✕
                     </button>
@@ -632,7 +632,7 @@ export function BookNotesModal({
                                     key={t.id}
                                     type="button"
                                     onClick={() => setEditTag(isSel ? null : t.id)}
-                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
+                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
                                       isSel
                                         ? `${t.badgeBg} ${t.badgeText} ${t.badgeBorder}`
                                         : 'bg-stone-800 light:bg-stone-100 text-stone-400 light:text-stone-600 border-stone-700 light:border-stone-300'
@@ -701,7 +701,7 @@ export function BookNotesModal({
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {tagMeta && (
                                 <span
-                                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${tagMeta.badgeBg} ${tagMeta.badgeText} ${tagMeta.badgeBorder} flex items-center gap-1 shrink-0`}
+                                  className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${tagMeta.badgeBg} ${tagMeta.badgeText} ${tagMeta.badgeBorder} flex items-center gap-1 shrink-0`}
                                 >
                                   <tagMeta.icon size={10} />
                                   <span>{tagMeta.label}</span>
@@ -709,7 +709,7 @@ export function BookNotesModal({
                               )}
 
                               {parsed.page && (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700 light:border-stone-300 flex items-center gap-1 shrink-0">
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700 light:border-stone-300 flex items-center gap-1 shrink-0">
                                   <BookOpen size={10} />
                                   <span>Pag. {parsed.page}</span>
                                 </span>
