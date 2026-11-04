@@ -1344,6 +1344,7 @@ export function Dashboard() {
                   loadBooks(true);
                   refreshGoals();
                   setShowBackupModal(false);
+                  toast({ message: 'Backup ripristinato con successo! Libreria aggiornata. 📚', type: 'success' });
                 }}
               />
             </div>

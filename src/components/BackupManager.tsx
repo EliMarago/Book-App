@@ -243,15 +243,19 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
         existingMap.set(key, b.id);
       });
 
+      // Mappa per associare vecchio ID a nuovo ID generato (per preservare la priorità)
+      const idMap = new Map<string, string>();
+      let lastErrorMessage: string | null = null;
+
       // Ripristino libri uno a uno con aggiornamento stato di progresso
       for (let i = 0; i < payload.books.length; i++) {
         const b = payload.books[i];
         setRestoreProgress(`Ripristino libro ${i + 1} di ${payload.books.length}: "${b.title}"...`);
 
-        const key = `${b.title.trim().toLowerCase()}:::${b.author.trim().toLowerCase()}`;
-        let targetBookId = existingMap.get(key) || (b.id && b.id.length > 20 ? b.id : undefined);
+        const key = `${(b.title || '').trim().toLowerCase()}:::${(b.author || '').trim().toLowerCase()}`;
+        const existingId = existingMap.get(key);
 
-        const bookPayload = {
+        const bookPayload: Record<string, any> = {
           user_id: user.id,
           title: b.title || 'Senza titolo',
           author: b.author || 'Sconosciuto',
@@ -264,33 +268,96 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           updated_at: new Date().toISOString(),
         };
 
-        if (targetBookId && existingBooks.some((eb) => eb.id === targetBookId)) {
-          // Aggiorna libro esistente
-          await supabase.from('books').update(bookPayload).eq('id', targetBookId);
-        } else {
-          // Inserisci nuovo libro
-          const { data: inserted, error: insertErr } = await supabase
-            .from('books')
-            .insert({ ...bookPayload, ...(b.id ? { id: b.id } : {}) })
-            .select('id')
-            .single();
+        let targetBookId: string | undefined = undefined;
 
-          if (insertErr || !inserted) {
-            // Se fallisce l'ID personalizzato, ritenta lasciando generare l'ID a Supabase
-            const { data: retryInserted } = await supabase
+        if (existingId) {
+          // 1. Aggiorna libro esistente dell'utente
+          let updateRes = await supabase.from('books').update(bookPayload).eq('id', existingId);
+          if (
+            updateRes.error &&
+            (updateRes.error.message?.includes('pages') ||
+              updateRes.error.message?.includes('read_pages') ||
+              updateRes.error.message?.includes('read_at'))
+          ) {
+            const { pages: _p, read_pages: _rp, read_at: _ra, ...stripped } = bookPayload;
+            updateRes = await supabase.from('books').update(stripped).eq('id', existingId);
+          }
+          if (!updateRes.error) {
+            targetBookId = existingId;
+          } else {
+            console.error('Errore update libro:', b.title, updateRes.error);
+            lastErrorMessage = updateRes.error.message;
+          }
+        } else {
+          // 2. Inserisci nuovo libro: se b.id è presente e non collide, usalo, altrimenti genera nuovo ID
+          let insertedData: any = null;
+          let insertError: any = null;
+
+          // Tentativo 1: prova con ID originale solo se è un uuid valido
+          if (b.id && b.id.length > 20) {
+            const res = await supabase
+              .from('books')
+              .insert({ ...bookPayload, id: b.id })
+              .select('id')
+              .single();
+            if (res.data) {
+              insertedData = res.data;
+            } else {
+              insertError = res.error;
+            }
+          }
+
+          // Tentativo 2: se fallisce per ID duplicato o se non c'è b.id, inserisci lasciando generare l'ID a Supabase
+          if (!insertedData) {
+            const res = await supabase
               .from('books')
               .insert(bookPayload)
               .select('id')
               .single();
 
-            targetBookId = retryInserted?.id;
-          } else {
-            targetBookId = inserted.id;
+            if (res.data) {
+              insertedData = res.data;
+              insertError = null;
+            } else {
+              insertError = res.error;
+            }
+          }
+
+          // Tentativo 3: se fallisce per colonne mancanti ('pages' o 'read_pages' o 'read_at')
+          if (
+            !insertedData &&
+            insertError &&
+            (insertError.message?.includes('pages') ||
+              insertError.message?.includes('read_pages') ||
+              insertError.message?.includes('read_at'))
+          ) {
+            const { pages: _p, read_pages: _rp, read_at: _ra, ...stripped } = bookPayload;
+            const res = await supabase
+              .from('books')
+              .insert(stripped)
+              .select('id')
+              .single();
+
+            if (res.data) {
+              insertedData = res.data;
+              insertError = null;
+            } else {
+              insertError = res.error;
+            }
+          }
+
+          if (insertedData) {
+            targetBookId = insertedData.id;
+          } else if (insertError) {
+            console.error('Errore inserimento libro nel backup:', b.title, insertError);
+            lastErrorMessage = insertError.message;
           }
         }
 
         if (targetBookId) {
           booksCount++;
+          if (b.id) idMap.set(b.id, targetBookId);
+
           // Sincronizza cache locale e note di sistema
           saveBookDate(targetBookId, b.read_at || null);
           saveBookPages(targetBookId, b.pages || null);
@@ -316,6 +383,14 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
         }
       }
 
+      if (booksCount === 0 && payload.books.length > 0) {
+        throw new Error(
+          lastErrorMessage
+            ? `Impossibile salvare i libri sul database: ${lastErrorMessage}`
+            : 'Nessun libro è stato inserito nel database. Verifica la connessione e i permessi.'
+        );
+      }
+
       // Ripristina gli obiettivi di lettura se presenti nel backup
       if (payload.reading_goals && typeof payload.reading_goals === 'object') {
         setRestoreProgress('Ripristino obiettivi di lettura annuali...');
@@ -328,10 +403,11 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
 
       // Ripristina l'ordine di priorità della lista da leggere
       if (Array.isArray(payload.want_priority)) {
+        const remappedPriority = payload.want_priority.map((oldId) => idMap.get(oldId) || oldId);
         await supabase.auth.updateUser({
-          data: { want_priority: payload.want_priority },
+          data: { want_priority: remappedPriority },
         });
-        saveStoredWantPriority(payload.want_priority);
+        saveStoredWantPriority(remappedPriority);
       }
 
       setNotification({

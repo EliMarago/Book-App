@@ -7,10 +7,13 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   isPasswordRecovery: boolean;
+  recoveryError: string | null;
+  clearRecoveryError: () => void;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  verifyRecoveryOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   clearPasswordRecovery: () => void;
 };
@@ -21,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -32,13 +36,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordRecovery(true);
+        setRecoveryError(null);
       }
       setLoading(false);
     });
 
-    // Controlla se l'URL contiene il frammento di recupero password (#type=recovery)
-    if (window.location.hash.includes('type=recovery')) {
+    // 1. Controlla se l'URL contiene un errore restituito da Supabase (da query o hash)
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(
+      window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
+    );
+
+    const urlError =
+      searchParams.get('error_description') ||
+      hashParams.get('error_description') ||
+      searchParams.get('error') ||
+      hashParams.get('error');
+
+    if (urlError) {
+      console.warn('Errore URL autenticazione Supabase:', urlError);
+      const isExpiredOrInvalid =
+        urlError.toLowerCase().includes('expired') ||
+        urlError.toLowerCase().includes('invalid') ||
+        urlError.toLowerCase().includes('otp');
+      const friendly = isExpiredOrInvalid
+        ? 'Il link di recupero non è valido o è già stato consumato. I link via email sono monouso: se il client email scansiona i link automaticamente con antivirus, il link scade. Puoi inserire qui il codice OTP a 6 cifre ricevuto via email oppure richiedere un nuovo link.'
+        : `Errore recupero password: ${urlError}`;
+      setRecoveryError(friendly);
+
+      if (window.location.hash || window.location.search) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
+    // 2. Controlla se c'è un codice di scambio PKCE (?code=...)
+    const code = searchParams.get('code');
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (!error && data?.session) {
+          setSession(data.session);
+          setIsPasswordRecovery(true);
+          setRecoveryError(null);
+        } else if (error) {
+          console.warn('Errore scambio codice PKCE:', error.message);
+          setRecoveryError(`Impossibile verificare il link: ${error.message}`);
+        }
+        if (window.location.search) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      });
+    }
+
+    // 3. Controlla se l'URL contiene frammenti di recupero password (#type=recovery o ?type=recovery)
+    if (
+      window.location.hash.includes('type=recovery') ||
+      searchParams.get('type') === 'recovery' ||
+      hashParams.get('type') === 'recovery'
+    ) {
       setIsPasswordRecovery(true);
+      setRecoveryError(null);
     }
 
     return () => {
@@ -90,13 +146,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
       return { error: 'Configurazione Supabase mancante nel file .env.' };
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`,
+    const cleanOrigin = window.location.origin.replace(/\/+$/, '');
+    const cleanPath = window.location.pathname.replace(/\/+$/, '');
+    const redirectTo = `${cleanOrigin}${cleanPath}/`;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
     });
     if (error) {
       return { error: error.message };
     }
+    setRecoveryError(null);
     return { error: null };
+  };
+
+  const verifyRecoveryOtp = async (email: string, token: string) => {
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
+      return { error: 'Configurazione Supabase mancante nel file .env.' };
+    }
+    const cleanToken = token.trim();
+    if (!cleanToken) {
+      return { error: 'Inserisci il codice di verifica a 6 cifre.' };
+    }
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: cleanToken,
+      type: 'recovery',
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    if (data?.session) {
+      setSession(data.session);
+    }
+    setIsPasswordRecovery(true);
+    setRecoveryError(null);
+    return { error: null };
+  };
+
+  const clearRecoveryError = () => {
+    setRecoveryError(null);
   };
 
   const updatePassword = async (newPassword: string) => {
@@ -105,8 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error.message };
     }
     setIsPasswordRecovery(false);
-    // Rimuove eventuali hash residui dall'URL
-    if (window.location.hash) {
+    setRecoveryError(null);
+    // Rimuove eventuali hash o parametri residui dall'URL
+    if (window.location.hash || window.location.search) {
       window.history.replaceState(null, '', window.location.pathname);
     }
     return { error: null };
@@ -114,7 +207,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearPasswordRecovery = () => {
     setIsPasswordRecovery(false);
-    if (window.location.hash) {
+    setRecoveryError(null);
+    if (window.location.hash || window.location.search) {
       window.history.replaceState(null, '', window.location.pathname);
     }
   };
@@ -122,6 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setIsPasswordRecovery(false);
+    setRecoveryError(null);
   };
 
   return (
@@ -131,10 +226,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: session?.user ?? null,
         loading,
         isPasswordRecovery,
+        recoveryError,
+        clearRecoveryError,
         signUp,
         signIn,
         signOut,
         resetPassword,
+        verifyRecoveryOtp,
         updatePassword,
         clearPasswordRecovery,
       }}

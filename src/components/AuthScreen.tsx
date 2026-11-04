@@ -40,7 +40,16 @@ function calculatePasswordStrength(pass: string): { score: number; label: string
 }
 
 export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
-  const { signIn, signUp, resetPassword, updatePassword, clearPasswordRecovery } = useAuth();
+  const {
+    signIn,
+    signUp,
+    resetPassword,
+    verifyRecoveryOtp,
+    updatePassword,
+    clearPasswordRecovery,
+    recoveryError,
+    clearRecoveryError,
+  } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
@@ -50,6 +59,8 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
 
   const isSupabaseConfigured = Boolean(
     import.meta.env.VITE_SUPABASE_URL &&
@@ -59,6 +70,42 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   );
 
   const strength = calculatePasswordStrength(password);
+
+  const switchMode = (newMode: AuthMode) => {
+    setMode(newMode);
+    setError(null);
+    setSuccessMessage(null);
+    setEmailSent(false);
+    setOtpCode('');
+    clearRecoveryError();
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!otpCode.trim()) {
+      setError('Inserisci il codice di verifica a 6 cifre presente nell\'email.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error: err } = await verifyRecoveryOtp(email, otpCode);
+      if (err) {
+        setError(
+          err.toLowerCase().includes('expired') ||
+          err.toLowerCase().includes('invalid') ||
+          err.toLowerCase().includes('token')
+            ? 'Codice non valido o scaduto. Verifica di aver digitato il codice corretto ricevuto nell\'ultima email.'
+            : err
+        );
+      } else {
+        setMode('update-password');
+        setSuccessMessage('Codice verificato con successo! Imposta ora la tua nuova password.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,8 +131,9 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         if (err) {
           setError(err);
         } else {
+          setEmailSent(true);
           setSuccessMessage(
-            `Link di recupero inviato a ${email}. Apri l'email e clicca sul link per scegliere una nuova password.`
+            `Email inviata a ${email}! Clicca sul link nell'email oppure inserisci qui sotto il codice a 6 cifre ricevuto.`
           );
         }
       } else if (mode === 'update-password') {
@@ -173,16 +221,39 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
             </div>
           )}
 
+          {/* Avviso in caso di link di recupero non valido o scaduto */}
+          {recoveryError && (
+            <div className="mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-3 animate-fade-up">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5 text-amber-400" />
+              <div className="flex-1 space-y-1.5">
+                <div className="font-semibold text-amber-400 text-sm">Problema con il link di recupero</div>
+                <div className="leading-relaxed text-stone-300 light:text-stone-700">{recoveryError}</div>
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => switchMode('forgot')}
+                    className="font-semibold text-amber-400 light:text-amber-600 underline hover:text-amber-300 cursor-pointer text-xs"
+                  >
+                    Usa codice OTP a 6 cifre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearRecoveryError}
+                    className="text-stone-400 hover:text-stone-200 cursor-pointer text-xs"
+                  >
+                    Chiudi
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Segmented Switcher Accedi / Registrati (solo quando non siamo in recovery) */}
           {(mode === 'signin' || mode === 'signup') && (
             <div className="flex gap-1.5 mb-6 p-1.5 bg-stone-950/60 light:bg-stone-100 rounded-2xl border border-stone-800/60 light:border-stone-200/60">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('signin');
-                  setError(null);
-                  setSuccessMessage(null);
-                }}
+                onClick={() => switchMode('signin')}
                 className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   mode === 'signin'
                     ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/15'
@@ -193,11 +264,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMode('signup');
-                  setError(null);
-                  setSuccessMessage(null);
-                }}
+                onClick={() => switchMode('signup')}
                 className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   mode === 'signup'
                     ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/15'
@@ -213,11 +280,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           {mode === 'forgot' && (
             <button
               type="button"
-              onClick={() => {
-                setMode('signin');
-                setError(null);
-                setSuccessMessage(null);
-              }}
+              onClick={() => switchMode('signin')}
               className="inline-flex items-center gap-1.5 text-xs text-stone-400 light:text-stone-600 hover:text-amber-400 light:hover:text-amber-700 font-medium mb-4 transition-colors cursor-pointer"
             >
               <ArrowLeft size={14} />
@@ -260,11 +323,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                   {mode === 'signin' && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setMode('forgot');
-                        setError(null);
-                        setSuccessMessage(null);
-                      }}
+                      onClick={() => switchMode('forgot')}
                       className="text-xs text-amber-400/90 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 hover:underline cursor-pointer transition-colors"
                     >
                       Password dimenticata?
@@ -354,39 +413,113 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               </div>
             )}
 
-            {/* Pulsante di invio principale */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 active:scale-98 disabled:opacity-50 text-stone-950 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 mt-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin text-stone-950" />
-                  <span>Elaborazione in corso...</span>
-                </>
-              ) : mode === 'signin' ? (
-                <>
-                  <span>Entra nella libreria</span>
-                  <ArrowRight size={17} />
-                </>
-              ) : mode === 'signup' ? (
-                <>
-                  <span>Registrati e inizia</span>
-                  <Sparkles size={17} />
-                </>
-              ) : mode === 'forgot' ? (
-                <>
-                  <span>Invia link di recupero</span>
-                  <Mail size={17} />
-                </>
-              ) : (
-                <>
-                  <span>Salva nuova password</span>
-                  <ShieldCheck size={17} />
-                </>
-              )}
-            </button>
+            {/* Se l'email è stata inviata in modalità forgot, offri l'inserimento del codice OTP */}
+            {mode === 'forgot' && emailSent ? (
+              <div className="space-y-3 pt-2 animate-fade-up">
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-stone-300 light:text-stone-700 space-y-1.5">
+                  <div className="font-semibold text-amber-400 light:text-amber-600 flex items-center gap-1.5">
+                    <KeyRound size={15} />
+                    <span>Hai due modi per proseguire:</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    1. Clicca direttamente sul <strong>link</strong> contenuto nell'email.
+                  </p>
+                  <p className="leading-relaxed">
+                    2. <strong>Oppure</strong>, se il link risulta non valido (o apri l'email da un'altra app), inserisci qui sotto il <strong>codice a 6 cifre (OTP)</strong>:
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-300 light:text-stone-700 uppercase tracking-wider mb-1.5">
+                    Codice di verifica OTP
+                  </label>
+                  <div className="relative">
+                    <KeyRound
+                      size={17}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400 pointer-events-none"
+                    />
+                    <input
+                      type="text"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.trim())}
+                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-mono tracking-widest text-center"
+                      placeholder="123456"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleVerifyOtp}
+                  disabled={loading || !otpCode.trim()}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 active:scale-98 disabled:opacity-50 text-stone-950 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin text-stone-950" />
+                      <span>Verifica in corso...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Verifica codice e continua</span>
+                      <ShieldCheck size={17} />
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between text-xs pt-1 px-1">
+                  <button
+                    type="button"
+                    onClick={() => setEmailSent(false)}
+                    className="text-stone-400 hover:text-stone-200 light:hover:text-stone-800 cursor-pointer transition-colors"
+                  >
+                    Cambia email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="text-amber-400 hover:text-amber-300 light:text-amber-600 underline cursor-pointer transition-colors"
+                  >
+                    Invia di nuovo email
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Pulsante di invio principale standard */
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 active:scale-98 disabled:opacity-50 text-stone-950 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 mt-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin text-stone-950" />
+                    <span>Elaborazione in corso...</span>
+                  </>
+                ) : mode === 'signin' ? (
+                  <>
+                    <span>Entra nella libreria</span>
+                    <ArrowRight size={17} />
+                  </>
+                ) : mode === 'signup' ? (
+                  <>
+                    <span>Registrati e inizia</span>
+                    <Sparkles size={17} />
+                  </>
+                ) : mode === 'forgot' ? (
+                  <>
+                    <span>Invia link e codice di recupero</span>
+                    <Mail size={17} />
+                  </>
+                ) : (
+                  <>
+                    <span>Salva nuova password</span>
+                    <ShieldCheck size={17} />
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Annulla recovery se in update-password */}
             {mode === 'update-password' && (
@@ -394,7 +527,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                 type="button"
                 onClick={() => {
                   clearPasswordRecovery();
-                  setMode('signin');
+                  switchMode('signin');
                 }}
                 className="w-full text-center text-xs text-stone-400 hover:text-stone-200 light:hover:text-stone-800 py-1 transition-colors cursor-pointer"
               >
