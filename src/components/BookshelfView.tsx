@@ -13,6 +13,7 @@ import {
   Crown,
   Calendar,
   ArrowRight,
+  Medal,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
@@ -975,20 +976,22 @@ export function BookshelfView({
                               {isBestSection && bestRank !== null && (
                                 <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
                                   {bestRank === 1 ? (
-                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1">
+                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1 whitespace-nowrap">
                                       <Crown size={10} className="text-stone-950 fill-stone-950" />
                                       #1 Top
                                     </span>
                                   ) : bestRank === 2 ? (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-0.5">
-                                      🥈 #2
+                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-stone-100 to-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-1 whitespace-nowrap">
+                                      <Medal size={11} className="text-stone-700 fill-stone-400/40" />
+                                      #2
                                     </span>
                                   ) : bestRank === 3 ? (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-700 text-amber-100 border border-amber-500/50 shadow-md flex items-center gap-0.5">
-                                      🥉 #3
+                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-amber-800 via-amber-700 to-amber-800 text-amber-100 border border-amber-500/60 shadow-md flex items-center gap-1 whitespace-nowrap">
+                                      <Medal size={11} className="text-amber-300 fill-amber-400/40" />
+                                      #3
                                     </span>
                                   ) : (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md whitespace-nowrap">
                                       ⭐ #{bestRank}
                                     </span>
                                   )}
@@ -1197,29 +1200,31 @@ export function BookshelfView({
                               <div className="z-20 mx-auto my-0.5 flex flex-col items-center">
                                 {bestRank === 1 ? (
                                   <span
-                                    className="px-1 py-0.5 rounded text-[9.5px] font-black tracking-tight bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200/80 flex items-center gap-0.5"
+                                    className="px-1 py-0.5 rounded text-[9.5px] font-black tracking-tight bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200/80 flex items-center gap-0.5 whitespace-nowrap"
                                     title="Classifica #1: Il tuo miglior libro in assoluto!"
                                   >
-                                    <Crown size={9} className="text-stone-950 fill-stone-950" />
+                                    <Crown size={9} className="text-stone-950 fill-stone-950 shrink-0" />
                                     1°
                                   </span>
                                 ) : bestRank === 2 ? (
                                   <span
-                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-stone-200 text-stone-900 border border-white shadow-xs"
+                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-gradient-to-r from-stone-100 to-stone-200 text-stone-900 border border-white shadow-xs flex items-center gap-0.5 whitespace-nowrap"
                                     title="Classifica #2"
                                   >
-                                    🥈 2°
+                                    <Medal size={9} className="text-stone-700 fill-stone-400/40 shrink-0" />
+                                    2°
                                   </span>
                                 ) : bestRank === 3 ? (
                                   <span
-                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-amber-700 text-amber-100 border border-amber-500/50 shadow-xs"
+                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-gradient-to-r from-amber-800 via-amber-700 to-amber-800 text-amber-100 border border-amber-500/60 shadow-xs ring-1 ring-amber-500/30 flex items-center gap-0.5 whitespace-nowrap"
                                     title="Classifica #3"
                                   >
-                                    🥉 3°
+                                    <Medal size={9} className="text-amber-300 fill-amber-300/40 shrink-0" />
+                                    3°
                                   </span>
                                 ) : (
                                   <span
-                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-black/60 text-amber-300 border border-amber-400/40 shadow-xs"
+                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-black/60 text-amber-300 border border-amber-400/40 shadow-xs whitespace-nowrap"
                                     title={`Classifica #${bestRank}`}
                                   >
                                     #{bestRank}
@@ -1233,14 +1238,14 @@ export function BookshelfView({
                               <div className="z-20 mx-auto my-0.5 flex flex-col items-center">
                                 {priorityRank === 1 ? (
                                   <span
-                                    className="px-1 py-0.5 rounded text-[9.5px] font-black tracking-tight bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200/80 flex items-center gap-0.5"
+                                    className="px-1 py-0.5 rounded text-[9.5px] font-black tracking-tight bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200/80 flex items-center gap-0.5 whitespace-nowrap"
                                     title="Priorità #1: la prossima lettura da iniziare!"
                                   >
                                     ★ 1°
                                   </span>
                                 ) : (
                                   <span
-                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-black/60 text-sky-300 border border-sky-400/40 shadow-xs"
+                                    className="px-1 py-0.5 rounded text-[9px] font-bold tracking-tight bg-black/60 text-sky-300 border border-sky-400/40 shadow-xs whitespace-nowrap"
                                     title={`Priorità #${priorityRank} da leggere`}
                                   >
                                     #{priorityRank}
