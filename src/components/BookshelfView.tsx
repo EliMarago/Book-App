@@ -899,7 +899,7 @@ export function BookshelfView({
                                 setInspectingBook(book);
                               }
                             }}
-                            className={`group relative flex flex-col items-center cursor-pointer transition-all duration-300 hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[140px] xs:max-w-[150px] mx-auto ${
+                            className={`group relative flex flex-col items-center cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[140px] xs:max-w-[150px] mx-auto ${
                               isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
                             } ${
                               isDragOver
@@ -1146,7 +1146,7 @@ export function BookshelfView({
                               borderColor: dynamicSpine ? dynamicSpine.border : undefined,
                               touchAction: isDraggable ? 'none' : 'pan-x pan-y',
                             }}
-                            className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-2 px-1 cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                            className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-2 px-1 cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-4 sm:hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                               dynamicSpine ? '' : `bg-gradient-to-r ${spine.bg} ${spine.border}`
                             } border-t border-b-2 shadow-lg select-none overflow-hidden ${
                               isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''

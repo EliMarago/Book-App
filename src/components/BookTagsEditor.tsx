@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { Tag, Plus, X } from 'lucide-react';
 
-const SUGGESTED_TAGS = [
-  // Generi
+const GENRE_TAGS = [
   'Romance',
   'Dark romance',
   'Romantasy',
+  'Contemporary romance',
+  'Billionaire romance',
+  'Sports romance',
+  'Romcom',
+  'Mafia romance',
   'Fantasy',
   'Thriller',
   'Giallo',
   'Storico',
   'Young adult',
   'Fantascienza',
-  'Contemporary romance',
-  'Billionaire romance',
-  'Sports romance',
-  'Romcom',
-  // Trope
+];
+
+const TROPE_TAGS = [
   'Enemies to lovers',
   'Friends to lovers',
   'Childhood friends to strangers to lovers',
@@ -36,10 +38,9 @@ const SUGGESTED_TAGS = [
   'Age gap',
   'Love triangle',
   'Secret baby',
-  'Brother\'s best friend',
+  "Brother's best friend",
   'Found family',
   'Small town',
-  'Mafia romance',
   'Morally grey',
   'Touch her and die',
   'Enemies with benefits',
@@ -53,13 +54,14 @@ interface BookTagsEditorProps {
 }
 
 function normalizeTag(raw: string): string {
-  const t = raw.trim().replace(/\s+/g, ' ').slice(0, 30);
+  const t = raw.trim().replace(/\s+/g, ' ').slice(0, 45);
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
 }
 
 export function BookTagsEditor({ tags, onChange }: BookTagsEditorProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [activeGroup, setActiveGroup] = useState<'trope' | 'genre'>('trope');
 
   const hasTag = (t: string) => tags.some((x) => x.toLowerCase() === t.toLowerCase());
 
@@ -72,7 +74,13 @@ export function BookTagsEditor({ tags, onChange }: BookTagsEditorProps) {
 
   const removeTag = (t: string) => onChange(tags.filter((x) => x !== t));
 
-  const suggestions = SUGGESTED_TAGS.filter((s) => !hasTag(s));
+  const query = draft.trim().toLowerCase();
+  const pool = query
+    ? [...GENRE_TAGS, ...TROPE_TAGS].filter((s) => s.toLowerCase().includes(query))
+    : activeGroup === 'genre'
+      ? GENRE_TAGS
+      : TROPE_TAGS;
+  const suggestions = pool.filter((s) => !hasTag(s));
 
   return (
     <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-xs">
@@ -106,14 +114,14 @@ export function BookTagsEditor({ tags, onChange }: BookTagsEditorProps) {
           {tags.map((t) => (
             <span
               key={t}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200"
             >
               {t}
               {editing && (
                 <button
                   type="button"
                   onClick={() => removeTag(t)}
-                  className="text-amber-300/70 hover:text-red-400 cursor-pointer"
+                  className="text-amber-300/70 light:text-amber-700/70 hover:text-red-400 light:hover:text-red-600 cursor-pointer ml-0.5"
                   aria-label={`Rimuovi ${t}`}
                 >
                   <X size={11} />
@@ -124,14 +132,14 @@ export function BookTagsEditor({ tags, onChange }: BookTagsEditorProps) {
         </div>
       ) : (
         !editing && (
-          <p className="text-xs text-stone-500 light:text-stone-500">
+          <p className="text-xs text-stone-400 light:text-stone-500">
             Nessun tag. Aggiungi il genere o i trope (es. Romance, Enemies to lovers).
           </p>
         )
       )}
 
       {editing && (
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 pt-1">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -143,34 +151,62 @@ export function BookTagsEditor({ tags, onChange }: BookTagsEditorProps) {
               type="text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              maxLength={30}
-              placeholder="Scrivi un tag personalizzato..."
+              maxLength={45}
+              placeholder="Cerca o scrivi un tag personalizzato..."
               className="flex-1 min-w-0 px-3 py-1.5 bg-stone-950/50 light:bg-white border border-stone-800 light:border-stone-300/80 rounded-lg text-stone-100 light:text-stone-900 placeholder-stone-500 focus:outline-none focus:border-amber-500 text-base sm:text-xs"
             />
             <button
               type="submit"
               disabled={!draft.trim()}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 text-stone-950 text-xs font-bold disabled:opacity-40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-amber-500 text-stone-950 text-xs font-bold disabled:opacity-40 cursor-pointer shrink-0"
             >
               Aggiungi
             </button>
           </form>
 
-          <div className="flex flex-wrap gap-1.5">
-            {suggestions.map((s) => (
+          {!query && (
+            <div className="inline-flex p-0.5 rounded-lg bg-stone-900/90 light:bg-stone-200/70 border border-stone-800 light:border-stone-300/60">
               <button
-                key={s}
                 type="button"
-                onClick={() => addTag(s)}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-stone-800/80 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-300 hover:border-amber-500/50 hover:text-amber-300 light:hover:text-amber-700 cursor-pointer transition-colors"
+                onClick={() => setActiveGroup('trope')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                  activeGroup === 'trope'
+                    ? 'bg-amber-500 text-stone-950'
+                    : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
               >
-                + {s}
+                Trope ({TROPE_TAGS.length})
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => setActiveGroup('genre')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                  activeGroup === 'genre'
+                    ? 'bg-amber-500 text-stone-950'
+                    : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
+              >
+                Generi ({GENRE_TAGS.length})
+              </button>
+            </div>
+          )}
+
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => addTag(s)}
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-stone-800/80 light:bg-white text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-300 hover:border-amber-500/50 hover:text-amber-300 light:hover:text-amber-700 active:scale-95 cursor-pointer transition-all"
+                >
+                  + {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
-

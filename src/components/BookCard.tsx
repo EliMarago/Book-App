@@ -130,7 +130,7 @@ function BookCardComponent({
         .single();
     }
 
-    if (res.data) onUpdate({ ...res.data, read_at: newReadAt, read_pages: newReadPages, notes_count: displayCount });
+    if (res.data) onUpdate({ ...book, ...res.data, read_at: newReadAt, read_pages: newReadPages, notes_count: displayCount });
 
     if (status === 'completed' && book.status !== 'completed') {
       toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
@@ -241,16 +241,6 @@ function BookCardComponent({
     toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
   };
 
-  const handleRatingChange = async (rating: number) => {
-    const { data } = await supabase
-      .from('books')
-      .update({ rating, updated_at: new Date().toISOString() })
-      .eq('id', book.id)
-      .select()
-      .single();
-    if (data) onUpdate({ ...data, read_at: book.read_at, notes_count: displayCount });
-  };
-
   const handleAutoFetchCover = async () => {
     setAutoFetchingCover(true);
     try {
@@ -262,7 +252,7 @@ function BookCardComponent({
           .eq('id', book.id)
           .select()
           .single();
-        if (updated) onUpdate({ ...updated, read_at: book.read_at, notes_count: displayCount });
+        if (updated) onUpdate({ ...book, ...updated, read_at: book.read_at, notes_count: displayCount });
       }
     } catch (e) {
       console.error('Errore recupero copertina:', e);
@@ -274,101 +264,103 @@ function BookCardComponent({
   const renderBottomBar = () => (
     <>
       {/* Riga 1: stato + priorità / data */}
-      <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 min-w-0 max-w-full">
-      {/* Selettore Stato del libro */}
-      <div className="relative shrink-0 inline-flex items-center">
-        <select
-          data-compact="true"
-          value={book.status}
-          onChange={(e) => {
-            const next = e.target.value as Book['status'];
-            // Passando a "Completato" chiede prima il voto
-            if (next === 'completed' && book.status !== 'completed') setShowFinishDialog(true);
-            else handleStatusChange(next);
-          }}
-          aria-label="Stato del libro"
-          className={`appearance-none h-7 lg:h-8 text-xs font-semibold pl-2 lg:pl-3 pr-5 lg:pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
-        >
-          <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
-          <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Completato</option>
-          <option value="want" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Da leggere</option>
-        </select>
-        <ChevronDown size={12} className="absolute right-1.5 lg:right-2 pointer-events-none opacity-70 shrink-0" />
-      </div>
+      {(book.status !== 'reading' || book.read_at) && (
+        <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 min-w-0 max-w-full">
+          {/* Selettore Stato del libro (nascosto per i libri già in lettura, che hanno il box progresso e il tasto Finito dedicato) */}
+          {book.status !== 'reading' && (
+            <div className="relative shrink-0 inline-flex items-center">
+              <select
+                data-compact="true"
+                value={book.status}
+                onChange={(e) => {
+                  const next = e.target.value as Book['status'];
+                  // Passando a "Completato" chiede prima il voto
+                  if (next === 'completed' && book.status !== 'completed') setShowFinishDialog(true);
+                  else handleStatusChange(next);
+                }}
+                aria-label="Stato del libro"
+                className={`appearance-none h-7 lg:h-8 text-xs font-semibold pl-2 lg:pl-3 pr-5 lg:pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
+              >
+                <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
+                <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Completato</option>
+                <option value="want" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Da leggere</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-1.5 lg:right-2 pointer-events-none opacity-70 shrink-0" />
+            </div>
+          )}
 
-      {/* Badge Priorità per i libri da leggere */}
-      {book.status === 'want' && priorityRank !== undefined && (
-        <span
-          className={`h-7 lg:h-8 shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-2 lg:px-2.5 rounded-full border shadow-xs ${
-            priorityRank === 1
-              ? 'bg-amber-500/20 text-amber-300 light:text-amber-800 border-amber-500/40 ring-1 ring-amber-400/40'
-              : 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
-          }`}
-          title={
-            priorityRank === 1
-              ? 'Priorità #1: la tua prossima lettura in programma!'
-              : `Priorità #${priorityRank} nella lista da leggere`
-          }
-        >
-          {isDraggable && <GripVertical size={13} className="opacity-70 text-sky-400" />}
-          <span>{priorityRank === 1 ? <>★ #1<span className="hidden lg:inline"> Prossimo</span></> : `#${priorityRank}`}</span>
-        </span>
+          {/* Badge Priorità per i libri da leggere */}
+          {book.status === 'want' && priorityRank !== undefined && (
+            <span
+              className={`h-7 lg:h-8 shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-2 lg:px-2.5 rounded-full border shadow-xs ${priorityRank === 1
+                  ? 'bg-amber-500/20 text-amber-300 light:text-amber-800 border-amber-500/40 ring-1 ring-amber-400/40'
+                  : 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
+                }`}
+              title={
+                priorityRank === 1
+                  ? 'Priorità #1: la tua prossima lettura in programma!'
+                  : `Priorità #${priorityRank} nella lista da leggere`
+              }
+            >
+              {isDraggable && <GripVertical size={13} className="opacity-70 text-sky-400" />}
+              <span>{priorityRank === 1 ? <>★ #1<span className="hidden lg:inline"> Prossimo</span></> : `#${priorityRank}`}</span>
+            </span>
+          )}
+
+          {/* Badge Data di lettura */}
+          {book.read_at ? (
+            <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 lg:px-3 whitespace-nowrap">
+              <Calendar size={12} className="shrink-0 hidden lg:inline" />
+              <span>
+                {new Date(book.read_at).toLocaleDateString('it-IT', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: '2-digit',
+                })}
+              </span>
+            </span>
+          ) : null}
+        </div>
       )}
-
-      {/* Badge Data di lettura */}
-      {book.read_at ? (
-        <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 lg:px-3 whitespace-nowrap">
-          <Calendar size={12} className="shrink-0 hidden lg:inline" />
-          <span>
-            {new Date(book.read_at).toLocaleDateString('it-IT', {
-              day: '2-digit',
-              month: 'short',
-              year: '2-digit',
-            })}
-          </span>
-        </span>
-      ) : null}
-      </div>
 
       {/* Riga 2: azioni (Scheda + Note), allineate a sinistra sotto la riga 1 */}
       <div className="inline-flex items-center gap-1.5 shrink-0">
-      {/* Pulsante Scheda / Trama (icona: la scheda si apre anche da copertina e titolo) */}
-      {onInspect && (
+        {/* Pulsante Scheda / Trama (icona: la scheda si apre anche da copertina e titolo) */}
+        {onInspect && (
+          <button
+            type="button"
+            onClick={() => onInspect(book)}
+            aria-label="Apri Scheda Libro e trama"
+            className="shrink-0 h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-full border border-stone-600 light:border-stone-300 text-amber-400 light:text-amber-600 hover:border-amber-500/40 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer active:scale-95"
+            title="Apri Scheda Libro e trama"
+          >
+            <BookOpen size={13} className="shrink-0" />
+          </button>
+        )}
+
+        {/* Pulsante Note */}
         <button
           type="button"
-          onClick={() => onInspect(book)}
-          aria-label="Apri Scheda Libro e trama"
-          className="shrink-0 h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-full border border-stone-600 light:border-stone-300 text-amber-400 light:text-amber-600 hover:border-amber-500/40 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer active:scale-95"
-          title="Apri Scheda Libro e trama"
+          onClick={() => setShowNotesModal(true)}
+          className={`shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${displayCount > 0
+              ? 'border-amber-500/40 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100'
+              : 'border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-700/50 light:hover:bg-stone-100'
+            } ${showNotesModal ? 'ring-1 ring-amber-500/40 light:ring-amber-400' : ''}`}
+          title={
+            displayCount > 0
+              ? `${displayCount} ${displayCount === 1 ? 'nota' : 'note'} (clicca per visualizzare o scrivere)`
+              : 'Note (clicca per scrivere citazioni o riflessioni)'
+          }
         >
-          <BookOpen size={13} className="shrink-0" />
+          <StickyNote size={12} className={`shrink-0 ${displayCount > 0 ? 'text-amber-400 light:text-amber-600' : 'text-stone-400 light:text-stone-500'}`} />
+          <span>
+            {displayCount === 0
+              ? 'Note'
+              : displayCount === 1
+                ? '1 nota'
+                : `${displayCount} note`}
+          </span>
         </button>
-      )}
-
-      {/* Pulsante Note */}
-      <button
-        type="button"
-        onClick={() => setShowNotesModal(true)}
-        className={`shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
-          displayCount > 0
-            ? 'border-amber-500/40 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100'
-            : 'border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-700/50 light:hover:bg-stone-100'
-        } ${showNotesModal ? 'ring-1 ring-amber-500/40 light:ring-amber-400' : ''}`}
-        title={
-          displayCount > 0
-            ? `${displayCount} ${displayCount === 1 ? 'nota' : 'note'} (clicca per visualizzare o scrivere)`
-            : 'Note (clicca per scrivere citazioni o riflessioni)'
-        }
-      >
-        <StickyNote size={12} className={`shrink-0 ${displayCount > 0 ? 'text-amber-400 light:text-amber-600' : 'text-stone-400 light:text-stone-500'}`} />
-        <span>
-          {displayCount === 0
-            ? 'Note'
-            : displayCount === 1
-              ? '1 nota'
-              : `${displayCount} note`}
-        </span>
-      </button>
       </div>
     </>
   );
@@ -524,11 +516,10 @@ function BookCardComponent({
 
   return (
     <div
-      className={`group rounded-2xl border transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.99] sm:active:scale-100 ${
-        highlight
+      className={`group rounded-2xl border transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.99] sm:active:scale-100 ${highlight
           ? 'bg-gradient-to-br from-amber-950/30 via-stone-850 to-stone-900 light:from-amber-50/70 light:via-white light:to-amber-50/30 border-amber-500/40 light:border-amber-300 shadow-lg shadow-amber-500/5 hover:border-amber-400/60 light:hover:border-amber-400 ring-1 ring-amber-500/20 light:ring-amber-300/40'
           : 'bg-stone-850/80 light:bg-white border-stone-800/80 light:border-stone-200/90 hover:border-stone-700 light:hover:border-stone-300 hover:shadow-md shadow-xs'
-      } overflow-hidden h-full flex flex-col`}
+        } overflow-hidden h-full flex flex-col`}
     >
       <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
         {/* Sezione superiore: Copertina e dettagli del libro */}
@@ -575,11 +566,10 @@ function BookCardComponent({
             {book.status === 'want' && priorityRank !== undefined && (
               <div className="absolute top-1 left-1 z-10 pointer-events-none">
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-black shadow-md ${
-                    priorityRank === 1
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-black shadow-md ${priorityRank === 1
                       ? 'bg-amber-400 text-stone-950 ring-1 ring-amber-200'
                       : 'bg-stone-900/90 text-sky-300 border border-sky-400/50'
-                  }`}
+                    }`}
                 >
                   #{priorityRank}
                 </span>
@@ -624,9 +614,8 @@ function BookCardComponent({
                 <div className="min-w-0 flex-1">
                   <h3
                     onClick={() => onInspect?.(book)}
-                    className={`font-serif text-base sm:text-lg font-semibold text-stone-100 light:text-stone-900 leading-snug break-words line-clamp-2 ${
-                      onInspect ? 'cursor-pointer hover:text-amber-400 light:hover:text-amber-700 transition-colors' : ''
-                    }`}
+                    className={`font-serif text-base sm:text-lg font-semibold text-stone-100 light:text-stone-900 leading-snug break-words line-clamp-2 ${onInspect ? 'cursor-pointer hover:text-amber-400 light:hover:text-amber-700 transition-colors' : ''
+                      }`}
                     title={onInspect ? `${book.title} — Clicca per aprire la Scheda Libro` : book.title}
                   >
                     {book.title}
@@ -639,6 +628,26 @@ function BookCardComponent({
                       </span>
                     )}
                   </div>
+                  {book.tags && book.tags.length > 0 && (
+                    <div
+                      onClick={() => onInspect?.(book)}
+                      className="flex items-center gap-1 mt-1.5 flex-wrap cursor-pointer"
+                    >
+                      {book.tags.slice(0, 3).map((t) => (
+                        <span
+                          key={t}
+                          className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200/90 leading-tight"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                      {book.tags.length > 3 && (
+                        <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-600 border border-stone-700 light:border-stone-200 leading-tight tabular-nums">
+                          +{book.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Pulsanti azioni rapidi (sempre visibili su mobile e tablet touch) */}
@@ -665,10 +674,10 @@ function BookCardComponent({
               </div>
             </div>
 
-            {/* Le stelle non servono sui libri ancora da leggere (a meno che non abbiano già un voto) */}
-            {(book.status !== 'want' || book.rating > 0) && (
+            {/* Valutazione visibile solo per i libri già letti e bloccata sulla card (non cambia passando il mouse) */}
+            {book.status === 'completed' && (
               <div className="mt-1.5 sm:mt-2">
-                <StarRating value={book.rating} onChange={handleRatingChange} size={18} />
+                <StarRating value={book.rating} size={18} readOnly />
               </div>
             )}
 

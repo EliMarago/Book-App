@@ -83,6 +83,7 @@ export function BookDetailModal({
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [plotExpanded, setPlotExpanded] = useState(false);
   const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [editingRating, setEditingRating] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
 
   // Paragrafi formattati della trama per una lettura ariosa e confortevole con a capo dedicati
@@ -812,25 +813,40 @@ export function BookDetailModal({
                 </div>
               )}
 
-              {/* Valutazione con stelle */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-stone-300 light:text-stone-700 font-semibold">
-                  La tua valutazione:
-                </span>
-                <StarRating
-                  value={book.rating}
-                  onChange={async (newRating) => {
-                    const updated = { ...book, rating: newRating };
-                    setBook(updated);
-                    onUpdateBook(updated);
-                    await supabase
-                      .from('books')
-                      .update({ rating: newRating, updated_at: new Date().toISOString() })
-                      .eq('id', book.id);
-                  }}
-                  size={19}
-                />
-              </div>
+              {/* Valutazione con stelle (solo per i libri già letti, bloccata di default se già votato) */}
+              {book.status === 'completed' && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-stone-300 light:text-stone-700 font-semibold">
+                    La tua valutazione:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <StarRating
+                      value={book.rating}
+                      readOnly={book.rating > 0 && !editingRating}
+                      onChange={async (newRating) => {
+                        const updated = { ...book, rating: newRating };
+                        setBook(updated);
+                        setEditingRating(false);
+                        onUpdateBook(updated);
+                        await supabase
+                          .from('books')
+                          .update({ rating: newRating, updated_at: new Date().toISOString() })
+                          .eq('id', book.id);
+                      }}
+                      size={19}
+                    />
+                    {book.rating > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingRating((v) => !v)}
+                        className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 border border-stone-700 light:border-stone-300 cursor-pointer transition-colors"
+                      >
+                        {editingRating ? 'Blocca' : 'Cambia'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Data di lettura se completato */}

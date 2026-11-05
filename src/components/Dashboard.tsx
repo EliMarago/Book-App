@@ -606,7 +606,7 @@ export function Dashboard() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cerca per titolo o autore..."
+              placeholder="Cerca per titolo, autore o trope..."
               className="w-full pl-10 pr-16 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm sm:text-base placeholder-stone-400 light:placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs"
             />
             {search && (
@@ -1192,7 +1192,7 @@ export function Dashboard() {
       {/* Barra di Navigazione Mobile: capsula flottante con indicatore della sezione attiva e contatori */}
       <nav
         aria-label="Navigazione rapida mobile"
-        className="sm:hidden fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(0.5rem,calc(env(safe-area-inset-bottom,0px)+0.25rem))] pointer-events-none"
+        className="sm:hidden fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(0.2rem,calc(env(safe-area-inset-bottom,0px)*0.45))] pointer-events-none"
       >
         <div className="pointer-events-auto max-w-lg mx-auto grid grid-cols-[1fr_1fr_64px_1fr_1fr] items-center h-[70px] px-1 rounded-[28px] border border-white/[0.07] light:border-stone-200/90 bg-stone-900/[0.94] light:bg-white/[0.95] backdrop-blur-md shadow-[0_10px_30px_-8px_rgba(0,0,0,0.65)] light:shadow-[0_10px_30px_-10px_rgba(120,90,60,0.35)]">
           {([
