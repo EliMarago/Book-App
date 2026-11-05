@@ -84,7 +84,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     e.preventDefault();
     setError(null);
     if (!otpCode.trim()) {
-      setError('Inserisci il codice di verifica a 6 cifre presente nell\'email.');
+      setError('Incolla il link ricevuto via email o il token.');
       return;
     }
     setLoading(true);
@@ -95,12 +95,12 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           err.toLowerCase().includes('expired') ||
           err.toLowerCase().includes('invalid') ||
           err.toLowerCase().includes('token')
-            ? 'Codice non valido o scaduto. Verifica di aver digitato il codice corretto ricevuto nell\'ultima email.'
+            ? 'Il token o link non è valido oppure è già stato utilizzato. Richiedi un nuovo link e incollalo subito prima di cliccarlo.'
             : err
         );
       } else {
         setMode('update-password');
-        setSuccessMessage('Codice verificato con successo! Imposta ora la tua nuova password.');
+        setSuccessMessage('Autenticazione riuscita! Imposta ora la tua nuova password.');
       }
     } finally {
       setLoading(false);
@@ -413,25 +413,22 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               </div>
             )}
 
-            {/* Se l'email è stata inviata in modalità forgot, offri l'inserimento del codice OTP */}
+            {/* Se l'email è stata inviata in modalità forgot, offri l'inserimento del link o del codice */}
             {mode === 'forgot' && emailSent ? (
               <div className="space-y-3 pt-2 animate-fade-up">
                 <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-stone-300 light:text-stone-700 space-y-1.5">
                   <div className="font-semibold text-amber-400 light:text-amber-600 flex items-center gap-1.5">
                     <KeyRound size={15} />
-                    <span>Hai due modi per proseguire:</span>
+                    <span>Come procedere:</span>
                   </div>
                   <p className="leading-relaxed">
-                    1. Clicca direttamente sul <strong>link</strong> contenuto nell'email.
-                  </p>
-                  <p className="leading-relaxed">
-                    2. <strong>Oppure</strong>, se il link risulta non valido (o apri l'email da un'altra app), inserisci qui sotto il <strong>codice a 6 cifre (OTP)</strong>:
+                    Puoi semplicemente <strong>copiare e incollare qui sotto l'intero link</strong> (o il token) ricevuto nell'email e cliccare sul pulsante qui sotto:
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-300 light:text-stone-700 uppercase tracking-wider mb-1.5">
-                    Codice di verifica OTP
+                    Link dell'email o Token
                   </label>
                   <div className="relative">
                     <KeyRound
@@ -442,8 +439,8 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                       type="text"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.trim())}
-                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-mono tracking-widest text-center"
-                      placeholder="123456"
+                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-xs font-mono"
+                      placeholder="Incolla qui l'URL completo o il token"
                     />
                   </div>
                 </div>
@@ -461,7 +458,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                     </>
                   ) : (
                     <>
-                      <span>Verifica codice e continua</span>
+                      <span>Verifica e imposta nuova password</span>
                       <ShieldCheck size={17} />
                     </>
                   )}

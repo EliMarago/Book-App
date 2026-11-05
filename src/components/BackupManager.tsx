@@ -21,6 +21,7 @@ import {
   syncBookDateToSupabase,
   syncBookPagesToSupabase,
   syncBookReadPagesToSupabase,
+  syncBookTagsToSupabase,
 } from '@/lib/bookDates';
 import { getStoredWantPriority, saveStoredWantPriority } from '@/lib/bookPriority';
 
@@ -46,6 +47,7 @@ interface BackupFilePayload {
     read_at?: string | null;
     pages?: number | null;
     read_pages?: number | null;
+    tags?: string[];
     created_at?: string;
     notes?: Array<{
       content: string;
@@ -93,7 +95,8 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
         if (
           !note.content.startsWith('__READ_AT__:') &&
           !note.content.startsWith('__PAGES__:') &&
-          !note.content.startsWith('__READ_PAGES__:')
+          !note.content.startsWith('__READ_PAGES__:') &&
+          !note.content.startsWith('__TAGS__:')
         ) {
           if (!notesByBook[note.book_id]) {
             notesByBook[note.book_id] = [];
@@ -122,6 +125,7 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           read_at: b.read_at || null,
           pages: b.pages || null,
           read_pages: b.read_pages !== undefined ? b.read_pages : null,
+          tags: b.tags || [],
           created_at: b.created_at,
           notes: notesByBook[b.id] || [],
         })),
@@ -365,6 +369,9 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           syncBookDateToSupabase(targetBookId, b.read_at || null).catch(() => { });
           syncBookPagesToSupabase(targetBookId, b.pages || null).catch(() => { });
           syncBookReadPagesToSupabase(targetBookId, b.read_pages || null).catch(() => { });
+          if (Array.isArray(b.tags) && b.tags.length > 0) {
+            syncBookTagsToSupabase(targetBookId, b.tags).catch(() => { });
+          }
 
           // Ripristina eventuali note associate a questo libro
           if (Array.isArray(b.notes) && b.notes.length > 0) {

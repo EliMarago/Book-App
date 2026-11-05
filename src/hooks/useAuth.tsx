@@ -160,27 +160,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const verifyRecoveryOtp = async (email: string, token: string) => {
+  const verifyRecoveryOtp = async (email: string, rawInput: string) => {
     if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
       return { error: 'Configurazione Supabase mancante nel file .env.' };
     }
-    const cleanToken = token.trim();
-    if (!cleanToken) {
-      return { error: 'Inserisci il codice di verifica a 6 cifre.' };
+    let token = rawInput.trim();
+    if (!token) {
+      return { error: 'Inserisci il link o il codice ricevuto via email.' };
     }
 
-    const { data, error } = await supabase.auth.verifyOtp({
+    // Se l'utente ha incollato l'intero URL dell'email o un frammento contenente "token="
+    if (token.includes('token=')) {
+      try {
+        const url = new URL(token);
+        const extracted = url.searchParams.get('token');
+        if (extracted) token = extracted;
+      } catch {
+        const match = token.match(/token=([a-zA-Z0-9_-]+)/);
+        if (match) token = match[1];
+      }
+    }
+
+    // Tentativo 1: Se è un hash lungo (> 20 caratteri, come quello del link), verificalo come token_hash
+    if (token.length > 20) {
+      const resHash = await supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'recovery',
+      });
+      if (!resHash.error && resHash.data?.session) {
+        setSession(resHash.data.session);
+        setIsPasswordRecovery(true);
+        setRecoveryError(null);
+        return { error: null };
+      }
+      if (resHash.error && !resHash.error.message.includes('fetch')) {
+        // Se l'hash è fallito, prova comunque il fallback successivo o restituisci l'errore chiaro
+        console.warn('Verifica token_hash fallita:', resHash.error.message);
+      }
+    }
+
+    // Tentativo 2: Prova con email e codice OTP
+    const resEmail = await supabase.auth.verifyOtp({
       email: email.trim(),
-      token: cleanToken,
+      token,
       type: 'recovery',
     });
 
-    if (error) {
-      return { error: error.message };
+    if (resEmail.error) {
+      return { error: resEmail.error.message };
     }
 
-    if (data?.session) {
-      setSession(data.session);
+    if (resEmail.data?.session) {
+      setSession(resEmail.data.session);
     }
     setIsPasswordRecovery(true);
     setRecoveryError(null);

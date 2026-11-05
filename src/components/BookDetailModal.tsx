@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
-  Hash,
   StickyNote,
   Pencil,
   Trash2,
@@ -25,12 +24,14 @@ import { supabase, type Book } from '@/lib/supabase';
 import { StarRating } from './StarRating';
 import { BookNotesModal } from './BookNotesModal';
 import { FinishBookDialog } from './FinishBookDialog';
+import { BookTagsEditor } from './BookTagsEditor';
 import { useToast } from './Toast';
 import {
   syncBookDateToSupabase,
   syncBookReadPagesToSupabase,
   syncBookPagesToSupabase,
   syncBookPlotToSupabase,
+  syncBookTagsToSupabase,
 } from '@/lib/bookDates';
 import {
   fetchBookDetails,
@@ -162,6 +163,13 @@ export function BookDetailModal({
 
     setShowSearchModal(false);
     toast({ message: `Trama impostata con successo da ${result.source}!`, type: 'success' });
+  };
+
+  const handleTagsChange = async (tags: string[]) => {
+    const updatedBook = { ...book, tags };
+    setBook(updatedBook);
+    onUpdateBook(updatedBook);
+    await syncBookTagsToSupabase(book.id, tags);
   };
 
   const handleOpenEditPlot = () => {
@@ -440,7 +448,7 @@ export function BookDetailModal({
                   </button>
                 </div>
 
-                {/* Metadati editoriali (Pagine, Anno, Editore, ISBN) */}
+                {/* Metadati editoriali (Pagine, Anno, Editore) */}
                 <div className="flex items-center gap-1 pt-0.5 flex-wrap">
                   {(book.pages || bookDetails?.pageCount) && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 tabular-nums">
@@ -460,13 +468,6 @@ export function BookDetailModal({
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/90 light:bg-stone-100 text-stone-300 light:text-stone-700 border border-stone-700/80 light:border-stone-200 max-w-[140px] truncate">
                       <Building2 size={10} className="text-amber-400 light:text-amber-600 shrink-0" />
                       <span className="truncate">{bookDetails.publisher}</span>
-                    </span>
-                  )}
-
-                  {bookDetails?.isbn && (
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-stone-800/60 light:bg-stone-100 text-stone-400 light:text-stone-500 border border-stone-700/60 light:border-stone-200 tabular-nums">
-                      <Hash size={10} />
-                      <span>{bookDetails.isbn}</span>
                     </span>
                   )}
                 </div>
@@ -541,6 +542,8 @@ export function BookDetailModal({
                 </div>
               </div>
             )}
+
+            <BookTagsEditor tags={book.tags || []} onChange={handleTagsChange} />
 
             {/* 2. SEZIONE TRAMA E SINOSSI (VERIFICATA IN ITALIANO + RICERCA MULTI-FONTE) */}
             <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-xs">

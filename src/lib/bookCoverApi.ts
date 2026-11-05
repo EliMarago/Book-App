@@ -30,13 +30,30 @@ function sanitizeQuery(str: string): string {
 /**
  * Esegue una fetch con timeout automatico
  */
+// Dopo un errore 429 (quota esaurita) sospendiamo le richieste a Google Books per qualche minuto:
+// continuare a insistere prolunga il blocco e rallenta tutte le ricerche (le altre fonti restano attive).
+const GOOGLE_COOLDOWN_MS = 10 * 60 * 1000;
+let googleCooldownUntil = 0;
+
+function isGoogleBooksUrl(url: string): boolean {
+  return url.startsWith('https://www.googleapis.com/books/');
+}
+
 async function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response> {
+  const googleUrl = isGoogleBooksUrl(url);
+  if (googleUrl && Date.now() < googleCooldownUntil) {
+    return new Response(null, { status: 429, statusText: 'Google Books in pausa (quota)' });
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
+    if (googleUrl && response.status === 429) {
+      googleCooldownUntil = Date.now() + GOOGLE_COOLDOWN_MS;
+    }
     return response;
   } catch (err) {
     clearTimeout(timeoutId);

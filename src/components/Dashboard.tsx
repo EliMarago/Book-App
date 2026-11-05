@@ -34,6 +34,7 @@ import {
   getStoredReadPages,
   removeBookReadPages,
   getStoredPlots,
+  getStoredTags,
   removeBookPlot,
   fetchNotesMetadataFromSupabase,
 } from '@/lib/bookDates';
@@ -206,11 +207,12 @@ export function Dashboard() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      const [storedLocalDates, storedLocalPages, storedLocalReadPages, storedLocalPlots, notesMeta] = await Promise.all([
+      const [storedLocalDates, storedLocalPages, storedLocalReadPages, storedLocalPlots, storedLocalTags, notesMeta] = await Promise.all([
         getStoredDates(),
         getStoredPages(),
         getStoredReadPages(),
         getStoredPlots(),
+        getStoredTags(),
         fetchNotesMetadataFromSupabase(),
       ]);
 
@@ -227,6 +229,7 @@ export function Dashboard() {
                   : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
         notes_count: notesMeta.counts[b.id] || 0,
         plot: b.plot || notesMeta.plots[b.id] || storedLocalPlots[b.id] || null,
+        tags: notesMeta.tags[b.id] || storedLocalTags[b.id] || [],
       }));
 
       setBooks(booksWithDatesAndPages);
