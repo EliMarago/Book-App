@@ -32,6 +32,7 @@ import {
   syncBookPagesToSupabase,
   syncBookPlotToSupabase,
   syncBookTagsToSupabase,
+  saveBookPlot,
 } from '@/lib/bookDates';
 import {
   fetchBookDetails,
@@ -264,12 +265,26 @@ export function BookDetailModal({
         if (!isMounted) return;
         setBookDetails(details);
 
+        let updatedBook = book;
+        let hasUpdates = false;
+
+        // Se l'API ha trovato una trama e il libro non l'aveva in cache locale, salviamola localmente per non richiederla più
+        if (!book.plot && details.description) {
+          saveBookPlot(book.id, details.description);
+          updatedBook = { ...updatedBook, plot: details.description };
+          hasUpdates = true;
+        }
+
         // Se il libro non aveva il numero di pagine salvato ma l'API lo ha trovato, aggiorniamolo silenziosamente
         if ((!book.pages || book.pages <= 0) && details.pageCount && details.pageCount > 0) {
           await syncBookPagesToSupabase(book.id, details.pageCount);
-          const updated = { ...book, pages: details.pageCount };
-          setBook(updated);
-          onUpdateBook(updated);
+          updatedBook = { ...updatedBook, pages: details.pageCount };
+          hasUpdates = true;
+        }
+
+        if (hasUpdates && isMounted) {
+          setBook(updatedBook);
+          onUpdateBook(updatedBook);
         }
       })
       .catch(() => {

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 export type ReadingGoals = Record<string, number>;
 
 const STORAGE_KEY = 'reading_goals';
+const GOALS_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 
 function getStoredGoals(): ReadingGoals {
   try {
@@ -31,7 +32,13 @@ export function useReadingGoals() {
   const [goals, setGoals] = useState<ReadingGoals>(() => getStoredGoals());
   const goalsRef = useRef<ReadingGoals>(goals);
 
-  const refreshGoals = useCallback(async () => {
+  const lastRefreshRef = useRef<number>(0);
+
+  const refreshGoals = useCallback(async (force = false) => {
+    if (!force && Date.now() - lastRefreshRef.current < GOALS_SYNC_COOLDOWN_MS) {
+      return;
+    }
+    lastRefreshRef.current = Date.now();
     try {
       const { data, error } = await supabase.auth.getUser();
       if (error || !data.user) return;
@@ -47,15 +54,13 @@ export function useReadingGoals() {
   }, []);
 
   useEffect(() => {
-    refreshGoals();
-    const onFocus = () => {
-      if (document.visibilityState === 'visible') refreshGoals();
+    refreshGoals(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshGoals(false);
     };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [refreshGoals]);
 

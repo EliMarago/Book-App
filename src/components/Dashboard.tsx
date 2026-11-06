@@ -37,6 +37,8 @@ import {
   getStoredTags,
   removeBookPlot,
   fetchNotesMetadataFromSupabase,
+  markLocalMutation,
+  isRecentLocalMutation,
 } from '@/lib/bookDates';
 import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
@@ -57,6 +59,8 @@ import { APP_VERSION_LABEL } from '@/version';
 
 // Tempo a disposizione per annullare l'eliminazione di un libro
 const UNDO_DELETE_MS = 6000;
+// Intervallo minimo tra sincronizzazioni automatiche in background quando si riapre l'app (5 minuti)
+const AUTO_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 
 type ViewTab = 'all' | 'reading' | 'completed' | 'want';
 
@@ -192,100 +196,144 @@ export function Dashboard() {
     [rawBooks, pendingDeleteIds]
   );
 
-  const loadBooks = useCallback(async (showFullLoader = false) => {
-    if (showFullLoader) {
-      setLoading(true);
-    }
-    setIsSyncing(true);
+  const loadInFlightRef = useRef(false);
+  const lastSyncTimestampRef = useRef<number>(0);
 
-    try {
-      // Controlla anche se ci sono nuove versioni dell'app distribuite sul server
-      checkForAppUpdate().catch(() => {});
+  const loadBooks = useCallback(
+    async (showFullLoader = false, options?: { silent?: boolean; force?: boolean }) => {
+      const silent = options?.silent ?? false;
+      const force = options?.force ?? false;
 
-      const { data } = await supabase
-        .from('books')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const [storedLocalDates, storedLocalPages, storedLocalReadPages, storedLocalPlots, storedLocalTags, notesMeta] = await Promise.all([
-        getStoredDates(),
-        getStoredPages(),
-        getStoredReadPages(),
-        getStoredPlots(),
-        getStoredTags(),
-        fetchNotesMetadataFromSupabase(),
-      ]);
-
-      const booksWithDatesAndPages = (data ?? []).map((b) => ({
-        ...b,
-        read_at: b.read_at || notesMeta.dates[b.id] || storedLocalDates[b.id] || null,
-        pages: b.pages !== undefined && b.pages !== null ? Number(b.pages) : (notesMeta.pages[b.id] || storedLocalPages[b.id] || null),
-        read_pages: b.read_pages !== undefined && b.read_pages !== null
-          ? Number(b.read_pages)
-          : (notesMeta.readPages[b.id] !== undefined
-              ? notesMeta.readPages[b.id]
-              : (storedLocalReadPages[b.id] !== undefined
-                  ? storedLocalReadPages[b.id]
-                  : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
-        notes_count: notesMeta.counts[b.id] || 0,
-        plot: b.plot || notesMeta.plots[b.id] || storedLocalPlots[b.id] || null,
-        tags: notesMeta.tags[b.id] || storedLocalTags[b.id] || [],
-      }));
-
-      setBooks(booksWithDatesAndPages);
-      setLastSyncedAt(new Date());
-    } catch (err) {
-      console.error('Errore durante la sincronizzazione:', err);
-    } finally {
-      if (showFullLoader) {
-        setLoading(false);
+      if (loadInFlightRef.current && !force) {
+        return;
       }
-      setIsSyncing(false);
-    }
-  }, []);
+
+      if (!showFullLoader && !force && Date.now() - lastSyncTimestampRef.current < AUTO_SYNC_COOLDOWN_MS) {
+        return;
+      }
+
+      loadInFlightRef.current = true;
+      if (showFullLoader) {
+        setLoading(true);
+      }
+      if (!silent) {
+        setIsSyncing(true);
+      }
+
+      try {
+        // Controlla anche se ci sono nuove versioni dell'app distribuite sul server (solo su richiesta o avvio)
+        if (showFullLoader || force) {
+          checkForAppUpdate().catch(() => {});
+        }
+
+        const { data } = await supabase
+          .from('books')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        const [storedLocalDates, storedLocalPages, storedLocalReadPages, storedLocalPlots, storedLocalTags, notesMeta] = await Promise.all([
+          getStoredDates(),
+          getStoredPages(),
+          getStoredReadPages(),
+          getStoredPlots(),
+          getStoredTags(),
+          fetchNotesMetadataFromSupabase(),
+        ]);
+
+        const booksWithDatesAndPages = (data ?? []).map((b) => ({
+          ...b,
+          read_at: b.read_at || notesMeta.dates[b.id] || storedLocalDates[b.id] || null,
+          pages: b.pages !== undefined && b.pages !== null ? Number(b.pages) : (notesMeta.pages[b.id] || storedLocalPages[b.id] || null),
+          read_pages: b.read_pages !== undefined && b.read_pages !== null
+            ? Number(b.read_pages)
+            : (notesMeta.readPages[b.id] !== undefined
+                ? notesMeta.readPages[b.id]
+                : (storedLocalReadPages[b.id] !== undefined
+                    ? storedLocalReadPages[b.id]
+                    : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
+          notes_count: notesMeta.counts[b.id] || 0,
+          plot: b.plot || notesMeta.plots[b.id] || storedLocalPlots[b.id] || null,
+          tags: notesMeta.tags[b.id] || storedLocalTags[b.id] || [],
+        }));
+
+        setBooks(booksWithDatesAndPages);
+        const now = new Date();
+        lastSyncTimestampRef.current = now.getTime();
+        setLastSyncedAt(now);
+      } catch (err) {
+        console.error('Errore durante la sincronizzazione:', err);
+      } finally {
+        loadInFlightRef.current = false;
+        if (showFullLoader) {
+          setLoading(false);
+        }
+        if (!silent) {
+          setIsSyncing(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    loadBooks(true);
+    loadBooks(true, { force: true });
 
-    // 1. Sincronizzazione Realtime via Supabase (modifiche istantanee da qualsiasi dispositivo)
+    let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleSilentRealtimeSync = () => {
+      // Se l'evento Realtime proviene da una modifica appena fatta su questo dispositivo,
+      // lo stato locale è già aggiornato: evitiamo di riscaricare tutta la libreria e le note.
+      if (isRecentLocalMutation(5000)) {
+        return;
+      }
+      if (realtimeTimer) clearTimeout(realtimeTimer);
+      realtimeTimer = setTimeout(() => {
+        if (!isRecentLocalMutation(5000)) {
+          loadBooks(false, { silent: true, force: true });
+        }
+      }, 1500);
+    };
+
+    // 1. Sincronizzazione Realtime via Supabase (silenziosa in background)
     const channel = supabase
       .channel('books-realtime-sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'books' },
-        () => {
-          loadBooks(false);
-        }
+        scheduleSilentRealtimeSync
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notes' },
-        () => {
-          loadBooks(false);
-        }
+        scheduleSilentRealtimeSync
       )
       .subscribe();
 
-    // 2. Ricarica quando l'utente rimette in primo piano l'app o il browser
-    const handleVisibilityOrFocus = () => {
+    // 2. Ricarica silenziosamente in background quando si riapre l'app, ma solo se sono passati almeno 5 minuti
+    const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        loadBooks(false);
+        loadBooks(false, { silent: true });
       }
     };
 
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    window.addEventListener('online', handleVisibilityOrFocus);
+    const handleOnline = () => {
+      if (document.visibilityState === 'visible') {
+        loadBooks(false, { silent: true, force: true });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
 
     return () => {
+      if (realtimeTimer) clearTimeout(realtimeTimer);
       supabase.removeChannel(channel);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      window.removeEventListener('online', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
     };
   }, [loadBooks]);
 
   const handleAddBook = (book: Book) => {
+    markLocalMutation();
     setBooks((prev) => [{ ...book, notes_count: book.notes_count ?? 0 }, ...prev]);
     setShowAddModal(false);
     toast({ message: `"${book.title}" aggiunto alla libreria`, type: 'success' });
@@ -298,6 +346,7 @@ export function Dashboard() {
 
   // Avvia la lettura del prossimo libro in lista (da "Da leggere" a "In lettura")
   const handleStartReading = async (book: Book) => {
+    markLocalMutation();
     const { data, error } = await supabase
       .from('books')
       .update({ status: 'reading', updated_at: new Date().toISOString() })
@@ -315,6 +364,7 @@ export function Dashboard() {
   };
 
   const handleUpdateBook = useCallback((updated: Book) => {
+    markLocalMutation();
     setBooks((prev) =>
       prev.map((b) =>
         b.id === updated.id
@@ -328,6 +378,7 @@ export function Dashboard() {
 
   // Eliminazione definitiva (dopo il periodo di "Annulla")
   const finalizeDelete = useCallback(async (book: Book) => {
+    markLocalMutation();
     pendingDeletes.current.delete(book.id);
     const { error } = await supabase.from('books').delete().eq('id', book.id);
     if (error) {
@@ -502,7 +553,7 @@ export function Dashboard() {
             </button>
 
             <button
-              onClick={() => loadBooks(false)}
+              onClick={() => loadBooks(false, { force: true })}
               disabled={isSyncing}
               className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-200 light:text-stone-750 hover:text-white light:hover:text-stone-950 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-60 shadow-xs active:scale-95"
               title={
@@ -1344,7 +1395,7 @@ export function Dashboard() {
                 books={books}
                 goals={goals}
                 onRestoreCompleted={() => {
-                  loadBooks(true);
+                  loadBooks(true, { force: true });
                   refreshGoals();
                   setShowBackupModal(false);
                   toast({ message: 'Backup ripristinato con successo! Libreria aggiornata. 📚', type: 'success' });

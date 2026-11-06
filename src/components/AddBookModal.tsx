@@ -112,7 +112,7 @@ export function AddBookModal({
     }
 
     const q = title.trim();
-    if (q.length < 2) {
+    if (q.length < 3) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -129,7 +129,7 @@ export function AddBookModal({
       } catch {
         if (isMounted) setSuggestions([]);
       }
-    }, 320);
+    }, 450);
 
     return () => {
       isMounted = false;
@@ -137,34 +137,45 @@ export function AddBookModal({
     };
   }, [title, isEditing]);
 
-  const handleSelectSuggestion = (item: BookSuggestion) => {
+  const handleSelectSuggestion = async (item: BookSuggestion) => {
     justSelectedSuggestionRef.current = true;
     setTitle(item.title);
     if (item.author) setAuthor(item.author);
+    lastSearchedRef.current = `${item.title.toLowerCase()}::${(item.author || '').toLowerCase()}`;
+    setShowSuggestions(false);
+
+    if (item.coverUrl) {
+      setCoverUrl(item.coverUrl);
+      setCoverSource('auto');
+    }
+
     if (item.pages && item.pages > 0) {
       setPages(String(item.pages));
       setAutoDetectedPages(item.pages);
       setPagesManual(false);
       setPagesNotFound(false);
+    } else if (!pagesManual) {
+      // Se il suggerimento scelto (es. da Apple Books) non ha il numero di pagine, cerca solo le pagine
+      try {
+        const foundPages = await fetchBookPageCount(item.title, item.author);
+        if (foundPages && foundPages > 0) {
+          setPages(String(foundPages));
+          setAutoDetectedPages(foundPages);
+          setPagesNotFound(false);
+        }
+      } catch {}
     }
-    if (item.coverUrl) {
-      setCoverUrl(item.coverUrl);
-      setCoverSource('auto');
-      lastSearchedRef.current = `${item.title.toLowerCase()}::${item.author.toLowerCase()}`;
-    }
-    setShowSuggestions(false);
   };
 
-  // Ricerca automatica della copertina quando l'utente digita titolo e autore
+  // Ricerca automatica della copertina solo quando l'utente ha compilato sia titolo che autore manualmente
   useEffect(() => {
-    // Non sovrascrivere se l'utente ha modificato manualmente o se sta modificando un libro esistente
     if (isEditing && book?.cover_url) return;
     if (coverSource === 'manual' && coverUrl.trim()) return;
 
     const cleanTitle = title.trim();
     const cleanAuthor = author.trim();
 
-    if (!cleanTitle || cleanTitle.length < 2) return;
+    if (!cleanTitle || cleanTitle.length < 3 || cleanAuthor.length < 2) return;
 
     const queryKey = `${cleanTitle.toLowerCase()}::${cleanAuthor.toLowerCase()}`;
     if (lastSearchedRef.current === queryKey) return;
@@ -174,8 +185,8 @@ export function AddBookModal({
       setSearchingCover(true);
       try {
         const [foundCover, foundPages] = await Promise.allSettled([
-          fetchBookCover(cleanTitle, cleanAuthor),
-          fetchBookPageCount(cleanTitle, cleanAuthor),
+          coverUrl.trim() ? Promise.resolve(coverUrl) : fetchBookCover(cleanTitle, cleanAuthor),
+          !pagesManual && !pages.trim() ? fetchBookPageCount(cleanTitle, cleanAuthor) : Promise.resolve(null),
         ]);
 
         if (foundCover.status === 'fulfilled' && foundCover.value) {
@@ -193,10 +204,10 @@ export function AddBookModal({
       } finally {
         setSearchingCover(false);
       }
-    }, 600);
+    }, 900);
 
     return () => clearTimeout(timer);
-  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl, pagesManual]);
+  }, [title, author, isEditing, book?.cover_url, coverSource, coverUrl, pagesManual, pages]);
 
   // Cerca manualmente la copertina e le eventuali alternative
   const handleManualSearchCover = async () => {

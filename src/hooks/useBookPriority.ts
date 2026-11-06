@@ -13,15 +13,22 @@ import {
   shiftBookPosition,
 } from '@/lib/bookPriority';
 
+const PRIORITY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
+
 export function useBookPriority() {
   const [priorityOrder, setPriorityOrder] = useState<string[]>(() => getStoredWantPriority());
   const priorityRef = useRef<string[]>(priorityOrder);
 
   const [bestBooksOrder, setBestBooksOrderState] = useState<string[]>(() => getStoredBestBooksOrder());
   const bestBooksRef = useRef<string[]>(bestBooksOrder);
+  const lastRefreshRef = useRef<number>(0);
 
   // Sincronizza con i metadati remoti su Supabase
-  const refreshPriority = useCallback(async () => {
+  const refreshPriority = useCallback(async (force = false) => {
+    if (!force && Date.now() - lastRefreshRef.current < PRIORITY_SYNC_COOLDOWN_MS) {
+      return;
+    }
+    lastRefreshRef.current = Date.now();
     try {
       const { data, error } = await supabase.auth.getUser();
       if (error || !data.user) return;
@@ -43,15 +50,13 @@ export function useBookPriority() {
   }, []);
 
   useEffect(() => {
-    refreshPriority();
-    const onFocus = () => {
-      if (document.visibilityState === 'visible') refreshPriority();
+    refreshPriority(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshPriority(false);
     };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [refreshPriority]);
 

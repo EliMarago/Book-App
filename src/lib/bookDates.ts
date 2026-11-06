@@ -1,5 +1,17 @@
 import { supabase } from '@/lib/supabase';
 
+// Traccia il timestamp dell'ultima modifica effettuata localmente da questo dispositivo
+// per evitare che il canale Realtime ricarichi inutilmente tutta la libreria dopo un'azione locale.
+let lastLocalMutationAt = 0;
+
+export function markLocalMutation() {
+  lastLocalMutationAt = Date.now();
+}
+
+export function isRecentLocalMutation(windowMs = 5000): boolean {
+  return Date.now() - lastLocalMutationAt < windowMs;
+}
+
 export function getStoredDates(): Record<string, string> {
   try {
     const data = localStorage.getItem('books_read_at');
@@ -109,6 +121,7 @@ export function removeBookPlot(bookId: string) {
 }
 
 export async function syncBookPlotToSupabase(bookId: string, plot: string | null) {
+  markLocalMutation();
   saveBookPlot(bookId, plot);
   try {
     await supabase
@@ -118,6 +131,7 @@ export async function syncBookPlotToSupabase(bookId: string, plot: string | null
       .like('content', '__PLOT__:%');
 
     if (plot && plot.trim()) {
+      markLocalMutation();
       await supabase.from('notes').insert({
         book_id: bookId,
         content: `__PLOT__:${plot.trim()}`,
@@ -152,6 +166,7 @@ export function saveBookTags(bookId: string, tags: string[] | null) {
 }
 
 export async function syncBookTagsToSupabase(bookId: string, tags: string[] | null) {
+  markLocalMutation();
   saveBookTags(bookId, tags);
   try {
     await supabase
@@ -161,6 +176,7 @@ export async function syncBookTagsToSupabase(bookId: string, tags: string[] | nu
       .like('content', '__TAGS__:%');
 
     if (tags && tags.length > 0) {
+      markLocalMutation();
       await supabase.from('notes').insert({
         book_id: bookId,
         content: `__TAGS__:${JSON.stringify(tags)}`,
@@ -172,6 +188,7 @@ export async function syncBookTagsToSupabase(bookId: string, tags: string[] | nu
 }
 
 export async function syncBookReadPagesToSupabase(bookId: string, readPages: number | null) {
+  markLocalMutation();
   saveBookReadPages(bookId, readPages);
   try {
     await supabase
@@ -181,6 +198,7 @@ export async function syncBookReadPagesToSupabase(bookId: string, readPages: num
       .like('content', '__READ_PAGES__:%');
 
     if (readPages !== null && readPages !== undefined && readPages >= 0) {
+      markLocalMutation();
       await supabase.from('notes').insert({
         book_id: bookId,
         content: `__READ_PAGES__:${readPages}`,
@@ -192,6 +210,7 @@ export async function syncBookReadPagesToSupabase(bookId: string, readPages: num
 }
 
 export async function syncBookPagesToSupabase(bookId: string, pages: number | null) {
+  markLocalMutation();
   saveBookPages(bookId, pages);
   try {
     // Rimuoviamo eventuali note di sistema precedenti per le pagine di questo libro
@@ -202,6 +221,7 @@ export async function syncBookPagesToSupabase(bookId: string, pages: number | nu
       .like('content', '__PAGES__:%');
 
     if (pages !== null && pages !== undefined && pages > 0) {
+      markLocalMutation();
       // Inseriamo il conteggio pagine come nota di sistema in Supabase per persistenza di backup
       await supabase.from('notes').insert({
         book_id: bookId,
@@ -214,6 +234,7 @@ export async function syncBookPagesToSupabase(bookId: string, pages: number | nu
 }
 
 export async function syncBookDateToSupabase(bookId: string, readAt: string | null) {
+  markLocalMutation();
   saveBookDate(bookId, readAt);
   try {
     // Rimuoviamo eventuali note di sistema precedenti per questo libro
@@ -224,6 +245,7 @@ export async function syncBookDateToSupabase(bookId: string, readAt: string | nu
       .like('content', '__READ_AT__:%');
 
     if (readAt) {
+      markLocalMutation();
       // Inseriamo la nuova data come nota di sistema in Supabase
       await supabase.from('notes').insert({
         book_id: bookId,

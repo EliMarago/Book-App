@@ -1,6 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import {
+  supabase,
+  isRememberMeEnabled,
+  setRememberMePreference,
+  setExplicitSignOut,
+  SESSION_BACKUP_KEY,
+} from '@/lib/supabase';
 
 type AuthContextType = {
   session: Session | null;
@@ -10,7 +16,7 @@ type AuthContextType = {
   recoveryError: string | null;
   clearRecoveryError: () => void;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   verifyRecoveryOtp: (email: string, token: string) => Promise<{ error: string | null }>;
@@ -20,20 +26,77 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getBackupSessionObject(): Session | null {
+  try {
+    if (!isRememberMeEnabled()) return null;
+    const raw = localStorage.getItem(SESSION_BACKUP_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.access_token && parsed.refresh_token && parsed.user) {
+      return parsed as Session;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(() => getBackupSessionObject());
+  const [loading, setLoading] = useState(() => !getBackupSessionObject());
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const explicitSignOutRef = useRef(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) {
+        setSession(data.session);
+        setLoading(false);
+        return;
+      }
+
+      // Se "Ricordami" è attivo e la sessione primaria non è stata trovata (es. risveglio da standby),
+      // proviamo a ripristinarla dal backup locale senza disconnettere l'utente.
+      const backup = getBackupSessionObject();
+      if (backup && !explicitSignOutRef.current) {
+        setSession(backup);
+        setLoading(false);
+        if (navigator.onLine) {
+          supabase.auth
+            .setSession({
+              access_token: backup.access_token,
+              refresh_token: backup.refresh_token,
+            })
+            .then(({ data: restored }) => {
+              if (restored.session) {
+                setSession(restored.session);
+              }
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
+      setSession(null);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession);
+      if (newSession) {
+        setSession(newSession);
+      } else if (explicitSignOutRef.current || !isRememberMeEnabled()) {
+        setSession(null);
+      } else {
+        // Evita che uno sbalzo temporaneo di rete durante il refresh del token butti fuori l'utente
+        const backup = getBackupSessionObject();
+        if (backup) {
+          setSession(backup);
+        } else {
+          setSession(null);
+        }
+      }
+
       if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordRecovery(true);
         setRecoveryError(null);
@@ -109,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'Variabili di ambiente mancanti: crea il file .env con VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
       };
     }
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) {
       if (error.message.includes('Failed to fetch')) {
         return {
@@ -122,14 +185,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, rememberMe = true) => {
     if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
       return {
         error:
           'Variabili di ambiente mancanti: crea il file .env con VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY per connetterti al database.',
       };
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    explicitSignOutRef.current = false;
+    setExplicitSignOut(false);
+    setRememberMePreference(rememberMe, email);
+
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
       if (error.message.includes('Failed to fetch')) {
         return {
@@ -245,9 +312,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    explicitSignOutRef.current = true;
+    setExplicitSignOut(true);
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore network error on signout
+    }
+    try {
+      const sensitiveKeys = [
+        SESSION_BACKUP_KEY,
+        'books_read_at',
+        'books_pages',
+        'books_read_pages',
+        'books_plots',
+        'books_tags',
+        'reading_goals',
+        'books_want_priority',
+        'books_best_order',
+        'bookshelf_book_details_it_v10',
+      ];
+      for (const k of sensitiveKeys) {
+        localStorage.removeItem(k);
+      }
+    } catch {
+      // ignore storage errors
+    }
+    setSession(null);
     setIsPasswordRecovery(false);
     setRecoveryError(null);
+    setExplicitSignOut(false);
   };
 
   return (

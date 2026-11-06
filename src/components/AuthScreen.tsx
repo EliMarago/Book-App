@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   BookOpen,
   Mail,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { getRememberedEmail, isRememberMeEnabled } from '@/lib/supabase';
 import { APP_VERSION_LABEL } from '@/version';
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'update-password';
@@ -26,11 +27,16 @@ interface AuthScreenProps {
   initialMode?: AuthMode;
 }
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 60 * 1000;
+const LOCKOUT_STORAGE_KEY = 'bookshelf_auth_lockout_until';
+const ATTEMPTS_STORAGE_KEY = 'bookshelf_auth_failed_attempts';
+
 function calculatePasswordStrength(pass: string): { score: number; label: string; color: string } {
   if (!pass) return { score: 0, label: '', color: '' };
   let score = 0;
-  if (pass.length >= 6) score += 1;
   if (pass.length >= 8) score += 1;
+  if (pass.length >= 10) score += 1;
   if (/[0-9]/.test(pass)) score += 1;
   if (/[^A-Za-z0-9]/.test(pass)) score += 1;
 
@@ -52,8 +58,9 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => getRememberedEmail());
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState<boolean>(() => isRememberMeEnabled());
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +68,32 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState<number>(() => {
+    try {
+      const until = Number(sessionStorage.getItem(LOCKOUT_STORAGE_KEY) || 0);
+      return until > Date.now() ? Math.ceil((until - Date.now()) / 1000) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      try {
+        const until = Number(sessionStorage.getItem(LOCKOUT_STORAGE_KEY) || 0);
+        const remaining = until > Date.now() ? Math.ceil((until - Date.now()) / 1000) : 0;
+        setLockoutSeconds(remaining);
+        if (remaining <= 0) {
+          sessionStorage.removeItem(LOCKOUT_STORAGE_KEY);
+          sessionStorage.removeItem(ATTEMPTS_STORAGE_KEY);
+        }
+      } catch {
+        setLockoutSeconds(0);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
 
   const isSupabaseConfigured = Boolean(
     import.meta.env.VITE_SUPABASE_URL &&
@@ -111,14 +144,51 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
+
+    if (mode === 'signin' && lockoutSeconds > 0) {
+      setError(`Troppi tentativi falliti. Riprova tra ${lockoutSeconds} secondi.`);
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (mode === 'signin') {
-        const { error: err } = await signIn(email, password);
-        if (err) setError(err);
+        const { error: err } = await signIn(email.trim(), password, rememberMe);
+        if (err) {
+          try {
+            const currentAttempts = Number(sessionStorage.getItem(ATTEMPTS_STORAGE_KEY) || 0) + 1;
+            if (currentAttempts >= MAX_LOGIN_ATTEMPTS) {
+              const until = Date.now() + LOCKOUT_DURATION_MS;
+              sessionStorage.setItem(LOCKOUT_STORAGE_KEY, String(until));
+              sessionStorage.setItem(ATTEMPTS_STORAGE_KEY, '0');
+              setLockoutSeconds(Math.ceil(LOCKOUT_DURATION_MS / 1000));
+              setError('Troppi tentativi di accesso non riusciti. Accesso temporaneamente bloccato per 60 secondi.');
+            } else {
+              sessionStorage.setItem(ATTEMPTS_STORAGE_KEY, String(currentAttempts));
+              const remainingAttempts = MAX_LOGIN_ATTEMPTS - currentAttempts;
+              setError(
+                remainingAttempts <= 2
+                  ? `Credenziali non valide (${remainingAttempts} ${remainingAttempts === 1 ? 'tentativo rimasto' : 'tentativi rimasti'} prima del blocco temporaneo).`
+                  : 'Email o password non corretti.'
+              );
+            }
+          } catch {
+            setError(err);
+          }
+        } else {
+          try {
+            sessionStorage.removeItem(ATTEMPTS_STORAGE_KEY);
+            sessionStorage.removeItem(LOCKOUT_STORAGE_KEY);
+          } catch {}
+        }
       } else if (mode === 'signup') {
-        const { error: err } = await signUp(email, password);
+        if (password.length < 8) {
+          setError('La password deve contenere almeno 8 caratteri.');
+          setLoading(false);
+          return;
+        }
+        const { error: err } = await signUp(email.trim(), password);
         if (err) {
           setError(err);
         } else {
@@ -137,8 +207,8 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           );
         }
       } else if (mode === 'update-password') {
-        if (password.length < 6) {
-          setError('La password deve contenere almeno 6 caratteri.');
+        if (password.length < 8) {
+          setError('La nuova password deve contenere almeno 8 caratteri.');
           setLoading(false);
           return;
         }
@@ -302,6 +372,8 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                   />
                   <input
                     type="email"
+                    name="email"
+                    autoComplete="username"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -338,12 +410,14 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                   />
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                     required
-                    minLength={6}
+                    minLength={mode === 'signin' ? 6 : 8}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-10 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
-                    placeholder="Minimo 6 caratteri"
+                    placeholder={mode === 'signin' ? 'Inserisci la tua password' : 'Minimo 8 caratteri'}
                   />
                   <button
                     type="button"
@@ -355,6 +429,21 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+
+                {/* Spunta "Ricordami" visibile in modalità login */}
+                {mode === 'signin' && (
+                  <label className="inline-flex items-center gap-2.5 mt-3 cursor-pointer select-none group">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-stone-700 light:border-stone-300 bg-stone-950/60 light:bg-white text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0 accent-amber-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium text-stone-300 light:text-stone-700 group-hover:text-stone-100 light:group-hover:text-stone-900 transition-colors">
+                      Ricordami e mantieni l'accesso su questo dispositivo
+                    </span>
+                  </label>
+                )}
 
                 {/* Indicatore di forza password in tempo reale (signup e update-password) */}
                 {(mode === 'signup' || mode === 'update-password') && password.length > 0 && (
@@ -386,8 +475,10 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                   />
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    name="confirmPassword"
+                    autoComplete="new-password"
                     required
-                    minLength={6}
+                    minLength={8}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
@@ -486,13 +577,18 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               /* Pulsante di invio principale standard */
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (mode === 'signin' && lockoutSeconds > 0)}
                 className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-450 hover:from-amber-450 hover:to-amber-400 active:scale-98 disabled:opacity-50 text-stone-950 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 mt-2"
               >
                 {loading ? (
                   <>
                     <Loader2 size={18} className="animate-spin text-stone-950" />
                     <span>Elaborazione in corso...</span>
+                  </>
+                ) : mode === 'signin' && lockoutSeconds > 0 ? (
+                  <>
+                    <Lock size={17} />
+                    <span>Attendi {lockoutSeconds}s per riprovare</span>
                   </>
                 ) : mode === 'signin' ? (
                   <>

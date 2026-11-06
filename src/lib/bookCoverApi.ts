@@ -7,14 +7,22 @@ const GOOGLE_BOOKS_API_KEY = (
   import.meta.env.VITE_GOOGLE_BOOKS_API_KEY as string | undefined
 )?.trim();
 
+// Se la chiave API restituisce 403 (es. dominio non autorizzato nel referrer), memorizziamo lo stato
+// per tutta la sessione così da non sprecare chiamate doppie su ogni singola richiesta.
+let googleKeyRejected = false;
+
 export function getGoogleBooksUrl(query: string, extraParams = ''): string {
   const base = `https://www.googleapis.com/books/v1/volumes?q=${query}${extraParams}`;
-  return GOOGLE_BOOKS_API_KEY ? `${base}&key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}` : base;
+  return GOOGLE_BOOKS_API_KEY && !googleKeyRejected
+    ? `${base}&key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}`
+    : base;
 }
 
 export function getGoogleBooksVolumeUrl(volumeId: string): string {
   const base = `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volumeId)}`;
-  return GOOGLE_BOOKS_API_KEY ? `${base}?key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}` : base;
+  return GOOGLE_BOOKS_API_KEY && !googleKeyRejected
+    ? `${base}?key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}`
+    : base;
 }
 
 /**
@@ -49,8 +57,18 @@ async function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    let response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
+
+    // Se la chiave API viene rifiutata con 403, disattivala per la sessione e riprova una sola volta senza chiave
+    if (googleUrl && response.status === 403 && !googleKeyRejected && url.includes('key=')) {
+      googleKeyRejected = true;
+      const strippedUrl = url.replace(/([?&])key=[^&]+(&|$)/, (_, prefix, suffix) =>
+        suffix ? prefix : ''
+      );
+      return fetchWithTimeout(strippedUrl, timeoutMs);
+    }
+
     if (googleUrl && response.status === 429) {
       googleCooldownUntil = Date.now() + GOOGLE_COOLDOWN_MS;
     }
@@ -77,30 +95,23 @@ async function searchAppleBooks(title: string, author?: string): Promise<string 
       }
     }
 
-    const titleVariants = getTitleSearchVariants(cleanTitle);
-    const searchTerms: string[] = [];
-    for (const v of titleVariants) {
-      if (cleanAuthor) searchTerms.push(`${v} ${cleanAuthor}`.trim());
-      searchTerms.push(v);
-    }
-    if (cleanAuthor) searchTerms.push(cleanAuthor);
+    const primaryTerm = cleanAuthor ? `${cleanTitle} ${cleanAuthor}`.trim() : cleanTitle;
+    if (!primaryTerm) return null;
 
     for (const country of ['it', 'us']) {
-      for (const term of searchTerms.slice(0, 3)) {
-        const query = encodeURIComponent(term);
-        const url = `https://itunes.apple.com/search?term=${query}&entity=ebook&country=${country}&limit=3`;
+      const query = encodeURIComponent(primaryTerm);
+      const url = `https://itunes.apple.com/search?term=${query}&entity=ebook&country=${country}&limit=4`;
 
-        const res = await fetchWithTimeout(url, 3500);
-        if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, 3500);
+      if (!res.ok) continue;
 
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          for (const item of data.results) {
-            if (item.artworkUrl100) {
-              return item.artworkUrl100
-                .replace('100x100bb', '600x600bb')
-                .replace('http://', 'https://');
-            }
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        for (const item of data.results) {
+          if (item.artworkUrl100) {
+            return item.artworkUrl100
+              .replace('100x100bb', '600x600bb')
+              .replace('http://', 'https://');
           }
         }
       }
@@ -1246,36 +1257,11 @@ async function fetchDetailsFromGoogleBooks(
       q: `${primaryTitle} ${cleanAuthor}`,
       langRestrict: 'it',
     });
-    if (authorKey && authorKey !== cleanAuthor) {
-      querySpecs.push({
-        q: `${primaryTitle} ${authorKey}`,
-        langRestrict: 'it',
-      });
-    }
-    querySpecs.push({
-      q: `intitle:${primaryTitle} inauthor:${authorKey || cleanAuthor}`,
-      langRestrict: 'it',
-    });
-    // Senza langRestrict per individuare edizioni italiane prive di tag "it"
+    // Fallback senza langRestrict per individuare edizioni italiane prive di tag "it" o sinossi originale
     querySpecs.push({
       q: `${primaryTitle} ${cleanAuthor}`,
     });
-    querySpecs.push({
-      q: `"${primaryTitle}" ${authorKey || cleanAuthor}`,
-    });
-    querySpecs.push({
-      q: primaryTitle,
-    });
-  }
-
-  for (const variant of titleVariants.slice(1, 3)) {
-    querySpecs.push({
-      q: authorKey ? `${variant} ${authorKey}` : variant,
-      langRestrict: 'it',
-    });
-  }
-
-  if (!cleanAuthor) {
+  } else {
     querySpecs.push({ q: primaryTitle, langRestrict: 'it' });
     querySpecs.push({ q: primaryTitle });
   }
@@ -1429,19 +1415,12 @@ async function fetchDetailsFromGoogleBooks(
     }
   }
 
-  // Se la ricerca per lista non ha restituito una trama lunga, controlliamo il volume singolo per i volumi top
+  // Se la ricerca per lista non ha restituito una trama lunga, controlliamo il volume singolo per i primi 2 volumi
   if ((!bestWithPlot?.description || bestWithPlot.description.length < 100) && volumeIdsToInspect.length > 0) {
     const detailResults = await Promise.allSettled(
-      volumeIdsToInspect.slice(0, 5).map(async (volId) => {
+      volumeIdsToInspect.slice(0, 2).map(async (volId) => {
         const url = getGoogleBooksVolumeUrl(volId);
-        let res = await fetchWithTimeout(url, 3500);
-        if (res.status === 403 && GOOGLE_BOOKS_API_KEY) {
-          const fallbackRes = await fetchWithTimeout(
-            `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volId)}`,
-            3500
-          ).catch(() => null);
-          if (fallbackRes && fallbackRes.ok) res = fallbackRes;
-        }
+        const res = await fetchWithTimeout(url, 3500);
         if (!res.ok) return null;
         return res.json();
       })
@@ -1502,12 +1481,10 @@ async function fetchDetailsFromAppleBooks(
     new Set(
       [
         cleanAuthor ? `${primaryTitle} ${cleanAuthor}`.trim() : '',
-        authorKey ? `${primaryTitle} ${authorKey}`.trim() : '',
-        ...titleVariants.slice(1, 3).map((v) => (authorKey ? `${v} ${authorKey}`.trim() : v)),
         primaryTitle,
       ].filter(Boolean)
     )
-  );
+  ).slice(0, 2);
 
   let bestMatch: BookDetails | null = null;
   let bestQualityScore = 0;
@@ -1601,14 +1578,10 @@ async function fetchDetailsFromWikipediaIt(
     new Set(
       [
         authorKey ? `${primaryTitle} ${authorKey} romanzo` : '',
-        authorKey ? `${primaryTitle} ${authorKey}` : '',
         `${primaryTitle} romanzo`,
-        `${primaryTitle} libro`,
-        ...titleVariants.slice(1, 3).map((v) => (authorKey ? `${v} ${authorKey}` : `${v} romanzo`)),
-        primaryTitle,
       ].filter(Boolean)
     )
-  );
+  ).slice(0, 2);
 
   const candidatePages: Array<{ pageId: number; priority: number; isDedicatedBookPage: boolean }> = [];
   const seenPageIds = new Set<number>();
@@ -1873,7 +1846,7 @@ export async function fetchBookDetails(
 
   if (!forceRefresh) {
     const cached = detailsCache.get(cacheKey);
-    if (cached && cached.description) {
+    if (cached) {
       return cached;
     }
     const stored = loadStoredDetailsCache();
@@ -1965,9 +1938,10 @@ export async function fetchBookDetails(
     }
   }
 
-  // Salviamo in cache se abbiamo una trama verificata
+  // Salviamo sempre in memoria nella sessione corrente (anche se senza trama, per non rifare 10 chiamate riaprendo lo stesso libro)
+  // e in localStorage se abbiamo trovato una trama verificata.
+  detailsCache.set(cacheKey, merged);
   if (merged.description) {
-    detailsCache.set(cacheKey, merged);
     saveDetailsToStorage(cacheKey, merged);
   }
 
@@ -1984,6 +1958,8 @@ export interface BookSuggestion {
   source?: string;
 }
 
+const suggestionsCache = new Map<string, BookSuggestion[]>();
+
 /**
  * Ricerca suggerimenti di autocompletamento libri (Titolo, Autore, Copertina, Pagine)
  * interrogando Apple Books (IT/US), Open Library e Google Books per compilazione istantanea 1-tap.
@@ -1992,10 +1968,14 @@ export async function searchBookSuggestions(query: string): Promise<BookSuggesti
   const raw = sanitizeQuery(query);
   if (!raw || raw.length < 2) return [];
 
+  const cacheKey = raw.toLowerCase();
+  if (suggestionsCache.has(cacheKey)) {
+    return suggestionsCache.get(cacheKey)!;
+  }
+
   const { title: parsedTitle, author: parsedAuthor } = parseTitleAndAuthorQuery(raw);
   const primaryTitle = parsedTitle || raw;
   const primaryAuthor = parsedAuthor;
-  const titleVariants = getTitleSearchVariants(primaryTitle);
 
   const seen = new Set<string>();
   const results: BookSuggestion[] = [];
@@ -2007,24 +1987,13 @@ export async function searchBookSuggestions(query: string): Promise<BookSuggesti
     results.push(s);
   };
 
-  // 1. Apple Books (IT + US) - Istantaneo, copertine 600x600 in alta risoluzione, immune a blocchi di quota 429
+  // 1. Apple Books (IT + eventuale fallback US) - 1 sola richiesta rapida invece di 10
   try {
-    const searchTerms: string[] = [];
-    if (primaryAuthor) {
-      for (const v of titleVariants) {
-        searchTerms.push(`${v} ${primaryAuthor}`.trim());
-      }
-      searchTerms.push(primaryAuthor);
-    }
-    for (const v of titleVariants) {
-      searchTerms.push(v);
-    }
-
+    const term = primaryAuthor ? `${primaryTitle} ${primaryAuthor}`.trim() : primaryTitle;
     for (const country of ['it', 'us']) {
-      for (const term of searchTerms.slice(0, 5)) {
-        const appleUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=ebook&country=${country}&limit=6`;
-        const res = await fetchWithTimeout(appleUrl, 3200);
-        if (!res.ok) continue;
+      const appleUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=ebook&country=${country}&limit=6`;
+      const res = await fetchWithTimeout(appleUrl, 3200);
+      if (res.ok) {
         const data = await res.json();
         for (const item of data.results || []) {
           if (!item.trackName || !item.artistName) continue;
@@ -2046,7 +2015,7 @@ export async function searchBookSuggestions(query: string): Promise<BookSuggesti
           });
         }
       }
-      if (results.length >= 8) break;
+      if (results.length >= 4) break;
     }
   } catch {}
 
@@ -2127,7 +2096,9 @@ export async function searchBookSuggestions(query: string): Promise<BookSuggesti
     });
   }
 
-  return results.slice(0, 8);
+  const finalSuggestions = results.slice(0, 8);
+  suggestionsCache.set(cacheKey, finalSuggestions);
+  return finalSuggestions;
 }
 
 export interface PlotSearchResult {
@@ -2182,7 +2153,7 @@ export async function searchBookPlotsOnline(
         }
 
         for (const country of ['it', 'us']) {
-          for (const term of terms.slice(0, 5)) {
+          for (const term of terms.slice(0, 2)) {
             const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=ebook&country=${country}&limit=8`;
             const data = await fetchItunesSearch(url, 3800);
             if (!data?.results || !Array.isArray(data.results)) continue;
