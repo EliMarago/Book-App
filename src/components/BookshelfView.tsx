@@ -14,6 +14,7 @@ import {
   Calendar,
   ArrowRight,
   Medal,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
@@ -21,6 +22,17 @@ import { CoverImage } from './CoverImage';
 import { EmptyReadingShelf } from './EmptyReadingShelf';
 import { optimizeCoverUrl } from '@/lib/coverUrl';
 import { orderWantBooks, orderBestBooks, reorderBookIds, shiftBookPosition } from '@/lib/bookPriority';
+import {
+  BookshelfDecoration,
+  ChristmasShelfLights,
+  getAutoHoliday,
+  type BookshelfHoliday,
+} from './BookshelfDecorations';
+import {
+  BookshelfCustomizationModal,
+  DEFAULT_BOOKSHELF_CUSTOMIZATION,
+  type BookshelfCustomization,
+} from './BookshelfCustomizationModal';
 
 // Palette predefinita per i dorsi dei libri quando non c'è una copertina
 const SPINE_PALETTES = [
@@ -234,6 +246,47 @@ export function BookshelfView({
       // ignore
     }
   };
+
+  // Personalizzazione avanzata della libreria (legno, sfondo, festività, decorazioni, luci)
+  const [customization, setCustomization] = useState<BookshelfCustomization>(() => {
+    try {
+      const saved = localStorage.getItem('bookapp_bookshelf_customization_v2');
+      if (saved) {
+        return {
+          ...DEFAULT_BOOKSHELF_CUSTOMIZATION,
+          ...JSON.parse(saved),
+        };
+      }
+      const oldHoliday = localStorage.getItem('bookapp_bookshelf_holiday');
+      if (oldHoliday) {
+        return {
+          ...DEFAULT_BOOKSHELF_CUSTOMIZATION,
+          holiday: oldHoliday as BookshelfHoliday,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_BOOKSHELF_CUSTOMIZATION;
+  });
+
+  const [isCustomizing, setIsCustomizing] = useState(false);
+
+  const handleUpdateCustomization = (newCustomization: BookshelfCustomization) => {
+    setCustomization(newCustomization);
+    try {
+      localStorage.setItem('bookapp_bookshelf_customization_v2', JSON.stringify(newCustomization));
+      localStorage.setItem('bookapp_bookshelf_holiday', newCustomization.holiday);
+    } catch {
+      // ignore
+    }
+  };
+
+  const autoHoliday = useMemo(() => getAutoHoliday(), []);
+  const activeHoliday = customization.holiday === 'auto' ? autoHoliday : customization.holiday;
+  const showLights =
+    customization.lights === 'always' ||
+    (customization.lights === 'auto' && activeHoliday === 'christmas');
 
   // Libro attualmente selezionato per ispezione dettagliata
   const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
@@ -538,7 +591,7 @@ export function BookshelfView({
     <div className="space-y-6">
       {/* BARRA CONTROLLI DELLO SCAFFALE */}
       <div className="flex flex-col gap-2.5 bg-stone-850/80 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
               <Library size={15} />
@@ -547,46 +600,60 @@ export function BookshelfView({
               <span className="font-serif font-bold text-xs xs:text-sm sm:text-base text-stone-100 light:text-stone-900 truncate">
                 Scaffale Virtuale
               </span>
-              <span className="hidden xs:inline text-stone-500 light:text-stone-400 text-[11px] sm:text-xs shrink-0">
+              <span className="text-stone-500 light:text-stone-400 text-[11px] sm:text-xs shrink-0">
                 · {books.length} {books.length === 1 ? 'libro' : 'libri'}
               </span>
             </div>
           </div>
 
-          {/* Toggle Stile Scaffale: Copertine vs Dorsi */}
-          <div className="flex items-center gap-1 bg-stone-900/90 light:bg-stone-100 p-0.5 sm:p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
+          {/* Controlli Scaffale: Personalizza + Toggle Copertine/Dorsi */}
+          <div className="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto pt-1 xs:pt-0 border-t xs:border-t-0 border-stone-800/40 light:border-stone-200/50">
+            {/* Pulsante Personalizzazione Libreria (Legno, Parete, Tema, Luci, Dettagli) */}
             <button
               type="button"
-              onClick={() => handleShelfStyleChange('covers')}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                shelfStyle === 'covers'
-                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-              }`}
-              title="Mostra copertine frontali dei libri sullo scaffale"
+              onClick={() => setIsCustomizing(true)}
+              className="flex items-center gap-1.5 px-3 py-1 sm:py-1.5 rounded-xl border border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-300 light:text-stone-700 hover:text-white light:hover:text-stone-950 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+              title="Personalizza l'aspetto della libreria (legno, sfondo, decorazioni)"
             >
-              <BookOpen size={13} />
-              <span>Copertine</span>
+              <SlidersHorizontal size={13} className="text-amber-400 light:text-amber-600" />
+              <span>Personalizza</span>
             </button>
-            <button
-              type="button"
-              onClick={() => handleShelfStyleChange('spines')}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                shelfStyle === 'spines'
-                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-              }`}
-              title="Mostra i dorsi dei libri come in una vera libreria fisica"
-            >
-              <Layers size={13} />
-              <span>Dorsi</span>
-            </button>
+
+            {/* Toggle Stile Scaffale: Copertine vs Dorsi */}
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-stone-900/90 light:bg-stone-100 p-0.5 sm:p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => handleShelfStyleChange('covers')}
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  shelfStyle === 'covers'
+                    ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                    : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
+                title="Mostra copertine frontali dei libri sullo scaffale"
+              >
+                <BookOpen size={13} />
+                <span>Copertine</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleShelfStyleChange('spines')}
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  shelfStyle === 'spines'
+                    ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                    : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
+                title="Mostra i dorsi dei libri come in una vera libreria fisica"
+              >
+                <Layers size={13} />
+                <span>Dorsi</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Filtro Anno Dinamico nella vista Libri Letti: si aggiorna da solo ogni anno */}
         {activeTab === 'completed' && availableYears.length > 0 && (
-          <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin pt-2 border-t border-stone-800/60 light:border-stone-200/60 overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+          <div className="w-full flex items-center gap-1.5 overflow-x-auto overflow-y-hidden pb-0.5 scrollbar-thin pt-2 border-t border-stone-800/60 light:border-stone-200/60 touch-manipulation">
             <span className="text-[11px] font-medium text-stone-400 light:text-stone-600 flex items-center gap-1 shrink-0 mr-1">
               <Calendar size={12} className="text-emerald-400 light:text-emerald-600" />
               Anno:
@@ -635,10 +702,18 @@ export function BookshelfView({
         )}
       </div>
 
-      {/* STRUTTURA DELLA LIBRERIA A SCAFFALI IN LEGNO */}
-      <div className="bg-gradient-to-b from-[#1a120c] via-[#140e09] to-[#0e0a06] light:from-[#faf6f0] light:via-[#f5eee4] light:to-[#eee3d3] border-4 border-[#2d1b11] light:border-[#d4b595] rounded-3xl p-4 sm:p-7 shadow-2xl relative overflow-hidden">
-        {/* Effetto luce ambientale calda dall'alto */}
-        <div className="absolute top-0 left-1/4 right-1/4 h-28 bg-amber-500/10 light:bg-amber-400/15 blur-3xl pointer-events-none" />
+      {/* STRUTTURA DELLA LIBRERIA A MENSOLE SOSPESE IN LEGNO (SFONDO PERSONALIZZABILE) */}
+      <div
+        className={
+          customization.background === 'brick'
+            ? 'bookshelf-brick-wall rounded-3xl p-3 sm:p-7 shadow-2xl transition-all duration-300'
+            : customization.background === 'boiserie'
+              ? 'bookshelf-wall-boiserie rounded-3xl p-3 sm:p-7 shadow-2xl transition-all duration-300'
+              : customization.background === 'plaster'
+                ? 'bookshelf-wall-plaster rounded-3xl p-3 sm:p-7 shadow-2xl transition-all duration-300'
+                : 'relative'
+        }
+      >
 
         {books.length === 0 ? (
           /* Scaffale vuoto */
@@ -662,7 +737,7 @@ export function BookshelfView({
           </div>
         ) : (
           <div className="space-y-12 sm:space-y-16 relative z-10">
-            {shelfSections.map((section) => {
+            {shelfSections.map((section, sectionIdx) => {
               const SectionIcon = section.icon;
               const accentBadge =
                 section.accent === 'emerald'
@@ -813,6 +888,13 @@ export function BookshelfView({
                   )}
 
                   {/* LIBRI APPOGGIATI SUL RIPIANO */}
+                  {/* Lucine festive natalizie animate sopra i libri se attive */}
+                  {showLights && (
+                    <div className="relative -mb-2 z-20 pointer-events-none px-1">
+                      <ChristmasShelfLights />
+                    </div>
+                  )}
+
                   {section.id === 'reading' && section.books.length === 0 ? (
                     /* Ripiano "In lettura" vuoto: propone le prossime letture */
                     <EmptyReadingShelf
@@ -824,233 +906,234 @@ export function BookshelfView({
                     />
                   ) : shelfStyle === 'covers' ? (
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
-                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-5 items-end px-2 pt-4 pb-2 min-h-[220px]">
-                      {section.books.map((book, bookIdx) => {
-                        const spine = getBookSpineStyle(book.id, book.title);
-                        const isWantSection = section.id === 'want';
-                        const isBestSection = section.id === 'best-completed';
-                        const isDraggable =
-                          (isWantSection && isReorderingWant) ||
-                          (isBestSection && isReorderingBest);
-                        const priorityRank = isWantSection ? bookIdx + 1 : null;
-                        const bestRank = isBestSection ? bookIdx + 1 : null;
+                    <div className="rounded-2xl pt-4 pb-2 px-1 sm:px-3 mb-0.5 relative">
+                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-5 items-end px-1 sm:px-2 pt-2 pb-1 min-h-[200px]">
+                        {section.books.map((book, bookIdx) => {
+                          const spine = getBookSpineStyle(book.id, book.title);
+                          const isWantSection = section.id === 'want';
+                          const isBestSection = section.id === 'best-completed';
+                          const isDraggable =
+                            (isWantSection && isReorderingWant) ||
+                            (isBestSection && isReorderingBest);
+                          const priorityRank = isWantSection ? bookIdx + 1 : null;
+                          const bestRank = isBestSection ? bookIdx + 1 : null;
 
-                        const isBeingDragged =
-                          (isWantSection && draggedBookId === book.id) ||
-                          (isBestSection && draggedBestBookId === book.id);
-                        const isDragOver =
-                          (isWantSection && dragOverBookId === book.id) ||
-                          (isBestSection && dragOverBestBookId === book.id);
+                          const isBeingDragged =
+                            (isWantSection && draggedBookId === book.id) ||
+                            (isBestSection && draggedBestBookId === book.id);
+                          const isDragOver =
+                            (isWantSection && dragOverBookId === book.id) ||
+                            (isBestSection && dragOverBestBookId === book.id);
 
-                        return (
-                          <div
-                            key={book.id}
-                            role="button"
-                            tabIndex={0}
-                            draggable={isDraggable}
-                            onDragStart={(e) => {
-                              if (!isDraggable) return;
-                              e.dataTransfer.setData('text/plain', book.id);
-                              e.dataTransfer.effectAllowed = 'move';
-                              if (isBestSection) setDraggedBestBookId(book.id);
-                              else if (isWantSection) setDraggedBookId(book.id);
-                            }}
-                            onDragOver={(e) => {
-                              if (!isDraggable) return;
-                              e.preventDefault();
-                              e.dataTransfer.dropEffect = 'move';
-                              if (isBestSection) {
-                                if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
-                              } else if (isWantSection) {
-                                if (dragOverBookId !== book.id) setDragOverBookId(book.id);
-                              }
-                            }}
-                            onDragLeave={(e) => {
-                              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                              if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
-                              else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
-                            }}
-                            onDrop={(e) => {
-                              if (!isDraggable) return;
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const sourceId =
-                                e.dataTransfer.getData('text/plain') ||
-                                (isBestSection ? draggedBestBookId : draggedBookId);
-                              if (sourceId && sourceId !== book.id) {
-                                if (isBestSection) handleBestDropReorder(sourceId, book.id);
-                                else if (isWantSection) handleDropReorder(sourceId, book.id);
-                              }
-                              setDraggedBookId(null);
-                              setDragOverBookId(null);
-                              setDraggedBestBookId(null);
-                              setDragOverBestBookId(null);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedBookId(null);
-                              setDragOverBookId(null);
-                              setDraggedBestBookId(null);
-                              setDragOverBestBookId(null);
-                            }}
-                            onClick={() => setInspectingBook(book)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
+                          return (
+                            <div
+                              key={book.id}
+                              role="button"
+                              tabIndex={0}
+                              draggable={isDraggable}
+                              onDragStart={(e) => {
+                                if (!isDraggable) return;
+                                e.dataTransfer.setData('text/plain', book.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                                if (isBestSection) setDraggedBestBookId(book.id);
+                                else if (isWantSection) setDraggedBookId(book.id);
+                              }}
+                              onDragOver={(e) => {
+                                if (!isDraggable) return;
                                 e.preventDefault();
-                                setInspectingBook(book);
-                              }
-                            }}
-                            className={`group relative flex flex-col items-center cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[140px] xs:max-w-[150px] mx-auto ${
-                              isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
-                            } ${
-                              isDragOver
-                                ? isBestSection
-                                  ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.7)] -translate-y-2 scale-105'
-                                  : 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2 scale-105'
-                                : ''
-                            }`}
-                            title={`${
-                              isBestSection
-                                ? `[👑 #${bestRank} Top Libro] `
-                                : isWantSection
-                                  ? `[Priorità #${priorityRank}] `
+                                e.dataTransfer.dropEffect = 'move';
+                                if (isBestSection) {
+                                  if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
+                                } else if (isWantSection) {
+                                  if (dragOverBookId !== book.id) setDragOverBookId(book.id);
+                                }
+                              }}
+                              onDragLeave={(e) => {
+                                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                                if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
+                                else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
+                              }}
+                              onDrop={(e) => {
+                                if (!isDraggable) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const sourceId =
+                                  e.dataTransfer.getData('text/plain') ||
+                                  (isBestSection ? draggedBestBookId : draggedBookId);
+                                if (sourceId && sourceId !== book.id) {
+                                  if (isBestSection) handleBestDropReorder(sourceId, book.id);
+                                  else if (isWantSection) handleDropReorder(sourceId, book.id);
+                                }
+                                setDraggedBookId(null);
+                                setDragOverBookId(null);
+                                setDraggedBestBookId(null);
+                                setDragOverBestBookId(null);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedBookId(null);
+                                setDragOverBookId(null);
+                                setDraggedBestBookId(null);
+                                setDragOverBestBookId(null);
+                              }}
+                              onClick={() => setInspectingBook(book)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setInspectingBook(book);
+                                }
+                              }}
+                              className={`group relative flex flex-col items-center cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[140px] xs:max-w-[150px] mx-auto ${
+                                isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                              } ${
+                                isDragOver
+                                  ? isBestSection
+                                    ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.7)] -translate-y-2 scale-105'
+                                    : 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2 scale-105'
                                   : ''
-                            }${book.title} — ${book.author}`}
-                          >
-                            {/* Libro appoggiato sullo scaffale */}
-                            <div className="relative w-full aspect-[2/3] rounded-r-lg rounded-l-xs overflow-hidden shadow-2xl transition-all group-hover:shadow-[0_20px_25px_-5px_rgba(245,158,11,0.25)] border-r-2 border-stone-200/30">
-                              {/* Effetto costa e piega copertina sinistra */}
-                              <div className="absolute top-0 left-0 bottom-0 w-3 bg-gradient-to-r from-white/20 via-transparent to-black/40 z-20 pointer-events-none" />
+                              }`}
+                              title={`${
+                                isBestSection
+                                  ? `[👑 #${bestRank} Top Libro] `
+                                  : isWantSection
+                                    ? `[Priorità #${priorityRank}] `
+                                    : ''
+                              }${book.title} — ${book.author}`}
+                            >
+                              {/* Libro appoggiato sullo scaffale con struttura tridimensionale */}
+                              <div className="relative w-full aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden book-3d-cover transition-all group-hover:scale-105 group-hover:shadow-[0_20px_28px_-4px_rgba(245,158,11,0.3)]">
+                                {/* Scanalatura e cerniera rilegatura copertina a sinistra */}
+                                <div className="absolute top-0 left-0 bottom-0 w-3 bg-gradient-to-r from-white/20 via-black/15 to-black/45 z-20 pointer-events-none" />
+                                <div className="absolute top-0 left-2.5 bottom-0 w-[1px] bg-black/40 z-20 pointer-events-none" />
+                                <div className="absolute top-0 left-[11px] bottom-0 w-[1px] bg-white/20 z-20 pointer-events-none" />
 
-                              {/* Bordo pagine a destra */}
-                              <div className="absolute top-0 right-0 bottom-0 w-1 bg-gradient-to-l from-stone-200/80 via-stone-300 to-stone-400 z-20 pointer-events-none shadow-sm" />
+                                {/* Taglio delle pagine di carta a destra e in alto */}
+                                <div className="absolute top-0 right-0 bottom-0 w-1.5 book-pages-right z-20 pointer-events-none shadow-xs" />
+                                <div className="absolute top-0 left-3 right-1.5 h-[2px] bg-[#f5ecdd] border-b border-stone-400/40 z-20 pointer-events-none" />
 
-                              {book.cover_url ? (
-                                <CoverImage
-                                  src={book.cover_url}
-                                  alt={book.title}
-                                  className="w-full h-full object-cover group-hover:scale-105"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                /* Copertina telata classica per libri senza immagine */
-                                <div
-                                  className={`w-full h-full bg-gradient-to-br ${spine.bg} p-3 flex flex-col justify-between border ${spine.border} relative overflow-hidden`}
-                                >
-                                  <div className="text-[10px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
-                                    Bookshelf
-                                  </div>
-                                  <div className="my-auto text-center px-1">
-                                    <h4 className="font-serif font-bold text-[10.5px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
-                                      {book.title}
-                                    </h4>
-                                    <p className="text-[10.5px] text-amber-200/80 mt-1 font-sans truncate">
-                                      {book.author}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center justify-between text-[10px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
-                                    <BookMarked size={12} />
-                                    {book.pages && <span>{book.pages}p</span>}
-                                  </div>
-                                </div>
-                              )}
+                                {/* Riflesso plastificato diagonale realistico */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.07] to-transparent pointer-events-none z-10" />
 
-                              {/* Nastro segnalibro in alto a destra se in lettura */}
-                              {book.status === 'reading' && (
-                                <div
-                                  className="absolute top-0 right-3 w-3 h-5 bg-amber-400 shadow-md z-30 pointer-events-none"
-                                  style={{
-                                    clipPath: 'polygon(0 0, 100% 0, 100% 0 100%, 50% 75%, 0 100%)',
-                                  }}
-                                  title="In lettura"
-                                />
-                              )}
-
-                              {/* Sigillo di completamento per i letti (se non nel ripiano classifica d'onore) */}
-                              {book.status === 'completed' && !isBestSection && (
-                                <div className="absolute top-1.5 left-2 z-30 pointer-events-none w-5 h-5 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-md">
-                                  <Trophy size={11} />
-                                </div>
-                              )}
-
-                              {/* Badge classifica ripiano d'onore dei migliori libri letti */}
-                              {isBestSection && bestRank !== null && (
-                                <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
-                                  {bestRank === 1 ? (
-                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1 whitespace-nowrap">
-                                      <Crown size={10} className="text-stone-950 fill-stone-950" />
-                                      #1 Top
-                                    </span>
-                                  ) : bestRank === 2 ? (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-stone-100 to-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-1 whitespace-nowrap">
-                                      <Medal size={11} className="text-stone-700 fill-stone-400/40" />
-                                      #2
-                                    </span>
-                                  ) : bestRank === 3 ? (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-amber-800 via-amber-700 to-amber-800 text-amber-100 border border-amber-500/60 shadow-md flex items-center gap-1 whitespace-nowrap">
-                                      <Medal size={11} className="text-amber-300 fill-amber-400/40" />
-                                      #3
-                                    </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md whitespace-nowrap">
-                                      ⭐ #{bestRank}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Badge priorità sulla copertina se ripiano da leggere */}
-                              {isWantSection && priorityRank !== null && (
-                                <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
-                                  {priorityRank === 1 ? (
-                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200 flex items-center gap-1">
-                                      ★ #1 Prossimo
-                                    </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-950/85 text-sky-300 border border-sky-400/50 shadow-md">
-                                      #{priorityRank}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Barra avanzamento pagine in basso se in lettura */}
-                              {book.status === 'reading' && book.pages && book.pages > 0 && (
-                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
-                                  <div
-                                    className="h-full bg-amber-400"
-                                    style={{
-                                      width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
-                                    }}
+                                {book.cover_url ? (
+                                  <CoverImage
+                                    src={book.cover_url}
+                                    alt={book.title}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
                                   />
-                                </div>
-                              )}
+                                ) : (
+                                  /* Copertina telata classica per libri senza immagine */
+                                  <div
+                                    className={`w-full h-full bg-gradient-to-br ${spine.bg} p-3 flex flex-col justify-between border ${spine.border} relative overflow-hidden`}
+                                  >
+                                    <div className="text-[10px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
+                                      Bookshelf
+                                    </div>
+                                    <div className="my-auto text-center px-1">
+                                      <h4 className="font-serif font-bold text-[10.5px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
+                                        {book.title}
+                                      </h4>
+                                      <p className="text-[10.5px] text-amber-200/80 mt-1 font-sans truncate">
+                                        {book.author}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
+                                      <BookMarked size={12} />
+                                      {book.pages && <span>{book.pages}p</span>}
+                                    </div>
+                                  </div>
+                                )}
 
-                              {/* Badge note se presenti */}
-                              {book.notes_count && book.notes_count > 0 ? (
-                                <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[11px] font-bold flex items-center gap-0.5 shadow-md">
-                                  <StickyNote size={8} />
-                                  <span>{book.notes_count}</span>
-                                </div>
-                              ) : null}
-                            </div>
+                                {/* Sigillo di completamento per i letti (se non nel ripiano classifica d'onore) */}
+                                {book.status === 'completed' && !isBestSection && (
+                                  <div className="absolute top-1.5 left-2 z-30 pointer-events-none w-5 h-5 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-md">
+                                    <Trophy size={11} />
+                                  </div>
+                                )}
 
-                            {/* Titolo e autore sotto la copertina con altezza uniforme per allineare perfettamente tutte le copertine */}
-                            <div className="text-center mt-2 px-0.5 w-full h-[46px] xs:h-[50px] flex flex-col justify-start overflow-hidden">
-                              <p className="font-serif text-[11px] xs:text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words">
-                                {book.title}
-                              </p>
-                              <p className="font-sans text-[11px] text-stone-400 light:text-stone-500 truncate mt-0.5">
-                                {book.author}
-                              </p>
+                                {/* Badge classifica ripiano d'onore dei migliori libri letti */}
+                                {isBestSection && bestRank !== null && (
+                                  <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
+                                    {bestRank === 1 ? (
+                                      <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1 whitespace-nowrap">
+                                        <Crown size={10} className="text-stone-950 fill-stone-950" />
+                                        #1 Top
+                                      </span>
+                                    ) : bestRank === 2 ? (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-stone-100 to-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-1 whitespace-nowrap">
+                                        <Medal size={11} className="text-stone-700 fill-stone-400/40" />
+                                        #2
+                                      </span>
+                                    ) : bestRank === 3 ? (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-amber-800 via-amber-700 to-amber-800 text-amber-100 border border-amber-500/60 shadow-md flex items-center gap-1 whitespace-nowrap">
+                                        <Medal size={11} className="text-amber-300 fill-amber-400/40" />
+                                        #3
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md whitespace-nowrap">
+                                        ⭐ #{bestRank}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Badge priorità sulla copertina se ripiano da leggere */}
+                                {isWantSection && priorityRank !== null && (
+                                  <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
+                                    {priorityRank === 1 ? (
+                                      <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200 flex items-center gap-1">
+                                        ★ #1 Prossimo
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-950/85 text-sky-300 border border-sky-400/50 shadow-md">
+                                        #{priorityRank}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Barra avanzamento pagine in basso se in lettura */}
+                                {book.status === 'reading' && book.pages && book.pages > 0 && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
+                                    <div
+                                      className="h-full bg-amber-400"
+                                      style={{
+                                        width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
+                                      }}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Badge note se presenti */}
+                                {book.notes_count && book.notes_count > 0 ? (
+                                  <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[11px] font-bold flex items-center gap-0.5 shadow-md">
+                                    <StickyNote size={8} />
+                                    <span>{book.notes_count}</span>
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              {/* Ombra di contatto realistica sul ripiano in legno */}
+                              <div className="w-[85%] h-2 mx-auto -mt-1 bg-black/75 light:bg-stone-900/35 rounded-full blur-[3px] pointer-events-none transition-transform group-hover:scale-75 group-hover:opacity-30" />
+
+                              {/* Titolo e autore sotto la copertina con altezza uniforme per allineare perfettamente tutte le copertine */}
+                              <div className="text-center mt-2 px-0.5 w-full h-[46px] xs:h-[50px] flex flex-col justify-start overflow-hidden">
+                                <p className="font-serif text-[11px] xs:text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words">
+                                  {book.title}
+                                </p>
+                                <p className="font-sans text-[11px] text-stone-400 light:text-stone-500 truncate mt-0.5">
+                                  {book.author}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : (
                     /* 2. VISTA DORSI DEI LIBRI VERTICALI (LIBRERIA CLASSICA) */
-                    <div className="flex items-end gap-1 sm:gap-2 px-2 sm:px-4 pt-6 pb-2 overflow-x-auto scrollbar-thin min-h-[240px] overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
-                      {section.books.map((book, bookIdx) => {
+                    <div className="rounded-2xl pt-5 pb-1 px-1 sm:px-3 mb-0.5 relative">
+                      <div className="flex items-end gap-1 sm:gap-2 px-2 sm:px-4 pb-1 overflow-x-auto overflow-y-hidden scrollbar-thin min-h-[250px] sm:min-h-[280px] touch-manipulation">
+                        {section.books.map((book, bookIdx) => {
                         const dynamicSpine = book.cover_url ? coverColors.get(book.cover_url) : null;
                         const spine = getBookSpineStyle(book.id, book.title);
 
@@ -1144,7 +1227,7 @@ export function BookshelfView({
                             style={{
                               background: dynamicSpine ? dynamicSpine.bgGradient : undefined,
                               borderColor: dynamicSpine ? dynamicSpine.border : undefined,
-                              touchAction: isDraggable ? 'none' : 'pan-x pan-y',
+                              touchAction: isDraggable ? 'none' : 'manipulation',
                             }}
                             className={`group relative ${spineWidth} ${spineHeight} rounded-t-sm shrink-0 flex flex-col justify-between py-2 px-1 cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-4 sm:hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                               dynamicSpine ? '' : `bg-gradient-to-r ${spine.bg} ${spine.border}`
@@ -1178,23 +1261,6 @@ export function BookshelfView({
                             )}
 
                             {/* Segnalibro sporgente in alto */}
-                            {book.status === 'reading' && (
-                              <div
-                                className="absolute -top-3 left-1/2 -translate-x-1/2 w-2.5 h-4 shadow-md z-20 pointer-events-none"
-                                style={{
-                                  backgroundColor: dynamicSpine ? dynamicSpine.ribbonColor : '#f59e0b',
-                                  clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 70%, 0 100%)',
-                                }}
-                              />
-                            )}
-
-                            {/* Capitello superiore del libro */}
-                            <div
-                              className={`h-1 rounded-full mx-auto w-4/5 mb-0.5 z-10 ${
-                                dynamicSpine?.isLight ? 'bg-stone-900/30' : 'bg-amber-100/40 opacity-70'
-                              }`}
-                            />
-
                             {/* Badge classifica ripiano d'onore per i migliori libri */}
                             {isBestSection && bestRank !== null && (
                               <div className="z-20 mx-auto my-0.5 flex flex-col items-center">
@@ -1285,23 +1351,46 @@ export function BookshelfView({
                               </span>
                             </div>
 
-                            {/* Nervature orizzontali da legatoria classica */}
-                            <div className="absolute top-8 left-0 right-0 h-0.5 bg-black/30 border-b border-white/20 pointer-events-none" />
-                            <div className="absolute bottom-8 left-0 right-0 h-0.5 bg-black/30 border-b border-white/20 pointer-events-none" />
 
                             {/* Luce riflessa longitudinale sul dorso */}
-                            <div className="absolute inset-y-0 left-0.5 w-1 bg-white/15 pointer-events-none z-10" />
-                            <div className="absolute inset-y-0 right-0.5 w-1 bg-black/40 pointer-events-none z-10" />
+                            <div className="absolute inset-y-0 left-0.5 w-1 bg-white/20 pointer-events-none z-20" />
+                            <div className="absolute inset-y-0 right-0.5 w-1 bg-black/45 pointer-events-none z-20" />
                           </div>
                         );
                       })}
+
+                      {/* Oggetto decorativo festivo o piantina sul ripiano (varia per ogni ripiano) */}
+                      {customization.showDecorations && (
+                        <div
+                          className="shrink-0 self-end ml-3 sm:ml-5 pb-0.5 pointer-events-none"
+                          title="Oggetto decorativo sul ripiano"
+                        >
+                          <BookshelfDecoration holiday={activeHoliday} shelfIndex={sectionIdx} />
+                        </div>
+                      )}
                     </div>
+                  </div>
                   )}
 
-                  {/* ASSE IN LEGNO DEL RIPIANO (3D SHELF PLANK) */}
-                  <div className="w-full">
-                    <div className="bookshelf-ledge w-full" />
-                    <div className="bookshelf-shelf w-full h-4 sm:h-5 rounded-b-md" />
+                  {/* MENSOLA SOSPESA IN LEGNO MASSIFICO (FLOATING WOOD SHELF) */}
+                  <div className={`floating-wood-shelf w-full wood-${customization.wood} relative z-20`}>
+                    {/* Piano d'appoggio superiore con venatura legno scuro */}
+                    <div className="floating-wood-shelf-top w-full rounded-t-xs" />
+                    {/* Bordo frontale sagomato e arrotondato con ombra morbida proiettata sulla parete */}
+                    <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 sm:px-5">
+                      {customization.showShelfLabels ? (
+                        <>
+                          <span className="font-serif text-[10.5px] sm:text-xs font-semibold tracking-wider uppercase text-amber-200/80 light:text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
+                            {section.title}
+                          </span>
+                          <span className="text-[10px] sm:text-[11px] font-sans font-medium text-amber-300/60 light:text-amber-200/70">
+                            {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
+                          </span>
+                        </>
+                      ) : (
+                        <div className="h-4" />
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1361,6 +1450,15 @@ export function BookshelfView({
               ? (dir) => handleShift(inspectingBook.id, dir)
               : undefined
           }
+        />
+      )}
+
+      {/* MODALE DI PERSONALIZZAZIONE DELLA LIBRERIA */}
+      {isCustomizing && (
+        <BookshelfCustomizationModal
+          customization={customization}
+          onChange={handleUpdateCustomization}
+          onClose={() => setIsCustomizing(false)}
         />
       )}
     </div>

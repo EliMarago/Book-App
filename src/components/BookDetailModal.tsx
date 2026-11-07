@@ -87,6 +87,34 @@ export function BookDetailModal({
   const [editingRating, setEditingRating] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
 
+  // Stato per la modifica manuale delle pagine lette
+  const [editingProgress, setEditingProgress] = useState(false);
+  const [progressInput, setProgressInput] = useState(
+    initialBook.read_pages ? String(initialBook.read_pages) : ''
+  );
+  const [savingProgress, setSavingProgress] = useState(false);
+
+  useEffect(() => {
+    if (!editingProgress) {
+      setProgressInput(book.read_pages ? String(book.read_pages) : '');
+    }
+  }, [book.read_pages, editingProgress]);
+
+  // Percentuale reale calcolata
+  const readingPercent = useMemo(() => {
+    if (!book.pages || book.pages <= 0) return null;
+    const current = book.read_pages || 0;
+    return Math.min(100, Math.max(0, Math.round((current / book.pages) * 100)));
+  }, [book.pages, book.read_pages]);
+
+  // Percentuale live d'anteprima mentre l'utente digita nell'input
+  const previewPercent = useMemo(() => {
+    if (!book.pages || book.pages <= 0) return null;
+    const val = parseInt(progressInput, 10);
+    if (isNaN(val)) return null;
+    return Math.min(100, Math.max(0, Math.round((val / book.pages) * 100)));
+  }, [book.pages, progressInput]);
+
   // Paragrafi formattati della trama per una lettura ariosa e confortevole con a capo dedicati
   const plotParagraphs = useMemo<string[]>(
     () => formatPlotIntoParagraphs(bookDetails?.description),
@@ -314,14 +342,46 @@ export function BookDetailModal({
     const current = book.read_pages || 0;
     const max = book.pages || 999999;
     const next = Math.min(max, current + added);
-    await supabase
-      .from('books')
-      .update({ read_pages: next, updated_at: new Date().toISOString() })
-      .eq('id', book.id);
-    await syncBookReadPagesToSupabase(book.id, next);
-    const updated = { ...book, read_pages: next };
-    setBook(updated);
-    onUpdateBook(updated);
+    const now = new Date().toISOString();
+    try {
+      await supabase
+        .from('books')
+        .update({ read_pages: next, updated_at: now })
+        .eq('id', book.id);
+      await syncBookReadPagesToSupabase(book.id, next);
+      const updated = { ...book, read_pages: next, updated_at: now };
+      setBook(updated);
+      setProgressInput(String(next));
+      onUpdateBook(updated);
+    } catch (e) {
+      console.error(e);
+      toast({ message: 'Errore durante l\'aggiornamento delle pagine', type: 'error' });
+    }
+  };
+
+  const handleSaveReadPages = async (newPage: number) => {
+    const maxPages = book.pages || 999999;
+    const clamped = Math.max(0, Math.min(maxPages, newPage));
+    setSavingProgress(true);
+    const now = new Date().toISOString();
+    try {
+      await supabase
+        .from('books')
+        .update({ read_pages: clamped, updated_at: now })
+        .eq('id', book.id);
+      await syncBookReadPagesToSupabase(book.id, clamped);
+      const updated: Book = { ...book, read_pages: clamped, updated_at: now };
+      setBook(updated);
+      setProgressInput(String(clamped));
+      onUpdateBook(updated);
+      setEditingProgress(false);
+      toast({ message: `Progresso aggiornato: pag. ${clamped}`, type: 'success' });
+    } catch (e) {
+      console.error(e);
+      toast({ message: 'Errore durante il salvataggio della pagina', type: 'error' });
+    } finally {
+      setSavingProgress(false);
+    }
   };
 
   const [showFinishDialog, setShowFinishDialog] = useState(false);
@@ -509,53 +569,170 @@ export function BookDetailModal({
           <div className="p-3.5 sm:p-5 overflow-y-auto space-y-3 sm:space-y-4 flex-1">
             {/* 1. SEZIONE AVANZAMENTO RAPIDO SE IN LETTURA */}
             {book.status === 'reading' && (
-              <div className="bg-amber-500/10 light:bg-amber-50 border border-amber-500/20 light:border-amber-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-amber-300 light:text-amber-800 flex items-center gap-1">
-                    <Flame size={13} />
-                    Progresso di lettura:
-                  </span>
-                  <span className="font-bold text-amber-300 light:text-amber-800 tabular-nums">
-                    {book.read_pages || 0}
-                    {book.pages ? ` / ${book.pages} pag.` : ' pag.'}
-                  </span>
-                </div>
+              <div className="bg-amber-500/10 light:bg-amber-50/80 border border-amber-500/25 light:border-amber-300/80 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-xs transition-all">
+                {editingProgress ? (
+                  /* MODALITÀ MODIFICA MANUALE DELLE PAGINE */
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-300 light:text-amber-800">
+                        <Flame size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
+                        <span>Modifica pagina letta</span>
+                      </div>
+                      {previewPercent !== null && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-500/25 light:bg-amber-200/80 text-amber-300 light:text-amber-900 border border-amber-500/40 light:border-amber-300 tabular-nums">
+                          {previewPercent}% completato
+                        </span>
+                      )}
+                    </div>
 
-                {book.pages && book.pages > 0 && (
-                  <div className="w-full bg-stone-800 light:bg-stone-200 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-amber-400 h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const val = parseInt(progressInput, 10);
+                        if (!isNaN(val)) handleSaveReadPages(val);
                       }}
-                    />
-                  </div>
-                )}
+                      className="space-y-2.5"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                        <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+                          <span className="text-xs text-stone-400 light:text-stone-600 font-medium">Pagina:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max={book.pages || undefined}
+                            value={progressInput}
+                            onChange={(e) => setProgressInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') setEditingProgress(false);
+                            }}
+                            autoFocus
+                            placeholder="0"
+                            className="w-28 px-3 py-1.5 bg-stone-900 light:bg-white border-2 border-amber-500 rounded-xl text-sm font-bold text-stone-100 light:text-stone-900 outline-none focus:ring-2 focus:ring-amber-400/50 tabular-nums shadow-inner"
+                          />
+                          {book.pages && book.pages > 0 && (
+                            <span className="text-xs text-stone-400 light:text-stone-600 font-medium">
+                              di {book.pages} tot.
+                            </span>
+                          )}
+                        </div>
 
-                <div className="flex items-center justify-between pt-0.5 flex-wrap gap-1.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-stone-400 light:text-stone-600">Avanza:</span>
-                    {[10, 25, 50].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => handleQuickAddPages(num)}
-                        className="text-[11px] px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 font-semibold border border-amber-500/30 cursor-pointer active:scale-95 tabular-nums"
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          <button
+                            type="submit"
+                            disabled={savingProgress}
+                            className="flex items-center gap-1 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            {savingProgress ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} className="stroke-[3]" />}
+                            <span>Salva</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProgressInput(book.read_pages ? String(book.read_pages) : '');
+                              setEditingProgress(false);
+                            }}
+                            className="px-3 py-1.5 rounded-xl border border-stone-700 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-800 light:hover:bg-stone-100 text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            Annulla
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Barra di anteprima reattiva durante la digitazione */}
+                      {book.pages && book.pages > 0 && (
+                        <div className="w-full bg-stone-800/90 light:bg-stone-200/90 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-amber-400 h-full rounded-full transition-all duration-150"
+                            style={{
+                              width: `${previewPercent !== null ? previewPercent : 0}%`,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </form>
+                  </div>
+                ) : (
+                  /* MODALITÀ VISUALIZZAZIONE NORMALE CON PERCENTUALE E ACCESSO RAPIDO */
+                  <>
+                    <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-300 light:text-amber-800">
+                        <Flame size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
+                        <span>Progresso di lettura</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProgressInput(book.read_pages ? String(book.read_pages) : '');
+                            setEditingProgress(true);
+                          }}
+                          className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-stone-900/80 light:bg-white border border-amber-500/30 light:border-amber-300/80 hover:border-amber-400 text-stone-200 light:text-stone-800 transition-all cursor-pointer shadow-xs active:scale-95"
+                          title="Clicca per inserire la pagina esatta"
+                        >
+                          <span className="font-bold tabular-nums text-xs text-amber-300 light:text-amber-900">
+                            Pag. {book.read_pages || 0}
+                            {book.pages ? ` di ${book.pages}` : ''}
+                          </span>
+                          {readingPercent !== null && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[11px] font-black bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 tabular-nums">
+                              {readingPercent}%
+                            </span>
+                          )}
+                          <Pencil size={11} className="text-stone-400 group-hover:text-amber-400 transition-colors shrink-0 ml-0.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Barra di progresso grafica con animazione fluida */}
+                    {book.pages && book.pages > 0 && (
+                      <div
+                        onClick={() => {
+                          setProgressInput(book.read_pages ? String(book.read_pages) : '');
+                          setEditingProgress(true);
+                        }}
+                        className="w-full bg-stone-800/90 light:bg-stone-200/90 h-2 rounded-full overflow-hidden cursor-pointer group"
+                        title="Clicca per modificare la pagina"
                       >
-                        +{num}
-                      </button>
-                    ))}
-                  </div>
+                        <div
+                          className="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-300 group-hover:brightness-110"
+                          style={{
+                            width: `${readingPercent !== null ? readingPercent : 0}%`,
+                          }}
+                        />
+                      </div>
+                    )}
 
-                  <button
-                    type="button"
-                    onClick={() => setShowFinishDialog(true)}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
-                  >
-                    <CheckCircle2 size={12} />
-                    <span>Finito</span>
-                  </button>
-                </div>
+                    {/* Controlli rapidi: Avanza +10/+25/+50 e tasto Finito */}
+                    <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-stone-400 light:text-stone-600 font-medium">Avanza:</span>
+                        {[10, 25, 50].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => handleQuickAddPages(num)}
+                            className="text-xs px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 font-bold border border-amber-500/30 cursor-pointer active:scale-95 tabular-nums transition-colors"
+                            title={`Aggiungi ${num} pagine lette`}
+                          >
+                            +{num}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowFinishDialog(true)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95 ml-auto"
+                        title="Ho finito di leggere tutto il libro! Segna come Completato"
+                      >
+                        <CheckCircle2 size={12} />
+                        <span>Finito</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

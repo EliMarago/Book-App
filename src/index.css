@@ -145,57 +145,264 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Realistic Wooden Bookshelf Styling */
-.bookshelf-shelf {
+/* Parete a Mattoncini a Vista (Brick Wall Loft) */
+.bookshelf-brick-wall {
   position: relative;
-  background: linear-gradient(
-    to bottom,
-    #382317 0%,
-    #2a180f 45%,
-    #1c0f09 100%
-  );
-  box-shadow: 
-    inset 0 3px 6px rgba(255, 255, 255, 0.08),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.6),
-    0 12px 24px -4px rgba(0, 0, 0, 0.7);
+  background-color: #241c19;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.12) 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Crect width='80' height='48' fill='%23191311'/%3E%3Crect x='2' y='2' width='76' height='20' rx='1' fill='%2328201d'/%3E%3Crect x='-38' y='26' width='76' height='20' rx='1' fill='%23221b18'/%3E%3Crect x='42' y='26' width='76' height='20' rx='1' fill='%232d2420'/%3E%3Cpath d='M0 0h80v2H0zM0 24h80v2H0zM0 0v24h2V0zM40 24v24h2V24z' fill='%23ffffff' fill-opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 0 45px rgba(0, 0, 0, 0.7),
+    0 20px 40px -10px rgba(0, 0, 0, 0.85);
 }
 
-.light .bookshelf-shelf,
-[data-theme='light'] .bookshelf-shelf {
-  background: linear-gradient(
-    to bottom,
-    #d8b898 0%,
-    #c49f7b 45%,
-    #a8815b 100%
-  );
-  box-shadow: 
-    inset 0 3px 6px rgba(255, 255, 255, 0.45),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
-    0 10px 20px -4px rgba(60, 40, 20, 0.22);
+.light .bookshelf-brick-wall,
+[data-theme='light'] .bookshelf-brick-wall {
+  background-color: #e5d2c6;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.35) 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Crect width='80' height='48' fill='%23f5ebe5'/%3E%3Crect x='2' y='2' width='76' height='20' rx='1' fill='%23e6d2c6'/%3E%3Crect x='-38' y='26' width='76' height='20' rx='1' fill='%23ddc4b7'/%3E%3Crect x='42' y='26' width='76' height='20' rx='1' fill='%23ecd9ce'/%3E%3Cpath d='M0 0h80v2H0zM0 24h80v2H0zM0 0v24h2V0zM40 24v24h2V24z' fill='%23ffffff' fill-opacity='0.85'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  border: 1px solid rgba(215, 185, 170, 0.8);
+  box-shadow:
+    inset 0 0 35px rgba(130, 80, 50, 0.08),
+    0 15px 35px -8px rgba(90, 50, 25, 0.2);
 }
 
-/* Shelf Top Highlight Ledge */
-.bookshelf-ledge {
-  height: 16px;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.12) 0%,
-    transparent 100%
-  );
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+/* Mensola Sospesa in Legno Massiccio (Floating Wood Shelf) */
+.floating-wood-shelf {
+  position: relative;
+  width: 100%;
 }
 
-.light .bookshelf-ledge,
-[data-theme='light'] .bookshelf-ledge {
+/* Piano d'appoggio superiore della mensola */
+.floating-wood-shelf-top {
+  height: 14px;
   background: linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.5) 0%,
-    transparent 100%
+    #2a160c 0%,
+    #3d2113 40%,
+    #4a2918 85%,
+    #59321e 100%
   );
-  border-top: 1px solid rgba(255, 255, 255, 0.75);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
+
+.light .floating-wood-shelf-top,
+[data-theme='light'] .floating-wood-shelf-top {
+  background: linear-gradient(
+    to bottom,
+    #301a0e 0%,
+    #422414 40%,
+    #522d1a 85%,
+    #613720 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Bordo frontale sagomato e arrotondato della mensola con luce e ombra */
+.floating-wood-shelf-front {
+  position: relative;
+  min-height: 24px;
+  background: linear-gradient(
+    to bottom,
+    #7a4529 0%,
+    #633720 18%,
+    #482716 48%,
+    #2c140a 78%,
+    #180a04 100%
+  );
+  border-radius: 0 0 4px 4px;
+  border-bottom: 2px solid #0f0602;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 215, 175, 0.4),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.65),
+    0 16px 24px -4px rgba(0, 0, 0, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.light .floating-wood-shelf-front,
+[data-theme='light'] .floating-wood-shelf-front {
+  background: linear-gradient(
+    to bottom,
+    #7c4629 0%,
+    #63361e 18%,
+    #462514 48%,
+    #2a1308 78%,
+    #150803 100%
+  );
+  border-radius: 0 0 4px 4px;
+  border-bottom: 2px solid #0b0402;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 225, 190, 0.5),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.55),
+    0 16px 22px -4px rgba(70, 35, 15, 0.35),
+    0 4px 8px rgba(70, 35, 15, 0.25);
+}
+
+/* =========================================================================
+   FINITURE DEL LEGNO DELLE MENSOLE (Shelf Wood Finishes)
+   ========================================================================= */
+
+/* 1. NOCE SCURO (Walnut - Predefinito) */
+.wood-walnut .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #2a160c 0%, #3d2113 40%, #4a2918 85%, #59321e 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.light .wood-walnut .floating-wood-shelf-top,
+[data-theme='light'] .wood-walnut .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #301a0e 0%, #422414 40%, #522d1a 85%, #613720 100%);
+}
+.wood-walnut .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #7a4529 0%, #633720 18%, #482716 48%, #2c140a 78%, #180a04 100%);
+  color: #fef3c7;
+}
+.light .wood-walnut .floating-wood-shelf-front,
+[data-theme='light'] .wood-walnut .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #7c4629 0%, #63361e 18%, #462514 48%, #2a1308 78%, #150803 100%);
+  color: #fffbeb;
+}
+
+/* 2. ROVERE CHIARO (Light Natural Oak) */
+.wood-oak .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #8a5a2e 0%, #a6723b 40%, #c48b4b 85%, #d59f5e 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+}
+.light .wood-oak .floating-wood-shelf-top,
+[data-theme='light'] .wood-oak .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #9d6735 0%, #b87f45 40%, #d49a56 85%, #e2ab69 100%);
+}
+.wood-oak .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #deb078 0%, #ca965a 18%, #af7c40 48%, #875926 78%, #5a3812 100%);
+  color: #291807;
+  border-bottom: 2px solid #3d2208;
+  box-shadow: inset 0 2px 3px rgba(255, 240, 220, 0.6), inset 0 -2px 3px rgba(0, 0, 0, 0.4), 0 16px 22px -4px rgba(70, 45, 20, 0.3);
+}
+.light .wood-oak .floating-wood-shelf-front,
+[data-theme='light'] .wood-oak .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #e8be89 0%, #d2a167 18%, #b88349 48%, #8e5f2c 78%, #5e3b14 100%);
+  color: #221204;
+}
+
+/* 3. CILIEGIO / MOGANO CALDO (Warm Cherry) */
+.wood-cherry .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #3b1111 0%, #4e1919 40%, #682323 85%, #7a2b2b 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+.wood-cherry .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #a33b3b 0%, #872b2b 18%, #661e1e 48%, #451212 78%, #240808 100%);
+  color: #fee2e2;
+  border-bottom: 2px solid #1a0505;
+  box-shadow: inset 0 2px 3px rgba(255, 210, 210, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.6), 0 16px 22px -4px rgba(60, 15, 15, 0.4);
+}
+
+/* 4. BIANCO MODERNO / FRASSINO SBIANCATO (Nordic White Ash) */
+.wood-white .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #cbd5e1 0%, #e2e8f0 40%, #f1f5f9 85%, #f8fafc 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+}
+.wood-white .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #ffffff 0%, #f1f5f9 20%, #e2e8f0 55%, #cbd5e1 80%, #94a3b8 100%);
+  color: #1e293b;
+  border-bottom: 2px solid #64748b;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.8), inset 0 -2px 3px rgba(0, 0, 0, 0.15), 0 14px 20px -4px rgba(0, 0, 0, 0.22);
+}
+
+/* 5. EBANO / NERO INDUSTRIALE (Ebony Black) */
+.wood-ebony .floating-wood-shelf-top {
+  background: linear-gradient(to bottom, #09090b 0%, #18181b 40%, #27272a 85%, #3f3f46 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+.wood-ebony .floating-wood-shelf-front {
+  background: linear-gradient(to bottom, #52525b 0%, #3f3f46 18%, #27272a 48%, #18181b 78%, #09090b 100%);
+  color: #f4f4f5;
+  border-bottom: 2px solid #000000;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.3), inset 0 -2px 3px rgba(0, 0, 0, 0.8), 0 16px 24px -4px rgba(0, 0, 0, 0.7);
+}
+
+/* =========================================================================
+   SFONDI DELLA LIBRERIA (Shelf Wall Backgrounds)
+   ========================================================================= */
+
+/* Boiserie classica a doghe verticali in legno */
+.bookshelf-wall-boiserie {
+  position: relative;
+  background-color: #1c130d;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #1c130d 0px,
+    #241911 38px,
+    #130c08 39px,
+    #0b0704 40px
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 45px rgba(0, 0, 0, 0.6), 0 20px 40px -10px rgba(0, 0, 0, 0.8);
+}
+.light .bookshelf-wall-boiserie,
+[data-theme='light'] .bookshelf-wall-boiserie {
+  background-color: #e8d7c5;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #e8d7c5 0px,
+    #eedfcb 38px,
+    #c4b09c 39px,
+    #9f8b78 40px
+  );
+  border: 1px solid rgba(175, 145, 120, 0.6);
+  box-shadow: inset 0 0 35px rgba(110, 75, 45, 0.12), 0 15px 30px -8px rgba(70, 40, 20, 0.18);
+}
+
+/* Intonaco caldo / Stucco vellutato */
+.bookshelf-wall-plaster {
+  position: relative;
+  background-color: #211c19;
+  background-image: radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.08) 0%, transparent 70%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5), 0 15px 35px -8px rgba(0, 0, 0, 0.7);
+}
+.light .bookshelf-wall-plaster,
+[data-theme='light'] .bookshelf-wall-plaster {
+  background-color: #f7f3ee;
+  background-image: radial-gradient(circle at 50% 30%, rgba(255, 245, 230, 0.8) 0%, transparent 70%);
+  border: 1px solid rgba(220, 210, 200, 0.8);
+  box-shadow: inset 0 0 40px rgba(150, 130, 110, 0.08), 0 15px 30px -8px rgba(90, 70, 50, 0.12);
+}
+
+/* Effetto libro fisico 3D (vista Copertine) con blocco pagine e cerniera rilegatura */
+.book-3d-cover {
+  position: relative;
+  box-shadow:
+    -3px 6px 12px rgba(0, 0, 0, 0.65),
+    4px 8px 18px rgba(0, 0, 0, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.light .book-3d-cover,
+[data-theme='light'] .book-3d-cover {
+  box-shadow:
+    -2px 5px 10px rgba(60, 35, 15, 0.28),
+    4px 7px 14px rgba(60, 35, 15, 0.22),
+    0 2px 4px rgba(60, 35, 15, 0.18);
+}
+
+/* Blocco fogli carta sul lato destro del libro */
+.book-pages-right {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #f3ead8 0px,
+      #dfd3be 1px,
+      #f7f0e2 2px,
+      #cfc1a9 3px
+    );
+  box-shadow: inset 1px 0 2px rgba(0, 0, 0, 0.28), inset 0 -4px 6px rgba(0, 0, 0, 0.22);
+}
+
 
 /* Vertical Spine Text */
 .writing-vertical-rl {
