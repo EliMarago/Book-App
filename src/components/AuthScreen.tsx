@@ -27,6 +27,9 @@ interface AuthScreenProps {
   initialMode?: AuthMode;
 }
 
+// Imposta a true per riattivare la creazione di nuovi account direttamente dall'app
+export const ALLOW_REGISTRATION = false;
+
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 60 * 1000;
 const LOCKOUT_STORAGE_KEY = 'bookshelf_auth_lockout_until';
@@ -57,7 +60,10 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     clearRecoveryError,
   } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (!ALLOW_REGISTRATION && initialMode === 'signup') return 'signin';
+    return initialMode;
+  });
   const [email, setEmail] = useState(() => getRememberedEmail());
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState<boolean>(() => isRememberMeEnabled());
@@ -126,8 +132,8 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
       if (err) {
         setError(
           err.toLowerCase().includes('expired') ||
-          err.toLowerCase().includes('invalid') ||
-          err.toLowerCase().includes('token')
+            err.toLowerCase().includes('invalid') ||
+            err.toLowerCase().includes('token')
             ? 'Il token o link non è valido oppure è già stato utilizzato. Richiedi un nuovo link e incollalo subito prima di cliccarlo.'
             : err
         );
@@ -180,9 +186,14 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           try {
             sessionStorage.removeItem(ATTEMPTS_STORAGE_KEY);
             sessionStorage.removeItem(LOCKOUT_STORAGE_KEY);
-          } catch {}
+          } catch { }
         }
       } else if (mode === 'signup') {
+        if (!ALLOW_REGISTRATION) {
+          setError('Le registrazioni di nuovi account sono momentaneamente disattivate.');
+          setLoading(false);
+          return;
+        }
         if (password.length < 8) {
           setError('La password deve contenere almeno 8 caratteri.');
           setLoading(false);
@@ -318,28 +329,26 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
             </div>
           )}
 
-          {/* Segmented Switcher Accedi / Registrati (solo quando non siamo in recovery) */}
-          {(mode === 'signin' || mode === 'signup') && (
+          {/* Segmented Switcher Accedi / Registrati (mostrato solo se ALLOW_REGISTRATION è true) */}
+          {ALLOW_REGISTRATION && (mode === 'signin' || mode === 'signup') && (
             <div className="flex gap-1.5 mb-6 p-1.5 bg-stone-950/60 light:bg-stone-100 rounded-2xl border border-stone-800/60 light:border-stone-200/60">
               <button
                 type="button"
                 onClick={() => switchMode('signin')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                  mode === 'signin'
-                    ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/15'
-                    : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-                }`}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${mode === 'signin'
+                  ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/15'
+                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                  }`}
               >
                 Accedi
               </button>
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                  mode === 'signup'
-                    ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/15'
-                    : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-                }`}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${mode === 'signup'
+                  ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/15'
+                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                  }`}
               >
                 Crea account
               </button>

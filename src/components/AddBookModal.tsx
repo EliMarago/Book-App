@@ -600,28 +600,23 @@ export function AddBookModal({
                   placeholder="Es. Umberto Eco"
                 />
               </div>
-
-              {coverSource === 'auto' && coverUrl && (
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400 light:text-emerald-700 font-medium">
-                  <Sparkles size={13} />
-                  <span>Copertina trovata in automatico!</span>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Sezione URL / Ricerca Copertina */}
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-medium text-stone-300 light:text-stone-700">
-                Copertina (automatica o personalizzata)
+          {/* Sezione Copertina */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 min-w-0">
+                <Link2 size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
+                <span className="truncate">Copertina</span>
+                <span className="text-[11px] text-stone-500 font-normal normal-case shrink-0 hidden xs:inline">(automatica o URL)</span>
               </label>
 
               <button
                 type="button"
                 onClick={handleManualSearchCover}
                 disabled={searchingCover || !title.trim()}
-                className="flex items-center gap-1 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2.5 py-1 rounded-lg bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2.5 py-1 rounded-lg bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer shrink-0"
                 title="Cerca copertina online"
               >
                 {searchingCover ? (
@@ -645,10 +640,17 @@ export function AddBookModal({
                   setCoverUrl(e.target.value);
                   setCoverSource('manual');
                 }}
-                className="w-full pl-9 pr-4 py-3 sm:py-2 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors text-base sm:text-xs"
+                className="w-full pl-9 pr-4 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors text-base sm:text-xs"
                 placeholder="Incolla URL copertina personalizzato..."
               />
             </div>
+
+            {coverSource === 'auto' && coverUrl && (
+              <p className="flex items-center gap-1.5 text-[11px] text-emerald-400 light:text-emerald-700 font-medium pt-0.5">
+                <Sparkles size={12} className="shrink-0" />
+                <span>Copertina trovata in automatico!</span>
+              </p>
+            )}
 
             {/* Copertine alternative selezionabili */}
             {alternativeCovers.length > 1 && (
@@ -690,20 +692,31 @@ export function AddBookModal({
           </div>
 
           {/* Campo Numero di Pagine */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700">
-                <Layers size={14} className="text-amber-400 light:text-amber-600" />
-                <span>Numero di pagine</span>
-                <span className="text-[11px] text-stone-500 font-normal normal-case">(opzionale)</span>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 min-w-0">
+                <Layers size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
+                <span className="truncate">Numero di pagine</span>
+                <span className="text-[11px] text-stone-500 font-normal normal-case shrink-0">(opzionale)</span>
               </label>
-              {autoDetectedPages !== null && !pagesManual && String(autoDetectedPages) === pages && (
-                <span className="text-[11px] text-emerald-400 light:text-emerald-700 font-medium flex items-center gap-1 bg-emerald-500/10 light:bg-emerald-50 px-2 py-0.5 rounded border border-emerald-500/20 light:border-emerald-200">
-                  <Sparkles size={11} />
-                  Rilevate in automatico
-                </span>
-              )}
+
+              <button
+                type="button"
+                onClick={handleDetectPages}
+                disabled={detectingPages || !title.trim()}
+                className="flex items-center gap-1.5 text-xs text-amber-400 light:text-amber-700 hover:text-amber-300 light:hover:text-amber-800 disabled:opacity-40 font-medium px-2.5 py-1 rounded-lg bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 border border-amber-500/30 light:border-amber-300 transition-colors cursor-pointer shrink-0"
+                title="Rileva il numero di pagine dal catalogo"
+                aria-label="Rileva il numero di pagine"
+              >
+                {detectingPages ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                <span>{detectingPages ? 'Rilevamento...' : 'Rileva pagine'}</span>
+              </button>
             </div>
+
             <div className="relative">
               <input
                 type="number"
@@ -717,23 +730,20 @@ export function AddBookModal({
                   setPagesManual(e.target.value.trim() !== '');
                   setPagesNotFound(false);
                 }}
-                className="w-full pl-3.5 pr-24 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
-                placeholder={detectingPages || searchingCover ? 'Rilevamento…' : 'Es. 384'}
+                className="w-full px-3.5 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
+                placeholder={detectingPages || searchingCover ? 'Rilevamento in corso…' : 'Es. 384'}
               />
-              <button
-                type="button"
-                onClick={handleDetectPages}
-                disabled={detectingPages || !title.trim()}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-amber-400 light:text-amber-700 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100 disabled:opacity-40 transition-colors cursor-pointer active:scale-95"
-                title="Rileva il numero di pagine dal catalogo"
-                aria-label="Rileva il numero di pagine"
-              >
-                {detectingPages ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                Rileva
-              </button>
             </div>
+
+            {autoDetectedPages !== null && !pagesManual && String(autoDetectedPages) === pages && (
+              <p className="flex items-center gap-1.5 text-[11px] text-emerald-400 light:text-emerald-700 font-medium pt-0.5">
+                <Sparkles size={12} className="shrink-0" />
+                <span>Pagine rilevate in automatico!</span>
+              </p>
+            )}
+
             {pagesNotFound && (
-              <p className="mt-1.5 text-[11px] text-stone-400 light:text-stone-500">
+              <p className="pt-0.5 text-[11px] text-stone-400 light:text-stone-500">
                 Numero di pagine non trovato: puoi inserirlo a mano.
               </p>
             )}
