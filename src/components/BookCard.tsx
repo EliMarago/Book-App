@@ -220,9 +220,9 @@ function BookCardComponent({
   const handleMarkAsFinished = async (rating = 0) => {
     const finalPages = book.pages || book.read_pages || null;
     const readAtDate = new Date().toISOString();
+    const existingStartedAt = book.started_at || book.created_at || null;
 
     await syncBookDateToSupabase(book.id, readAtDate);
-    removeBookStartedReadingDate(book.id);
     if (finalPages) {
       await syncBookReadPagesToSupabase(book.id, finalPages);
     }
@@ -256,6 +256,7 @@ function BookCardComponent({
       ...book,
       status: 'completed',
       read_at: readAtDate,
+      started_at: existingStartedAt,
       read_pages: finalPages,
       updated_at: readAtDate,
     };
@@ -265,6 +266,7 @@ function BookCardComponent({
       ...updated,
       status: 'completed',
       read_at: readAtDate,
+      started_at: existingStartedAt,
       read_pages: finalPages,
       ...(rating > 0 ? { rating } : {}),
       notes_count: displayCount,

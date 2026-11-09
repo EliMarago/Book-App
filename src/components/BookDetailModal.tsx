@@ -37,6 +37,8 @@ import {
   removeBookStartedReadingDate,
   formatReadingDuration,
   formatReadingStartDate,
+  formatDaysAgo,
+  formatCompletedReadingDuration,
   saveBookPlot,
 } from '@/lib/bookDates';
 import {
@@ -136,6 +138,19 @@ export function BookDetailModal({
   const readingStartDateFormatted = useMemo(
     () => (effectiveStartedAt ? formatReadingStartDate(effectiveStartedAt) : null),
     [effectiveStartedAt]
+  );
+  const completedDaysAgo = useMemo(
+    () => (book.status === 'completed' && book.read_at ? formatDaysAgo(book.read_at) : null),
+    [book.status, book.read_at]
+  );
+  const completedReadingDuration = useMemo(
+    () =>
+      book.status === 'completed' &&
+      book.read_at &&
+      (book.started_at || (book.created_at && new Date(book.created_at) <= new Date(book.read_at)))
+        ? formatCompletedReadingDuration(book.started_at || book.created_at, book.read_at)
+        : null,
+    [book.status, book.read_at, book.started_at, book.created_at]
   );
   const [editingStartDate, setEditingStartDate] = useState(false);
   const [startDateInput, setStartDateInput] = useState(
@@ -432,7 +447,7 @@ export function BookDetailModal({
     const now = new Date().toISOString();
     const finalPages = book.pages ?? book.read_pages ?? null;
     await syncBookDateToSupabase(book.id, now);
-    removeBookStartedReadingDate(book.id);
+    const existingStartedAt = book.started_at || book.created_at || null;
     if (finalPages) {
       await syncBookReadPagesToSupabase(book.id, finalPages);
     }
@@ -444,7 +459,7 @@ export function BookDetailModal({
       ...book,
       status: 'completed',
       read_at: now,
-      started_at: null,
+      started_at: existingStartedAt,
       read_pages: finalPages,
       ...(rating > 0 ? { rating } : {}),
     };
@@ -1158,17 +1173,29 @@ export function BookDetailModal({
 
             {/* Data di lettura se completato */}
             {book.status === 'completed' && book.read_at && (
-              <div className="flex items-center gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-2.5 sm:p-3 rounded-xl border border-stone-800 light:border-stone-200">
+              <div className="flex items-center gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-2.5 sm:p-3 rounded-xl border border-stone-800 light:border-stone-200 flex-wrap">
                 <Calendar size={14} className="text-emerald-400 light:text-emerald-600 shrink-0" />
-                <span>
-                  Completato il{' '}
-                  <strong className="text-stone-200 light:text-stone-800">
-                    {new Date(book.read_at).toLocaleDateString('it-IT', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </strong>
+                <span className="flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    Completato il{' '}
+                    <strong className="text-stone-200 light:text-stone-800 font-semibold">
+                      {new Date(book.read_at).toLocaleDateString('it-IT', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </strong>
+                  </span>
+                  {completedDaysAgo && (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-800 border border-emerald-500/30 light:border-emerald-300">
+                      {completedDaysAgo}
+                    </span>
+                  )}
+                  {completedReadingDuration && (
+                    <span className="text-stone-300 light:text-stone-600 font-medium text-[11px] inline-flex items-center gap-1">
+                      · ⏱️ letto in {completedReadingDuration}
+                    </span>
+                  )}
                 </span>
               </div>
             )}

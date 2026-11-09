@@ -441,6 +441,81 @@ export function formatReadingStartDate(startedDate: string | Date | null | undef
   });
 }
 
+/**
+ * Calcola quanti giorni fa è stata completata la lettura
+ * - 0: "oggi"
+ * - 1: "ieri"
+ * - 2-29: "X giorni fa" (short: "X gg fa")
+ * - 30-59: "1 mese fa" / "1 mese e X giorni fa"
+ * - 60-364: "X mesi fa"
+ * - 365+: "oltre 1 anno fa" / "oltre X anni fa"
+ */
+export function formatDaysAgo(
+  date: string | Date | null | undefined,
+  options?: { short?: boolean }
+): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+
+  const now = new Date();
+  const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffMs = todayMidnight.getTime() - dMidnight.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  const isShort = options?.short ?? false;
+
+  if (diffDays <= 0) return 'oggi';
+  if (diffDays === 1) return 'ieri';
+  if (diffDays < 30) return isShort ? `${diffDays} gg fa` : `${diffDays} giorni fa`;
+  if (diffDays < 60) {
+    const rem = diffDays - 30;
+    if (rem === 0) return isShort ? '1 m fa' : '1 mese fa';
+    return isShort ? `1 m e ${rem} gg fa` : `1 mese e ${rem} giorni fa`;
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return isShort ? `${months} m fa` : `${months} mesi fa`;
+  }
+  const years = Math.floor(diffDays / 365);
+  return isShort ? `> ${years} a fa` : years === 1 ? 'oltre 1 anno fa' : `oltre ${years} anni fa`;
+}
+
+/**
+ * Calcola la durata effettiva della lettura (tempo impiegato tra inizio e completamento)
+ * Es. "letto in 5 giorni", "letto in 1 mese", "in giornata"
+ */
+export function formatCompletedReadingDuration(
+  startedDate: string | Date | null | undefined,
+  completedDate: string | Date | null | undefined,
+  options?: { short?: boolean }
+): string | null {
+  if (!startedDate || !completedDate) return null;
+  const start = new Date(startedDate);
+  const end = new Date(completedDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+
+  const startMidnight = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const diffMs = endMidnight.getTime() - startMidnight.getTime();
+  if (diffMs < 0) return null;
+
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const isShort = options?.short ?? false;
+
+  if (diffDays === 0) return isShort ? 'in giornata' : 'in giornata (1 giorno)';
+  if (diffDays === 1) return '1 giorno';
+  if (diffDays < 30) return isShort ? `${diffDays} gg` : `${diffDays} giorni`;
+  if (diffDays < 60) {
+    const rem = diffDays - 30;
+    if (rem === 0) return '1 mese';
+    return isShort ? `1 m e ${rem} gg` : `1 mese e ${rem} giorni`;
+  }
+  const months = Math.floor(diffDays / 30);
+  return isShort ? `${months} m` : `${months} mesi`;
+}
+
 export async function fetchDatesFromSupabase(): Promise<Record<string, string>> {
   const meta = await fetchNotesMetadataFromSupabase();
   return meta.dates;
