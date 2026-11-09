@@ -13,7 +13,13 @@ import {
   Flame,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
-import { syncBookDateToSupabase, syncBookPagesToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
+import {
+  syncBookDateToSupabase,
+  syncBookPagesToSupabase,
+  syncBookReadPagesToSupabase,
+  syncBookStartedReadingToSupabase,
+  removeBookStartedReadingDate,
+} from '@/lib/bookDates';
 import { parseTitleAndAuthorQuery } from '@/lib/bookSearch';
 import {
   fetchBookCover,
@@ -51,6 +57,13 @@ export function AddBookModal({
   );
   const [readAt, setReadAt] = useState(
     book?.read_at ? new Date(book.read_at).toISOString().split('T')[0] : ''
+  );
+  const [startedAt, setStartedAt] = useState(
+    book?.started_at
+      ? new Date(book.started_at).toISOString().split('T')[0]
+      : book?.status === 'reading' && book?.created_at
+        ? new Date(book.created_at).toISOString().split('T')[0]
+        : ''
   );
   const [coverUrl, setCoverUrl] = useState(book?.cover_url ?? '');
   const [coverSource, setCoverSource] = useState<'auto' | 'manual' | null>(
@@ -288,6 +301,10 @@ export function AddBookModal({
       ? new Date(`${readAt}T12:00:00`).toISOString()
       : null;
 
+    const computedStartedAt = startedAt
+      ? new Date(`${startedAt}T12:00:00`).toISOString()
+      : (status === 'reading' ? new Date().toISOString() : null);
+
     const parsedPages = pages.trim() ? parseInt(pages.trim(), 10) : null;
     const validPages = parsedPages && !isNaN(parsedPages) && parsedPages > 0 ? parsedPages : null;
 
@@ -352,6 +369,9 @@ export function AddBookModal({
         syncBookDateToSupabase(book.id, computedReadAt),
         syncBookPagesToSupabase(book.id, validPages),
         syncBookReadPagesToSupabase(book.id, validReadPages),
+        status === 'reading' && computedStartedAt
+          ? syncBookStartedReadingToSupabase(book.id, computedStartedAt)
+          : (book.status === 'reading' ? removeBookStartedReadingDate(book.id) : Promise.resolve()),
       ]);
 
       const baseBook = updateData ?? book;
@@ -363,6 +383,7 @@ export function AddBookModal({
         cover_url: finalCoverUrl,
         status,
         read_at: computedReadAt,
+        started_at: status === 'reading' ? computedStartedAt : null,
         pages: validPages,
         read_pages: validReadPages,
         updated_at: updatedAt,
@@ -409,6 +430,9 @@ export function AddBookModal({
         syncBookDateToSupabase(insertData.id, computedReadAt),
         syncBookPagesToSupabase(insertData.id, validPages),
         syncBookReadPagesToSupabase(insertData.id, validReadPages),
+        status === 'reading' && computedStartedAt
+          ? syncBookStartedReadingToSupabase(insertData.id, computedStartedAt)
+          : Promise.resolve(),
       ]);
 
       const mergedInsertData = {
@@ -419,6 +443,7 @@ export function AddBookModal({
         cover_url: finalCoverUrl,
         status,
         read_at: computedReadAt,
+        started_at: status === 'reading' ? computedStartedAt : null,
         pages: validPages,
         read_pages: validReadPages,
       };
@@ -812,6 +837,20 @@ export function AddBookModal({
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {status === 'reading' && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 mb-1.5">
+                Data inizio lettura (opzionale)
+              </label>
+              <input
+                type="date"
+                value={startedAt}
+                onChange={(e) => setStartedAt(e.target.value)}
+                className="w-full px-3.5 py-3 sm:py-2.5 bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm"
+              />
             </div>
           )}
 

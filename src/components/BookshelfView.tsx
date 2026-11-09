@@ -22,6 +22,7 @@ import { CoverImage } from './CoverImage';
 import { EmptyReadingShelf } from './EmptyReadingShelf';
 import { optimizeCoverUrl } from '@/lib/coverUrl';
 import { orderWantBooks, orderBestBooks, reorderBookIds, shiftBookPosition } from '@/lib/bookPriority';
+import { formatReadingDuration } from '@/lib/bookDates';
 import {
   BookshelfDecoration,
   ChristmasShelfLights,
@@ -996,7 +997,9 @@ export function BookshelfView({
                                   ? `[👑 #${bestRank} Top Libro] `
                                   : isWantSection
                                     ? `[Priorità #${priorityRank}] `
-                                    : ''
+                                    : book.status === 'reading'
+                                      ? `[📖 ${formatReadingDuration(book.started_at || book.created_at, { short: true }) || 'In lettura'}] `
+                                      : ''
                               }${book.title} — ${book.author}`}
                             >
                               {/* Libro appoggiato sullo scaffale con struttura tridimensionale */}
@@ -1245,7 +1248,9 @@ export function BookshelfView({
                                 ? `[👑 #${bestRank} Top Libro] `
                                 : isWantSection
                                   ? `[Priorità #${priorityRank}] `
-                                  : ''
+                                  : book.status === 'reading'
+                                    ? `[📖 ${formatReadingDuration(book.started_at || book.created_at, { short: true }) || 'In lettura'}] `
+                                    : ''
                             }${book.title} — ${book.author}`}
                           >
                             {/* Texture sfumata prelevata direttamente dalla copertina */}

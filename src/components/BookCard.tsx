@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   Trash2,
   Loader2,
@@ -13,10 +13,18 @@ import {
   CheckCircle2,
   ChevronDown,
   GripVertical,
+  Clock,
 } from 'lucide-react';
 import type { Book, Note } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
-import { syncBookDateToSupabase, syncBookReadPagesToSupabase } from '@/lib/bookDates';
+import {
+  syncBookDateToSupabase,
+  syncBookReadPagesToSupabase,
+  syncBookStartedReadingToSupabase,
+  removeBookStartedReadingDate,
+  formatReadingDuration,
+  formatReadingStartDate,
+} from '@/lib/bookDates';
 import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
 import { CoverImage } from './CoverImage';
@@ -95,9 +103,21 @@ function BookCardComponent({
 
   const displayCount = notes !== null ? notes.length : notesCount;
 
+  const effectiveStartedAt = book.status === 'reading' ? (book.started_at || book.created_at) : null;
+  const readingDurationShort = useMemo(
+    () => (effectiveStartedAt ? formatReadingDuration(effectiveStartedAt, { short: true }) : null),
+    [effectiveStartedAt]
+  );
+  const readingStartDateFormatted = useMemo(
+    () => (effectiveStartedAt ? formatReadingStartDate(effectiveStartedAt) : null),
+    [effectiveStartedAt]
+  );
+
   const handleStatusChange = async (status: Book['status']) => {
     let newReadAt = book.read_at;
     let newReadPages = book.read_pages;
+    let newStartedAt = book.started_at;
+
     if (status === 'completed') {
       if (!newReadAt) {
         newReadAt = new Date().toISOString();
@@ -107,10 +127,21 @@ function BookCardComponent({
         newReadPages = book.pages;
         await syncBookReadPagesToSupabase(book.id, newReadPages);
       }
+      newStartedAt = null;
+      removeBookStartedReadingDate(book.id);
     } else if (book.status === 'completed') {
       newReadAt = null;
       await syncBookDateToSupabase(book.id, null);
     }
+
+    if (status === 'reading' && book.status !== 'reading') {
+      newStartedAt = new Date().toISOString();
+      await syncBookStartedReadingToSupabase(book.id, newStartedAt);
+    } else if (status === 'want' && book.status === 'reading') {
+      newStartedAt = null;
+      removeBookStartedReadingDate(book.id);
+    }
+
     const updatePayload: any = { status, read_at: newReadAt, updated_at: new Date().toISOString() };
     if (newReadPages !== undefined) updatePayload.read_pages = newReadPages;
 
@@ -130,7 +161,7 @@ function BookCardComponent({
         .single();
     }
 
-    if (res.data) onUpdate({ ...book, ...res.data, read_at: newReadAt, read_pages: newReadPages, notes_count: displayCount });
+    if (res.data) onUpdate({ ...book, ...res.data, read_at: newReadAt, started_at: newStartedAt, read_pages: newReadPages, notes_count: displayCount });
 
     if (status === 'completed' && book.status !== 'completed') {
       toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
@@ -191,6 +222,7 @@ function BookCardComponent({
     const readAtDate = new Date().toISOString();
 
     await syncBookDateToSupabase(book.id, readAtDate);
+    removeBookStartedReadingDate(book.id);
     if (finalPages) {
       await syncBookReadPagesToSupabase(book.id, finalPages);
     }
@@ -603,10 +635,22 @@ function BookCardComponent({
           {/* Colonna dettagli del libro */}
           <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
             <div>
-              {highlight && (
-                <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1">
-                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 light:bg-amber-500 animate-pulse inline-block" />
-                  <span>In lettura</span>
+              {(highlight || book.status === 'reading') && (
+                <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 light:bg-amber-500 animate-pulse inline-block shrink-0" />
+                    <span>In lettura</span>
+                  </div>
+                  {readingDurationShort && (
+                    <span
+                      className="normal-case font-medium text-amber-300/85 light:text-amber-800/85 tracking-normal inline-flex items-center gap-1"
+                      title={readingStartDateFormatted ? `Iniziato il ${readingStartDateFormatted}` : undefined}
+                    >
+                      <span className="opacity-50">·</span>
+                      <Clock size={11} className="shrink-0 text-amber-400 light:text-amber-600" />
+                      <span>{readingDurationShort}</span>
+                    </span>
+                  )}
                 </div>
               )}
 

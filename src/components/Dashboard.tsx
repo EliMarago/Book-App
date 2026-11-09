@@ -35,6 +35,10 @@ import {
   removeBookReadPages,
   getStoredPlots,
   getStoredTags,
+  getStoredStartedReadingDates,
+  saveBookStartedReadingDate,
+  removeBookStartedReadingDate,
+  syncBookStartedReadingToSupabase,
   removeBookPlot,
   fetchNotesMetadataFromSupabase,
   markLocalMutation,
@@ -231,18 +235,32 @@ export function Dashboard() {
           .select('*')
           .order('created_at', { ascending: false });
 
-        const [storedLocalDates, storedLocalPages, storedLocalReadPages, storedLocalPlots, storedLocalTags, notesMeta] = await Promise.all([
+        const [
+          storedLocalDates,
+          storedLocalPages,
+          storedLocalReadPages,
+          storedLocalPlots,
+          storedLocalTags,
+          storedLocalStartedDates,
+          notesMeta,
+        ] = await Promise.all([
           getStoredDates(),
           getStoredPages(),
           getStoredReadPages(),
           getStoredPlots(),
           getStoredTags(),
+          getStoredStartedReadingDates(),
           fetchNotesMetadataFromSupabase(),
         ]);
 
         const booksWithDatesAndPages = (data ?? []).map((b) => ({
           ...b,
           read_at: b.read_at || notesMeta.dates[b.id] || storedLocalDates[b.id] || null,
+          started_at:
+            (b as any).started_at ||
+            notesMeta.startedDates[b.id] ||
+            storedLocalStartedDates[b.id] ||
+            (b.status === 'reading' ? b.created_at : null),
           pages: b.pages !== undefined && b.pages !== null ? Number(b.pages) : (notesMeta.pages[b.id] || storedLocalPages[b.id] || null),
           read_pages: b.read_pages !== undefined && b.read_pages !== null
             ? Number(b.read_pages)
@@ -347,9 +365,11 @@ export function Dashboard() {
   // Avvia la lettura del prossimo libro in lista (da "Da leggere" a "In lettura")
   const handleStartReading = async (book: Book) => {
     markLocalMutation();
+    const now = new Date().toISOString();
+    await syncBookStartedReadingToSupabase(book.id, now);
     const { data, error } = await supabase
       .from('books')
-      .update({ status: 'reading', updated_at: new Date().toISOString() })
+      .update({ status: 'reading', updated_at: now })
       .eq('id', book.id)
       .select()
       .single();
@@ -358,7 +378,7 @@ export function Dashboard() {
       return;
     }
     setBooks((prev) =>
-      prev.map((b) => (b.id === book.id ? { ...b, ...data, read_at: b.read_at, notes_count: b.notes_count } : b))
+      prev.map((b) => (b.id === book.id ? { ...b, ...data, started_at: now, read_at: b.read_at, notes_count: b.notes_count } : b))
     );
     toast({ message: `Buona lettura con "${book.title}"! 📖`, type: 'success' });
   };
@@ -388,6 +408,7 @@ export function Dashboard() {
       return;
     }
     removeBookDate(book.id);
+    removeBookStartedReadingDate(book.id);
     removeBookPages(book.id);
     removeBookReadPages(book.id);
     removeBookPlot(book.id);

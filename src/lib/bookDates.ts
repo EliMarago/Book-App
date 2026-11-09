@@ -259,6 +259,7 @@ export async function syncBookDateToSupabase(bookId: string, readAt: string | nu
 
 export async function fetchNotesMetadataFromSupabase(): Promise<{
   dates: Record<string, string>;
+  startedDates: Record<string, string>;
   pages: Record<string, number>;
   readPages: Record<string, number>;
   plots: Record<string, string>;
@@ -271,10 +272,11 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
       .select('book_id, content');
 
     if (error || !data) {
-      return { dates: {}, pages: {}, readPages: {}, plots: {}, tags: {}, counts: {} };
+      return { dates: {}, startedDates: {}, pages: {}, readPages: {}, plots: {}, tags: {}, counts: {} };
     }
 
     const dates: Record<string, string> = {};
+    const startedDates: Record<string, string> = {};
     const pages: Record<string, number> = {};
     const readPages: Record<string, number> = {};
     const plots: Record<string, string> = {};
@@ -284,6 +286,8 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
     for (const item of data) {
       if (item.content.startsWith('__READ_AT__:')) {
         dates[item.book_id] = item.content.replace('__READ_AT__:', '');
+      } else if (item.content.startsWith('__STARTED_AT__:')) {
+        startedDates[item.book_id] = item.content.replace('__STARTED_AT__:', '');
       } else if (item.content.startsWith('__PAGES__:')) {
         const p = parseInt(item.content.replace('__PAGES__:', ''), 10);
         if (!isNaN(p) && p > 0) {
@@ -308,11 +312,133 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
       }
     }
 
-    return { dates, pages, readPages, plots, tags, counts };
+    return { dates, startedDates, pages, readPages, plots, tags, counts };
   } catch (err) {
     console.error('Errore nel recupero note, date e pagine da Supabase:', err);
-    return { dates: {}, pages: {}, readPages: {}, plots: {}, tags: {}, counts: {} };
+    return { dates: {}, startedDates: {}, pages: {}, readPages: {}, plots: {}, tags: {}, counts: {} };
   }
+}
+
+export function getStoredStartedReadingDates(): Record<string, string> {
+  try {
+    const data = localStorage.getItem('books_started_reading_at');
+    return data ? JSON.parse(data) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveBookStartedReadingDate(bookId: string, startedAt: string | null) {
+  try {
+    const dates = getStoredStartedReadingDates();
+    if (startedAt) {
+      dates[bookId] = startedAt;
+    } else {
+      delete dates[bookId];
+    }
+    localStorage.setItem('books_started_reading_at', JSON.stringify(dates));
+  } catch (e) {
+    console.error('Errore nel salvataggio della data di inizio lettura in localStorage:', e);
+  }
+}
+
+export function removeBookStartedReadingDate(bookId: string) {
+  saveBookStartedReadingDate(bookId, null);
+}
+
+export async function syncBookStartedReadingToSupabase(bookId: string, startedAt: string | null) {
+  markLocalMutation();
+  saveBookStartedReadingDate(bookId, startedAt);
+  try {
+    await supabase
+      .from('notes')
+      .delete()
+      .eq('book_id', bookId)
+      .like('content', '__STARTED_AT__:%');
+
+    if (startedAt) {
+      markLocalMutation();
+      await supabase.from('notes').insert({
+        book_id: bookId,
+        content: `__STARTED_AT__:${startedAt}`,
+      });
+    }
+  } catch (err) {
+    console.error('Errore nel sincronizzare la data di inizio lettura su Supabase:', err);
+  }
+}
+
+/**
+ * Calcola da quanto tempo un libro è in lettura (giorni, settimane, mesi, anni)
+ * Formatta in italiano naturale:
+ * - diffDays = 0: "Iniziato oggi"
+ * - diffDays = 1: "In lettura da 1 giorno" (short: "da 1 giorno")
+ * - diffDays < 30: "In lettura da X giorni" (short: "da X giorni")
+ * - Mesi: "In lettura da 1 mese e X giorni" (short: "da 1 mese e X gg")
+ */
+export function formatReadingDuration(
+  startedDate: string | Date | null | undefined,
+  options?: { short?: boolean }
+): string | null {
+  if (!startedDate) return null;
+  const start = new Date(startedDate);
+  if (isNaN(start.getTime())) return null;
+
+  const now = new Date();
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffMs = today.getTime() - startDay.getTime();
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+  const isShort = options?.short ?? false;
+
+  if (diffDays === 0) {
+    return 'Iniziato oggi';
+  }
+
+  if (diffDays === 1) {
+    return isShort ? 'da 1 giorno' : 'In lettura da 1 giorno';
+  }
+
+  if (diffDays < 30) {
+    return isShort ? `da ${diffDays} giorni` : `In lettura da ${diffDays} giorni`;
+  }
+
+  if (diffDays < 60) {
+    const remDays = diffDays - 30;
+    if (remDays === 0) {
+      return isShort ? 'da 1 mese' : 'In lettura da 1 mese';
+    }
+    const remStr = remDays === 1 ? '1 giorno' : `${remDays} ${isShort ? 'gg' : 'giorni'}`;
+    return isShort ? `da 1 mese e ${remStr}` : `In lettura da 1 mese e ${remStr}`;
+  }
+
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    const remDays = diffDays % 30;
+    if (remDays === 0) {
+      return isShort ? `da ${months} mesi` : `In lettura da ${months} mesi`;
+    }
+    const remStr = remDays === 1 ? '1 giorno' : `${remDays} ${isShort ? 'gg' : 'giorni'}`;
+    return isShort ? `da ${months} mesi e ${remStr}` : `In lettura da ${months} mesi e ${remStr}`;
+  }
+
+  const years = Math.floor(diffDays / 365);
+  if (years === 1) {
+    return isShort ? 'da oltre 1 anno' : 'In lettura da oltre 1 anno';
+  }
+  return isShort ? `da oltre ${years} anni` : `In lettura da oltre ${years} anni`;
+}
+
+export function formatReadingStartDate(startedDate: string | Date | null | undefined): string | null {
+  if (!startedDate) return null;
+  const d = new Date(startedDate);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('it-IT', {
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+  });
 }
 
 export async function fetchDatesFromSupabase(): Promise<Record<string, string>> {

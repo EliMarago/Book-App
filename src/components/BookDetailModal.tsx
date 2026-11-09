@@ -19,6 +19,7 @@ import {
   Trash2,
   Search,
   Check,
+  Clock,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import { StarRating } from './StarRating';
@@ -32,6 +33,10 @@ import {
   syncBookPagesToSupabase,
   syncBookPlotToSupabase,
   syncBookTagsToSupabase,
+  syncBookStartedReadingToSupabase,
+  removeBookStartedReadingDate,
+  formatReadingDuration,
+  formatReadingStartDate,
   saveBookPlot,
 } from '@/lib/bookDates';
 import {
@@ -122,6 +127,42 @@ export function BookDetailModal({
   );
 
   const { toast } = useToast();
+
+  const effectiveStartedAt = book.status === 'reading' ? (book.started_at || book.created_at) : null;
+  const readingDuration = useMemo(
+    () => (effectiveStartedAt ? formatReadingDuration(effectiveStartedAt) : null),
+    [effectiveStartedAt]
+  );
+  const readingStartDateFormatted = useMemo(
+    () => (effectiveStartedAt ? formatReadingStartDate(effectiveStartedAt) : null),
+    [effectiveStartedAt]
+  );
+  const [editingStartDate, setEditingStartDate] = useState(false);
+  const [startDateInput, setStartDateInput] = useState(
+    effectiveStartedAt ? new Date(effectiveStartedAt).toISOString().split('T')[0] : ''
+  );
+
+  useEffect(() => {
+    if (effectiveStartedAt) {
+      setStartDateInput(new Date(effectiveStartedAt).toISOString().split('T')[0]);
+    }
+  }, [effectiveStartedAt]);
+
+  const handleSaveStartDate = async (customDate?: string) => {
+    const targetDate = customDate ?? startDateInput;
+    if (!targetDate) return;
+    const isoDate = new Date(targetDate).toISOString();
+    await syncBookStartedReadingToSupabase(book.id, isoDate);
+    const updated: Book = {
+      ...book,
+      started_at: isoDate,
+    };
+    setBook(updated);
+    onUpdateBook(updated);
+    setEditingStartDate(false);
+    toast({ message: 'Data inizio lettura aggiornata', type: 'success' });
+  };
+
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PlotSearchResult[]>([]);
@@ -391,6 +432,7 @@ export function BookDetailModal({
     const now = new Date().toISOString();
     const finalPages = book.pages ?? book.read_pages ?? null;
     await syncBookDateToSupabase(book.id, now);
+    removeBookStartedReadingDate(book.id);
     if (finalPages) {
       await syncBookReadPagesToSupabase(book.id, finalPages);
     }
@@ -402,6 +444,7 @@ export function BookDetailModal({
       ...book,
       status: 'completed',
       read_at: now,
+      started_at: null,
       read_pages: finalPages,
       ...(rating > 0 ? { rating } : {}),
     };
@@ -422,6 +465,16 @@ export function BookDetailModal({
     if (book.status === 'completed') {
       await syncBookDateToSupabase(book.id, null);
     }
+
+    let newStartedAt = book.started_at;
+    if (newStatus === 'reading' && book.status !== 'reading') {
+      newStartedAt = now;
+      await syncBookStartedReadingToSupabase(book.id, now);
+    } else if (newStatus === 'want' && book.status === 'reading') {
+      newStartedAt = null;
+      removeBookStartedReadingDate(book.id);
+    }
+
     await supabase
       .from('books')
       .update({
@@ -434,6 +487,7 @@ export function BookDetailModal({
       ...book,
       status: newStatus,
       read_at: book.status === 'completed' ? null : book.read_at,
+      started_at: newStartedAt,
       updated_at: now,
     };
     setBook(updated);
@@ -656,9 +710,20 @@ export function BookDetailModal({
                   /* MODALITÀ VISUALIZZAZIONE NORMALE CON PERCENTUALE E ACCESSO RAPIDO */
                   <>
                     <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 font-semibold text-amber-300 light:text-amber-800">
-                        <Flame size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
-                        <span>Progresso di lettura</span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 font-semibold text-amber-300 light:text-amber-800">
+                          <Flame size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
+                          <span>Progresso di lettura</span>
+                        </div>
+                        {readingDuration && (
+                          <div className="flex items-center gap-1 text-[11px] font-medium text-amber-300/85 light:text-amber-800/85">
+                            <Clock size={11} className="text-amber-400 light:text-amber-600 shrink-0" />
+                            <span>{readingDuration}</span>
+                            {readingStartDateFormatted && (
+                              <span className="opacity-75">({readingStartDateFormatted})</span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1040,6 +1105,56 @@ export function BookDetailModal({
                 </div>
               )}
             </div>
+
+            {/* Data inizio lettura se in lettura */}
+            {book.status === 'reading' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 text-xs text-stone-400 light:text-stone-500 bg-stone-850/50 light:bg-stone-100/70 p-2.5 sm:p-3 rounded-xl border border-stone-800 light:border-stone-200">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Clock size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
+                    <span className="truncate">
+                      <strong className="text-amber-300 light:text-amber-800 font-semibold">
+                        {readingDuration || 'In lettura'}
+                      </strong>
+                      {readingStartDateFormatted && (
+                        <span className="ml-1 opacity-80">(dal {readingStartDateFormatted})</span>
+                      )}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!startDateInput && effectiveStartedAt) {
+                        setStartDateInput(new Date(effectiveStartedAt).toISOString().split('T')[0]);
+                      }
+                      setEditingStartDate((v) => !v);
+                    }}
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 border border-stone-700 light:border-stone-300 cursor-pointer transition-colors shrink-0"
+                  >
+                    {editingStartDate ? 'Chiudi' : 'Modifica data'}
+                  </button>
+                </div>
+
+                {editingStartDate && (
+                  <div className="p-3 bg-stone-900/90 light:bg-white rounded-xl border border-amber-500/30 flex items-center gap-2 flex-wrap text-xs shadow-inner">
+                    <span className="text-stone-400 light:text-stone-600 font-medium">Iniziato il:</span>
+                    <input
+                      type="date"
+                      value={startDateInput}
+                      onChange={(e) => setStartDateInput(e.target.value)}
+                      className="px-2.5 py-1 bg-stone-950 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveStartDate()}
+                      className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-lg text-xs cursor-pointer active:scale-95 transition-all"
+                    >
+                      Salva data
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Data di lettura se completato */}
             {book.status === 'completed' && book.read_at && (
