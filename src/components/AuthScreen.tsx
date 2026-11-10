@@ -6,6 +6,7 @@ import {
   AlertCircle,
   Sun,
   Moon,
+  SunMoon,
   Sparkles,
   ArrowRight,
   Loader2,
@@ -59,7 +60,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     recoveryError,
     clearRecoveryError,
   } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, themePreference, toggleTheme } = useTheme();
   const [mode, setMode] = useState<AuthMode>(() => {
     if (!ALLOW_REGISTRATION && initialMode === 'signup') return 'signin';
     return initialMode;
@@ -246,14 +247,22 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
       <div className="pointer-events-none absolute -top-40 -left-40 w-96 h-96 rounded-full bg-amber-500/10 light:bg-amber-300/25 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-amber-600/10 light:bg-orange-300/20 blur-3xl" />
 
-      {/* Selettore Tema chiaro/scuro in alto a destra */}
+      {/* Selettore Tema chiaro/scuro/auto in alto a destra */}
       <button
         onClick={toggleTheme}
         className="absolute top-5 right-5 p-2.5 rounded-2xl bg-stone-900/80 light:bg-white/90 border border-stone-800 light:border-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 shadow-md backdrop-blur-md transition-all cursor-pointer hover:scale-105 active:scale-95"
-        title={theme === 'dark' ? 'Passa alla modalità chiara' : 'Passa alla modalità scura'}
+        title={
+          themePreference === 'system'
+            ? `Tema: Automatico di sistema (${theme === 'dark' ? 'Scura attiva' : 'Chiara attiva'})`
+            : themePreference === 'light'
+            ? 'Tema: Chiaro manuale'
+            : 'Tema: Scuro manuale'
+        }
         aria-label="Cambia tema"
       >
-        {theme === 'dark' ? (
+        {themePreference === 'system' ? (
+          <SunMoon size={19} className="text-amber-400 light:text-amber-600" />
+        ) : theme === 'dark' ? (
           <Sun size={19} className="text-amber-400 hover:rotate-45 transition-transform" />
         ) : (
           <Moon size={19} className="text-amber-600 hover:-rotate-12 transition-transform" />

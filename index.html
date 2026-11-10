@@ -22,19 +22,25 @@
   <script>
     (function () {
       try {
-        var saved = localStorage.getItem('bookshelf_theme') || 'dark';
+        var pref = localStorage.getItem('bookshelf_theme_pref') || 'system';
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var resolved = pref === 'system' ? (prefersDark ? 'dark' : 'light') : pref;
         var metaTheme = document.querySelector('meta[name="theme-color"]');
         var metaStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-        if (saved === 'light') {
+        if (resolved === 'light') {
           document.documentElement.classList.add('light');
+          document.documentElement.classList.remove('dark');
           document.documentElement.setAttribute('data-theme', 'light');
           if (metaTheme) metaTheme.setAttribute('content', '#fcfbfa');
           if (metaStatus) metaStatus.setAttribute('content', 'default');
+          if (document.body) document.body.style.backgroundColor = '#fcfbfa';
         } else {
           document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
           document.documentElement.setAttribute('data-theme', 'dark');
           if (metaTheme) metaTheme.setAttribute('content', '#1c1917');
           if (metaStatus) metaStatus.setAttribute('content', 'default');
+          if (document.body) document.body.style.backgroundColor = '#1c1917';
         }
       } catch (e) { }
     })();

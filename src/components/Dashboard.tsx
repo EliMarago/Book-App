@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  SunMoon,
   ArrowUpDown,
   ChevronDown,
   Database,
@@ -70,7 +71,7 @@ type ViewTab = 'all' | 'reading' | 'completed' | 'want';
 
 export function Dashboard() {
   const { signOut, user } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark, themePreference, toggleTheme } = useTheme();
   const { toast } = useToast();
   const {
     priorityOrder,
@@ -556,20 +557,28 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Toggle Modalità Chiara / Scura */}
+            {/* Toggle Modalità Chiara / Scura / Sistema */}
             <button
               onClick={toggleTheme}
               className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-200 light:text-stone-750 hover:text-white light:hover:text-stone-950 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
-              title={isDark ? 'Passa alla modalità chiara' : 'Passa alla modalità scura'}
+              title={
+                themePreference === 'system'
+                  ? `Tema: Automatico di sistema (${isDark ? 'Scura attiva' : 'Chiara attiva'}). Clicca per impostare Chiara.`
+                  : themePreference === 'light'
+                  ? 'Tema: Chiara manuale. Clicca per impostare Scura.'
+                  : 'Tema: Scura manuale. Clicca per impostare Automatica di sistema.'
+              }
               aria-label="Cambia tema"
             >
-              {isDark ? (
-                <Sun size={15} className="text-amber-400 hover:rotate-45 transition-transform" />
+              {themePreference === 'system' ? (
+                <SunMoon size={15} className="text-amber-400 light:text-amber-600 transition-transform" />
+              ) : isDark ? (
+                <Moon size={15} className="text-amber-400 hover:-rotate-12 transition-transform" />
               ) : (
-                <Moon size={15} className="text-amber-600 hover:-rotate-12 transition-transform" />
+                <Sun size={15} className="text-amber-600 hover:rotate-45 transition-transform" />
               )}
               <span className="hidden sm:inline">
-                {isDark ? 'Chiaro' : 'Scuro'}
+                {themePreference === 'system' ? 'Auto' : isDark ? 'Scuro' : 'Chiaro'}
               </span>
             </button>
 
