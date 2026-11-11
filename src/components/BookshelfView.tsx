@@ -368,10 +368,12 @@ export function BookshelfView({
   // Libro attualmente selezionato per ispezione dettagliata
   const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
 
-  // Scelta personalizzata dei libri da esporre di fronte con la copertina su basetta (true = copertina, false = dorso)
+  // Scelta personalizzata dei libri da esporre di fronte con la copertina su basetta:
+  // usa la chiave "${sectionId}::${bookId}" così ogni scaffale (es. "I Migliori" vs "Ultime Letture") è indipendente
+  // e fissando lo stato degli altri libri dello scaffale evita che il cambio di larghezza attivi copertine sui ripiani sottostanti
   const [faceOutOverrides, setFaceOutOverrides] = useState<Record<string, boolean>>(() => {
     try {
-      const saved = localStorage.getItem('bookapp_faceout_overrides_v1');
+      const saved = localStorage.getItem('bookapp_faceout_overrides_v2');
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -379,11 +381,22 @@ export function BookshelfView({
   });
   const [isSelectingFaceOut, setIsSelectingFaceOut] = useState(false);
 
-  const handleToggleFaceOut = (bookId: string, currentlyFaceOut: boolean) => {
+  const handleToggleFaceOut = (
+    sectionId: string,
+    bookId: string,
+    currentlyFaceOut: boolean,
+    currentSectionState: Record<string, boolean>
+  ) => {
     setFaceOutOverrides((prev) => {
-      const next = { ...prev, [bookId]: !currentlyFaceOut };
+      const next = { ...prev };
+      // Congela lo stato attuale di tutti i libri di questo scaffale così nessun altro libro cambia da solo andando a capo
+      for (const [bId, state] of Object.entries(currentSectionState)) {
+        next[`${sectionId}::${bId}`] = state;
+      }
+      // Inverte esclusivamente il libro cliccato su questo specifico scaffale
+      next[`${sectionId}::${bookId}`] = !currentlyFaceOut;
       try {
-        localStorage.setItem('bookapp_faceout_overrides_v1', JSON.stringify(next));
+        localStorage.setItem('bookapp_faceout_overrides_v2', JSON.stringify(next));
       } catch {
         // ignore
       }
@@ -397,7 +410,7 @@ export function BookshelfView({
   const handleResetFaceOutOverrides = () => {
     setFaceOutOverrides({});
     try {
-      localStorage.removeItem('bookapp_faceout_overrides_v1');
+      localStorage.removeItem('bookapp_faceout_overrides_v2');
     } catch {
       // ignore
     }
@@ -1535,6 +1548,7 @@ export function BookshelfView({
                       let cursor = 0;
                       let rowIdx = 0;
                       const totalBooksInSection = section.books.length;
+                      const currentSectionFaceOutMap: Record<string, boolean> = {};
 
                       while (cursor < totalBooksInSection) {
                         const isTopSpinesRow =
@@ -1559,14 +1573,15 @@ export function BookshelfView({
                         while (cursor < totalBooksInSection) {
                           const book = section.books[cursor];
                           const globalIdx = cursor;
+                          const sectionBookKey = `${section.id}::${book.id}`;
 
                           // Determina se il libro va mostrato di fronte con la copertina su basetta o di dorso:
-                          // 1. Se l'utente ha scelto manualmente per questo libro (faceOutOverrides), rispetta sempre la sua scelta
+                          // 1. Usa la chiave specifica dello scaffale ("section.id::book.id") così i vari scaffali sono indipendenti
                           // 2. Altrimenti, in modalità 'mixed' sui ripiani misti, espone di fronte il 1° e il 4° libro (e su Web anche l'8°)
                           let isFaceOut = false;
                           if (shelfStyle === 'mixed' && Boolean(book.cover_url)) {
-                            if (faceOutOverrides[book.id] !== undefined) {
-                              isFaceOut = faceOutOverrides[book.id];
+                            if (faceOutOverrides[sectionBookKey] !== undefined) {
+                              isFaceOut = faceOutOverrides[sectionBookKey];
                             } else if (!isTopSpinesRow) {
                               isFaceOut =
                                 idxInRow === 0 ||
@@ -1582,6 +1597,7 @@ export function BookshelfView({
                             break;
                           }
 
+                          currentSectionFaceOutMap[book.id] = isFaceOut;
                           items.push({ book, globalIdx, isFaceOut });
                           usedPx += itemPx;
                           cursor += 1;
@@ -1656,7 +1672,12 @@ export function BookshelfView({
 
                                       const handleBookClick = () => {
                                         if (isSelectingFaceOut && book.cover_url) {
-                                          handleToggleFaceOut(book.id, isFaceOut);
+                                          handleToggleFaceOut(
+                                            section.id,
+                                            book.id,
+                                            isFaceOut,
+                                            currentSectionFaceOutMap
+                                          );
                                           return;
                                         }
                                         setInspectingBook(book);
