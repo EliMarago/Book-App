@@ -13,7 +13,6 @@ import {
   Crown,
   Calendar,
   ArrowRight,
-  Medal,
   SlidersHorizontal,
   Eye,
   RotateCcw,
@@ -22,6 +21,7 @@ import { type Book } from '@/lib/supabase';
 import { BookDetailModal } from './BookDetailModal';
 import { CoverImage } from './CoverImage';
 import { EmptyReadingShelf } from './EmptyReadingShelf';
+import { RankSeal } from './RankSeal';
 import { orderWantBooks, orderBestBooks, reorderBookIds, shiftBookPosition } from '@/lib/bookPriority';
 import { formatReadingDuration } from '@/lib/bookDates';
 import {
@@ -1058,27 +1058,27 @@ export function BookshelfView({
 
             {shelfSections.map((section, sectionIdx) => {
               const SectionIcon = section.icon;
-              const isDarkWall = customization.background !== 'clean';
+              const isAlwaysDarkWall = customization.background === 'boiserie';
               const accentBadge =
                 section.accent === 'emerald'
-                  ? isDarkWall
+                  ? isAlwaysDarkWall
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
-                    : 'bg-emerald-500/15 light:bg-emerald-100 text-emerald-400 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40 light:bg-emerald-100 light:text-emerald-900 light:border-emerald-300'
                   : section.accent === 'sky'
-                    ? isDarkWall
+                    ? isAlwaysDarkWall
                       ? 'bg-sky-500/20 text-sky-300 border-sky-400/40'
-                      : 'bg-sky-500/15 light:bg-sky-100 text-sky-400 light:text-sky-700 border-sky-500/30 light:border-sky-300'
-                    : isDarkWall
+                      : 'bg-sky-500/20 text-sky-300 border-sky-400/40 light:bg-sky-100 light:text-sky-950 light:border-sky-300'
+                    : isAlwaysDarkWall
                       ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
-                      : 'bg-amber-500/15 light:bg-amber-100 text-amber-400 light:text-amber-700 border-amber-500/30 light:border-amber-300';
+                      : 'bg-amber-500/20 text-amber-300 border-amber-400/40 light:bg-amber-100 light:text-amber-950 light:border-amber-300';
 
               return (
                 <div key={section.id} className="relative">
-                  {/* Intestazione del ripiano pulita e senza riquadri invasivi, integrata nello stile della libreria */}
+                  {/* Intestazione del ripiano pulita e ad alto contrasto sia in dark che light mode */}
                   <div
-                    className={`mb-3 sm:mb-4 px-1 sm:px-2 pb-2.5 border-b ${isDarkWall
+                    className={`mb-3 sm:mb-4 px-1 sm:px-2 pb-2.5 border-b ${isAlwaysDarkWall
                       ? 'border-amber-200/10'
-                      : 'border-stone-800/80 light:border-stone-300/70'
+                      : 'border-amber-200/10 light:border-stone-400/40'
                       }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -1095,7 +1095,9 @@ export function BookshelfView({
                             {section.shelfLabel}
                           </span>
                           <h3
-                            className={`font-serif text-xs xs:text-sm sm:text-base md:text-lg font-bold leading-snug line-clamp-1 sm:line-clamp-2 break-words ${isDarkWall ? 'text-amber-50/95 drop-shadow-xs' : 'text-stone-100 light:text-stone-900'
+                            className={`font-serif text-xs xs:text-sm sm:text-base md:text-lg font-bold leading-snug line-clamp-1 sm:line-clamp-2 break-words ${isAlwaysDarkWall
+                              ? 'text-amber-50/95 drop-shadow-xs'
+                              : 'text-stone-100 light:text-stone-950 drop-shadow-xs light:drop-shadow-none'
                               }`}
                           >
                             {section.title}
@@ -1110,9 +1112,9 @@ export function BookshelfView({
                             onClick={() => setIsReorderingWant((v) => !v)}
                             className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${isReorderingWant
                               ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
-                              : isDarkWall
+                              : isAlwaysDarkWall
                                 ? 'bg-black/35 text-sky-300 border border-sky-400/30 hover:border-sky-300/60'
-                                : 'bg-stone-850/80 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400 hover:bg-sky-500/10'
+                                : 'bg-black/35 text-sky-300 border border-sky-400/30 hover:border-sky-300/60 light:bg-white light:text-sky-900 light:border-sky-300 hover:light:bg-sky-50'
                               }`}
                             title="Modifica priorità di lettura con Drag and Drop"
                           >
@@ -1126,9 +1128,9 @@ export function BookshelfView({
                             onClick={() => setIsReorderingBest((v) => !v)}
                             className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${isReorderingBest
                               ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
-                              : isDarkWall
+                              : isAlwaysDarkWall
                                 ? 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60'
-                                : 'bg-stone-850/80 light:bg-white text-amber-400 light:text-amber-700 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/10'
+                                : 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60 light:bg-white light:text-amber-950 light:border-amber-300 hover:light:bg-amber-50'
                               }`}
                             title="Modifica classifica dei migliori libri con Drag and Drop"
                           >
@@ -1137,9 +1139,9 @@ export function BookshelfView({
                           </button>
                         )}
                         <span
-                          className={`text-[11px] sm:text-xs font-sans font-medium px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${isDarkWall
+                          className={`text-[11px] sm:text-xs font-sans font-medium px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${isAlwaysDarkWall
                             ? 'bg-black/30 text-amber-100/80 border-amber-200/15'
-                            : 'bg-stone-850/90 light:bg-white/90 text-stone-300 light:text-stone-700 border-stone-700/70 light:border-stone-300/80'
+                            : 'bg-black/30 text-amber-100/80 border-amber-200/15 light:bg-white/95 light:text-stone-900 light:border-stone-300/90 light:shadow-xs'
                             }`}
                         >
                           {section.books.length} <span className="hidden xs:inline">{section.books.length === 1 ? 'volume' : 'volumi'}</span><span className="xs:hidden">vol.</span>
@@ -1150,11 +1152,11 @@ export function BookshelfView({
                     {/* Su mobile: pulsante di riordino su riga dedicata per evitare qualsiasi sovrapposizione o troncamento del titolo */}
                     {section.id === 'want' && section.books.length > 1 && (
                       <div
-                        className={`sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t ${isDarkWall ? 'border-amber-200/10' : 'border-stone-800/40 light:border-stone-200/50'
+                        className={`sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t ${isAlwaysDarkWall ? 'border-amber-200/10' : 'border-amber-200/10 light:border-stone-300/60'
                           }`}
                       >
                         <span
-                          className={`text-[11px] font-medium flex items-center gap-1 truncate ${isDarkWall ? 'text-sky-300/90' : 'text-sky-400 light:text-sky-700'
+                          className={`text-[11px] font-medium flex items-center gap-1 truncate ${isAlwaysDarkWall ? 'text-sky-300/90' : 'text-sky-300/90 light:text-sky-950'
                             }`}
                         >
                           <Bookmark size={11} className="shrink-0" />
@@ -1165,9 +1167,9 @@ export function BookshelfView({
                           onClick={() => setIsReorderingWant((v) => !v)}
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${isReorderingWant
                             ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
-                            : isDarkWall
+                            : isAlwaysDarkWall
                               ? 'bg-black/35 text-sky-300 border border-sky-400/30'
-                              : 'bg-stone-850 light:bg-white text-sky-400 light:text-sky-700 border border-sky-500/30 hover:border-sky-400'
+                              : 'bg-black/35 text-sky-300 border border-sky-400/30 light:bg-white light:text-sky-900 light:border-sky-300'
                             }`}
                         >
                           <Pencil size={10} />
@@ -1178,11 +1180,11 @@ export function BookshelfView({
 
                     {section.id === 'best-completed' && section.books.length > 1 && (
                       <div
-                        className={`sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t ${isDarkWall ? 'border-amber-200/10' : 'border-stone-800/40 light:border-stone-200/50'
+                        className={`sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t ${isAlwaysDarkWall ? 'border-amber-200/10' : 'border-amber-200/10 light:border-stone-300/60'
                           }`}
                       >
                         <span
-                          className={`text-[11px] font-medium flex items-center gap-1 truncate ${isDarkWall ? 'text-amber-300/90' : 'text-amber-400 light:text-amber-700'
+                          className={`text-[11px] font-medium flex items-center gap-1 truncate ${isAlwaysDarkWall ? 'text-amber-300/90' : 'text-amber-300/90 light:text-amber-950'
                             }`}
                         >
                           <Crown size={11} className="shrink-0" />
@@ -1193,9 +1195,9 @@ export function BookshelfView({
                           onClick={() => setIsReorderingBest((v) => !v)}
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${isReorderingBest
                             ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
-                            : isDarkWall
+                            : isAlwaysDarkWall
                               ? 'bg-black/35 text-amber-300 border border-amber-400/30'
-                              : 'bg-stone-850 light:bg-white text-amber-400 light:text-amber-700 border border-amber-500/30 hover:border-amber-400'
+                              : 'bg-black/35 text-amber-300 border border-amber-400/30 light:bg-white light:text-amber-950 light:border-amber-300'
                             }`}
                         >
                           <Crown size={10} />
@@ -1211,7 +1213,7 @@ export function BookshelfView({
                       <div className="flex items-start gap-2 min-w-0">
                         <Bookmark size={14} className="shrink-0 text-sky-400 mt-0.5 xs:mt-0" />
                         <span className="text-[11px] sm:text-xs leading-snug">
-                          <strong>Ordine di lettura:</strong> trascina i libri per posizionarli (★ <strong>#1</strong> è il prossimo).
+                          <strong>Ordine di lettura:</strong> trascina i libri per posizionarli (★ <strong>1°</strong> è il prossimo).
                         </span>
                       </div>
                       <button
@@ -1229,7 +1231,7 @@ export function BookshelfView({
                       <div className="flex items-start gap-2 min-w-0">
                         <Crown size={14} className="shrink-0 text-amber-400 mt-0.5 xs:mt-0" />
                         <span className="text-[11px] sm:text-xs leading-snug">
-                          <strong>Classifica Top:</strong> trascina i libri per decidere il podio (👑 <strong>#1</strong> è il preferito).
+                          <strong>Classifica Top:</strong> trascina i libri per decidere il podio (👑 <strong>1°</strong> è il preferito).
                         </span>
                       </div>
                       <button
@@ -1252,6 +1254,7 @@ export function BookshelfView({
                         onStartReading={onStartReading}
                         onAddBook={onAddBook}
                         onOpenBook={setInspectingBook}
+                        isAlwaysDarkWall={isAlwaysDarkWall}
                       />
                       <div className={`floating-wood-shelf w-full wood-${customization.wood} relative z-20 mb-3`}>
                         <div className="floating-wood-shelf-top w-full rounded-t-xs" />
@@ -1419,42 +1422,15 @@ export function BookshelfView({
 
                                   {/* Badge classifica ripiano d'onore dei migliori libri letti */}
                                   {isBestSection && bestRank !== null && (
-                                    <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
-                                      {bestRank === 1 ? (
-                                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 shadow-lg ring-1 ring-amber-200 flex items-center gap-1 whitespace-nowrap">
-                                          <Crown size={10} className="text-stone-950 fill-stone-950" />
-                                          #1 Top
-                                        </span>
-                                      ) : bestRank === 2 ? (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-stone-100 to-stone-200 text-stone-900 border border-white shadow-md flex items-center gap-1 whitespace-nowrap">
-                                          <Medal size={11} className="text-stone-700 fill-stone-400/40" />
-                                          #2
-                                        </span>
-                                      ) : bestRank === 3 ? (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-gradient-to-r from-amber-800 via-amber-700 to-amber-800 text-amber-100 border border-amber-500/60 shadow-md flex items-center gap-1 whitespace-nowrap">
-                                          <Medal size={11} className="text-amber-300 fill-amber-400/40" />
-                                          #3
-                                        </span>
-                                      ) : (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-stone-900/90 text-amber-300 border border-amber-500/40 shadow-md whitespace-nowrap">
-                                          ⭐ #{bestRank}
-                                        </span>
-                                      )}
+                                    <div className="absolute top-1.5 left-4 sm:top-2 sm:left-4 z-30 pointer-events-none">
+                                      <RankSeal rank={bestRank} kind="best" size="md" />
                                     </div>
                                   )}
 
                                   {/* Badge priorità sulla copertina se ripiano da leggere */}
                                   {isWantSection && priorityRank !== null && (
-                                    <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-30 pointer-events-none">
-                                      {priorityRank === 1 ? (
-                                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10.5px] sm:text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 shadow-md ring-1 ring-amber-200 flex items-center gap-1">
-                                          ★ #1 Prossimo
-                                        </span>
-                                      ) : (
-                                        <span className="px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-950/85 text-sky-300 border border-sky-400/50 shadow-md">
-                                          #{priorityRank}
-                                        </span>
-                                      )}
+                                    <div className="absolute top-1.5 left-4 sm:top-2 sm:left-4 z-30 pointer-events-none">
+                                      <RankSeal rank={priorityRank} kind="want" size="md" />
                                     </div>
                                   )}
 
@@ -1484,10 +1460,10 @@ export function BookshelfView({
 
                                 {/* Titolo e autore sotto la copertina con altezza uniforme per allineare perfettamente tutte le copertine */}
                                 <div className="text-center mt-2 px-0.5 w-full h-[46px] xs:h-[50px] flex flex-col justify-start overflow-hidden">
-                                  <p className="font-serif text-[11px] xs:text-xs sm:text-sm font-semibold text-stone-200 light:text-stone-800 line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words">
+                                  <p className={`font-serif text-[11px] xs:text-xs sm:text-sm font-semibold line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words ${isAlwaysDarkWall ? 'text-amber-100' : 'text-stone-200 light:text-stone-900'}`}>
                                     {book.title}
                                   </p>
-                                  <p className="font-sans text-[11px] text-stone-400 light:text-stone-500 truncate mt-0.5">
+                                  <p className={`font-sans text-[11px] truncate mt-0.5 ${isAlwaysDarkWall ? 'text-amber-200/75' : 'text-stone-400 light:text-stone-600'}`}>
                                     {book.author}
                                   </p>
                                 </div>
@@ -1545,77 +1521,85 @@ export function BookshelfView({
                         propShelfIndex: number;
                       }> = [];
 
-                      let cursor = 0;
-                      let rowIdx = 0;
                       const totalBooksInSection = section.books.length;
                       const currentSectionFaceOutMap: Record<string, boolean> = {};
 
-                      while (cursor < totalBooksInSection) {
+                      // Calcolo bilanciato anti-orfano (Web vs Mobile):
+                      // - Da Web (bookcaseWidth >= 640px): fino a 16 libri stanno su un unico ripiano continuo; se sono di più si divide in file bilanciate.
+                      // - Da Mobile (bookcaseWidth < 640px): fino a 6 libri stanno TUTTI su un unico ripiano (evita tassativamente ripiani orfani con 1 solo libro!).
+                      //   Se i libri sono > 6, si distribuiscono in modo bilanciato (es. 7 libri -> 4 + 3; 8 libri -> 4 + 4; 9 libri -> 5 + 4),
+                      //   in modo che NESSUN ripiano abbia mai un solo libro isolato!
+                      const numRows = isWeb
+                        ? Math.max(1, Math.ceil(totalBooksInSection / 16))
+                        : totalBooksInSection <= 6
+                        ? 1
+                        : Math.max(2, Math.ceil(totalBooksInSection / 5));
+
+                      const baseCount = Math.floor(totalBooksInSection / numRows);
+                      const remainder = totalBooksInSection % numRows;
+
+                      let cursor = 0;
+                      for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
+                        // Numero di libri assegnati a questa riga (bilanciato equamente)
+                        const countForThisRow = baseCount + (rowIdx < remainder ? 1 : 0);
+                        if (countForThisRow <= 0) break;
+
                         const isTopSpinesRow =
                           shelfStyle === 'spines' ||
-                          (!isWeb &&
+                          (rowIdx === 0 &&
                             sectionIdx === 0 &&
-                            rowIdx === 0 &&
-                            (shelfSections.length > 1 || totalBooksInSection > 5)) ||
-                          (isWeb && sectionIdx === 0 && rowIdx === 0 && shelfSections.length > 1);
+                            (shelfSections.length > 1 || totalBooksInSection > 5));
 
-                        // Sul primo ripiano (o se tutti i libri rimanenti ci stanno insieme alla decorazione), riserva spazio per il gattino/addobbo a destra
                         const wantsPropOnThisRow =
                           customization.showDecorations && rowIdx === 0 && isTopSpinesRow;
-                        const maxRowPx = wantsPropOnThisRow
-                          ? Math.max(180, availShelfPx - propWidthPx)
-                          : availShelfPx;
 
                         const items: Array<{ book: Book; globalIdx: number; isFaceOut: boolean }> = [];
                         let usedPx = 0;
-                        let idxInRow = 0;
 
-                        while (cursor < totalBooksInSection) {
+                        for (let idxInRow = 0; idxInRow < countForThisRow; idxInRow++) {
+                          if (cursor >= totalBooksInSection) break;
                           const book = section.books[cursor];
                           const globalIdx = cursor;
                           const sectionBookKey = `${section.id}::${book.id}`;
 
                           // Determina se il libro va mostrato di fronte con la copertina su basetta o di dorso:
-                          // 1. Usa la chiave specifica dello scaffale ("section.id::book.id") così i vari scaffali sono indipendenti
-                          // 2. Altrimenti, in modalità 'mixed' sui ripiani misti, espone di fronte il 1° e il 4° libro (e su Web anche l'8°)
+                          // 1. Usa la chiave specifica dello scaffale ("section.id::book.id") se l'utente ha impostato una preferenza manuale
+                          // 2. Altrimenti in modalità 'mixed':
+                          //    - Se c'è solo 1 libro in tutta la sezione, mostralo sempre con la copertina frontale
+                          //    - Su mobile mostra di fronte il 1° libro (idxInRow === 0) per non saturare la larghezza
+                          //    - Su web espone anche il 4° e l'8° libro
                           let isFaceOut = false;
                           if (shelfStyle === 'mixed' && Boolean(book.cover_url)) {
                             if (faceOutOverrides[sectionBookKey] !== undefined) {
                               isFaceOut = faceOutOverrides[sectionBookKey];
                             } else if (!isTopSpinesRow) {
-                              isFaceOut =
-                                idxInRow === 0 ||
-                                idxInRow === 3 ||
-                                (isWeb && idxInRow === 7);
+                              if (totalBooksInSection === 1) {
+                                isFaceOut = true;
+                              } else {
+                                isFaceOut =
+                                  idxInRow === 0 ||
+                                  (isWeb && (idxInRow === 4 || idxInRow === 8));
+                              }
                             }
                           }
 
                           const itemPx = isFaceOut ? faceOutWidthPx : spineWidthPx;
-
-                          // Se non è il primo libro del ripiano e supererebbe la larghezza disponibile della mensola, passa al piano inferiore
-                          if (items.length > 0 && usedPx + itemPx > maxRowPx) {
-                            break;
-                          }
-
                           currentSectionFaceOutMap[book.id] = isFaceOut;
                           items.push({ book, globalIdx, isFaceOut });
                           usedPx += itemPx;
                           cursor += 1;
-                          idxInRow += 1;
                         }
 
-                        // Mostra il gattino/decorazione a destra solo se c'è effettivamente lo spazio fisico sulla mensola
+                        // Mostra il gattino/decorazione a destra se c'è spazio sufficiente sulla mensola
                         const showPropOnRight =
                           customization.showDecorations &&
-                          (wantsPropOnThisRow || usedPx + propWidthPx <= availShelfPx);
+                          (wantsPropOnThisRow || usedPx + propWidthPx <= availShelfPx || items.length <= 4);
 
                         rows.push({
                           items,
                           showPropOnRight,
                           propShelfIndex: sectionIdx + rowIdx,
                         });
-
-                        rowIdx += 1;
                       }
 
                       return (
@@ -1779,38 +1763,15 @@ export function BookshelfView({
 
                                               {/* Badge classifica (1°, 2°, 3°, 4°...) o priorità (1°, 2°, 3°) coerente con i dorsi */}
                                               {isBestSection && bestRank !== null && (
-                                                <div className="absolute top-1.5 left-1.5 z-30 pointer-events-none">
-                                                  <span
-                                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-black shadow-md flex items-center gap-0.5 leading-tight ${bestRank === 1
-                                                      ? 'bg-amber-400 text-stone-950'
-                                                      : bestRank === 2
-                                                        ? 'bg-stone-100 text-stone-900'
-                                                        : bestRank === 3
-                                                          ? 'bg-amber-600 text-white'
-                                                          : 'bg-stone-950/85 text-amber-300 border border-amber-400/40'
-                                                      }`}
-                                                  >
-                                                    {bestRank === 1 && <Crown size={9} className="fill-stone-950" />}
-                                                    {bestRank}°
-                                                  </span>
+                                                <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
+                                                  <RankSeal rank={bestRank} kind="best" size="md" />
                                                 </div>
                                               )}
                                               {isWantSection &&
                                                 priorityRank !== null &&
                                                 (priorityRank <= 3 || isReorderingWant) && (
-                                                  <div className="absolute top-1.5 left-1.5 z-30 pointer-events-none">
-                                                    <span
-                                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-black shadow-md leading-tight block ${priorityRank === 1
-                                                        ? 'bg-amber-400 text-stone-950'
-                                                        : priorityRank === 2
-                                                          ? 'bg-sky-300 text-stone-950'
-                                                          : priorityRank === 3
-                                                            ? 'bg-sky-500 text-stone-950'
-                                                            : 'bg-sky-950/90 text-sky-300 border border-sky-400/40'
-                                                        }`}
-                                                    >
-                                                      {priorityRank === 1 ? '★ 1°' : `${priorityRank}°`}
-                                                    </span>
+                                                  <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
+                                                    <RankSeal rank={priorityRank} kind="want" size="md" />
                                                   </div>
                                                 )}
 
@@ -1998,33 +1959,11 @@ export function BookshelfView({
 
                                           {/* Badge classifica (1°, 2°, 3°, 4°...) / priorità di lettura (1°, 2°, 3°) */}
                                           {showSpineRankBadge ? (
-                                            <div className="z-20 mx-auto mt-1 shrink-0">
+                                            <div className="z-20 mx-auto mt-1 shrink-0 flex justify-center">
                                               {isBestSection && bestRank !== null ? (
-                                                <span
-                                                  className={`px-1 py-0.2 rounded text-[8.5px] font-black shadow-xs block leading-tight ${bestRank === 1
-                                                    ? 'bg-amber-400 text-stone-950'
-                                                    : bestRank === 2
-                                                      ? 'bg-stone-100 text-stone-900'
-                                                      : bestRank === 3
-                                                        ? 'bg-amber-600 text-white'
-                                                        : 'bg-stone-950/85 text-amber-300 border border-amber-400/40'
-                                                    }`}
-                                                >
-                                                  {bestRank}°
-                                                </span>
+                                                <RankSeal rank={bestRank} kind="best" size="sm" />
                                               ) : isWantSection && priorityRank !== null ? (
-                                                <span
-                                                  className={`px-1 py-0.2 rounded text-[8.5px] font-black shadow-xs block leading-tight ${priorityRank === 1
-                                                    ? 'bg-amber-400 text-stone-950'
-                                                    : priorityRank === 2
-                                                      ? 'bg-sky-300 text-stone-950'
-                                                      : priorityRank === 3
-                                                        ? 'bg-sky-500 text-stone-950'
-                                                        : 'bg-black/65 text-sky-300'
-                                                    }`}
-                                                >
-                                                  {priorityRank === 1 ? '★1°' : `${priorityRank}°`}
-                                                </span>
+                                                <RankSeal rank={priorityRank} kind="want" size="sm" />
                                               ) : null}
                                             </div>
                                           ) : null}
