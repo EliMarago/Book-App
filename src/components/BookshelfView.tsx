@@ -183,14 +183,14 @@ const SPINE_PALETTES: SpinePaletteItem[] = [
 
 // Proporzioni realistiche variate per creare lo skyline organico dello screenshot senza mai sovrapporre titolo e autore
 const SPINE_DIMENSIONS = [
-  { width: 'w-[35px] xs:w-[38px] sm:w-[45px]', height: 'h-[200px] xs:h-[212px] sm:h-[240px]', maxChars: 16 },
-  { width: 'w-[32px] xs:w-[35px] sm:w-[41px]', height: 'h-[176px] xs:h-[186px] sm:h-[210px]', maxChars: 12 },
-  { width: 'w-[33px] xs:w-[36px] sm:w-[42px]', height: 'h-[186px] xs:h-[196px] sm:h-[222px]', maxChars: 14 },
-  { width: 'w-[32px] xs:w-[35px] sm:w-[41px]', height: 'h-[180px] xs:h-[190px] sm:h-[214px]', maxChars: 13 },
-  { width: 'w-[35px] xs:w-[38px] sm:w-[45px]', height: 'h-[194px] xs:h-[204px] sm:h-[230px]', maxChars: 15 },
-  { width: 'w-[32px] xs:w-[35px] sm:w-[40px]', height: 'h-[176px] xs:h-[186px] sm:h-[210px]', maxChars: 12 },
-  { width: 'w-[36px] xs:w-[39px] sm:w-[46px]', height: 'h-[208px] xs:h-[220px] sm:h-[248px]', maxChars: 16 },
-  { width: 'w-[35px] xs:w-[38px] sm:w-[44px]', height: 'h-[192px] xs:h-[202px] sm:h-[228px]', maxChars: 14 },
+  { width: 'w-[35px] xs:w-[38px] sm:w-[45px]', height: 'h-[200px] xs:h-[212px] sm:h-[240px]', maxChars: 16, basePx: 35, xsPx: 38, smPx: 45 },
+  { width: 'w-[32px] xs:w-[35px] sm:w-[41px]', height: 'h-[176px] xs:h-[186px] sm:h-[210px]', maxChars: 12, basePx: 32, xsPx: 35, smPx: 41 },
+  { width: 'w-[33px] xs:w-[36px] sm:w-[42px]', height: 'h-[186px] xs:h-[196px] sm:h-[222px]', maxChars: 14, basePx: 33, xsPx: 36, smPx: 42 },
+  { width: 'w-[32px] xs:w-[35px] sm:w-[41px]', height: 'h-[180px] xs:h-[190px] sm:h-[214px]', maxChars: 13, basePx: 32, xsPx: 35, smPx: 41 },
+  { width: 'w-[35px] xs:w-[38px] sm:w-[45px]', height: 'h-[194px] xs:h-[204px] sm:h-[230px]', maxChars: 15, basePx: 35, xsPx: 38, smPx: 45 },
+  { width: 'w-[32px] xs:w-[35px] sm:w-[40px]', height: 'h-[176px] xs:h-[186px] sm:h-[210px]', maxChars: 12, basePx: 32, xsPx: 35, smPx: 40 },
+  { width: 'w-[36px] xs:w-[39px] sm:w-[46px]', height: 'h-[208px] xs:h-[220px] sm:h-[248px]', maxChars: 16, basePx: 36, xsPx: 39, smPx: 46 },
+  { width: 'w-[35px] xs:w-[38px] sm:w-[44px]', height: 'h-[192px] xs:h-[202px] sm:h-[228px]', maxChars: 14, basePx: 35, xsPx: 38, smPx: 44 },
 ];
 
 function getBookHash(id: string, title: string): number {
@@ -481,10 +481,16 @@ export function BookshelfView({
   const [bookcaseWidth, setBookcaseWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth - 24, 1280) : 1024
   );
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
 
   useEffect(() => {
     const el = bookcaseRef.current;
     const updateWidth = () => {
+      if (typeof window !== 'undefined') {
+        setViewportWidth(window.innerWidth);
+      }
       if (el && el.clientWidth > 0) {
         setBookcaseWidth(el.clientWidth);
       } else if (typeof window !== 'undefined') {
@@ -1500,58 +1506,120 @@ export function BookshelfView({
                   ) : (
                     /* 2. VISTA LIBRERIA 3D BOOKTOK (MISTO DORSI + COPERTINE SU BASETTA OPPURE SOLO DORSI) */
                     (() => {
-                      // Calcolo dinamico in pixel basato sulla larghezza reale dello scaffale (Web vs Mobile):
-                      // - Da Web (bookcaseWidth >= 640px): sfrutta tutta la larghezza della mensola mantenendo i libri su un unico piano
-                      //   (va a capo su un secondo piano solo se i libri superano fisicamente la larghezza dell'intera mensola web).
-                      // - Da Mobile (bookcaseWidth < 640px): calcola esattamente quanti dorsi e copertine entrano nello schermo del telefono
-                      //   e dispone i libri eccedenti sui piani sottostanti senza mai tagliare i libri o il gattino.
+                      // Calcolo dinamico in pixel basato sulla larghezza reale dello scaffale e sui breakpoint Tailwind (xs: 420px, sm: 640px):
+                      // 1. Misura al pixel ciascun dorso 3D (getBookSpineDimension) e copertina su basetta (108px / 118px / 158px)
+                      // 2. Riempie ogni mensola fino alla sua reale capienza visiva (es. 6-7 libri in modalità Misto o 8-9 dorsi in modalità Solo Dorsi su mobile)
+                      // 3. Ribilancia l'ultima fila se resterebbe con 1 solo libro orfano (o pochi dorsi)
+                      // 4. Se un ripiano ha spazio extra su mobile, espone automaticamente una seconda copertina su basetta e/o la decorazione a destra
+                      const isSm = viewportWidth >= 640;
+                      const isXs = viewportWidth >= 420;
                       const isWeb = bookcaseWidth >= 640;
-                      const isCompactMobile = bookcaseWidth < 365;
 
-                      const horizontalPaddingPx = isWeb ? 56 : 28;
-                      const availShelfPx = Math.max(260, bookcaseWidth - horizontalPaddingPx);
+                      const horizontalPaddingPx =
+                        (customization.background === 'clean' ? 0 : isSm ? 40 : 24) +
+                        (isSm ? 32 : 12);
+                      const availShelfPx = Math.max(250, bookcaseWidth - horizontalPaddingPx);
 
-                      const spineWidthPx = isWeb ? 48 : isCompactMobile ? 35 : 38;
-                      const faceOutWidthPx = isWeb ? 156 : isCompactMobile ? 108 : 118;
-                      const propWidthPx = isWeb ? 102 : 84;
+                      const gapPx = isSm ? 6 : isXs ? 3 : 2;
+                      const faceOutWidthPx = isSm ? 158 : isXs ? 118 : 108;
+                      const propWidthPx = isSm ? 96 : isXs ? 76 : 68;
 
+                      const getSpinePx = (b: Book): number => {
+                        const dim = getBookSpineDimension(b);
+                        return isSm ? dim.smPx : isXs ? dim.xsPx : dim.basePx;
+                      };
+
+                      const isDefaultFaceOut = (b: Book, idxInRow: number): boolean => {
+                        if (shelfStyle !== 'mixed' || !b.cover_url) return false;
+                        const sectionBookKey = `${section.id}::${b.id}`;
+                        if (faceOutOverrides[sectionBookKey] !== undefined) {
+                          return faceOutOverrides[sectionBookKey];
+                        }
+                        return idxInRow === 0 || (isWeb && (idxInRow === 4 || idxInRow === 8));
+                      };
+
+                      const totalBooksInSection = section.books.length;
+                      const currentSectionFaceOutMap: Record<string, boolean> = {};
+
+                      // Fase 1: Impacchettamento greedy basato sulla larghezza reale in pixel di ogni libro
+                      // Calcola per ogni fila sia la capienza massima senza decorazione (rowCounts) sia la capienza
+                      // piena con decorazione a destra (rowCapWithProp), così un ripiano donatore può cedere libri
+                      // all'ultimo ripiano inserendo al loro posto la decorazione e restando pieno al ~96-100%.
+                      const rowCounts: number[] = [];
+                      const rowCapWithProp: number[] = [];
+                      let packCursor = 0;
+                      while (packCursor < totalBooksInSection) {
+                        let rowUsedPx = 0;
+                        let count = 0;
+                        let countWithProp = 0;
+                        while (packCursor < totalBooksInSection) {
+                          if (isWeb && shelfStyle === 'mixed' && count >= 16) break;
+                          const candidate = section.books[packCursor];
+                          const willBeFo = isDefaultFaceOut(candidate, count);
+                          const itemPx = willBeFo ? faceOutWidthPx : getSpinePx(candidate);
+                          const addPx = (count > 0 ? gapPx : 0) + itemPx;
+                          if (count > 0 && rowUsedPx + addPx > availShelfPx) break;
+                          rowUsedPx += addPx;
+                          count += 1;
+                          if (rowUsedPx + propWidthPx <= availShelfPx) {
+                            countWithProp = count;
+                          }
+                          packCursor += 1;
+                        }
+                        rowCounts.push(count);
+                        rowCapWithProp.push(Math.max(1, countWithProp));
+                      }
+
+                      // Fase 2: Ribilanciamento intelligente anti-orfano dell'ultimo ripiano
+                      // 1) I ripiani superiori cedono i libri eccedenti la loro capienza "piena con decorazione" (rowCapWithProp),
+                      //    così il ripiano superiore ospita la decorazione restando pieno al ~96% e l'ultimo ripiano si riempie!
+                      // 2) Se l'ultimo ripiano ha ancora troppo pochi libri (es. < 2 in modalità Misto o < 4 in modalità Solo Dorsi),
+                      //    prende ancora 1 volume dal ripiano precedente per garantire equilibrio visivo.
+                      if (rowCounts.length > 1) {
+                        const targetLast = customization.showDecorations
+                          ? rowCapWithProp[0]
+                          : Math.max(2, Math.floor(rowCounts[0] * 0.7));
+                        let needed = Math.max(0, targetLast - rowCounts[rowCounts.length - 1]);
+                        for (let i = rowCounts.length - 2; i >= 0 && needed > 0; i--) {
+                          const minKeepFullWithProp = customization.showDecorations
+                            ? rowCapWithProp[i]
+                            : Math.max(3, rowCounts[i] - 2);
+                          const canGive = Math.max(0, rowCounts[i] - minKeepFullWithProp);
+                          const give = Math.min(needed, canGive);
+                          rowCounts[i] -= give;
+                          rowCounts[rowCounts.length - 1] += give;
+                          needed -= give;
+                        }
+
+                        // Sicurezza aggiuntiva per non lasciare mai 1 solo libro o meno di 4 dorsi sottili sull'ultima fila
+                        const strictMinLast =
+                          shelfStyle === 'spines'
+                            ? Math.min(4, Math.floor(totalBooksInSection / 2))
+                            : 2;
+                        if (rowCounts[rowCounts.length - 1] < strictMinLast) {
+                          let extraNeeded = strictMinLast - rowCounts[rowCounts.length - 1];
+                          for (let i = rowCounts.length - 2; i >= 0 && extraNeeded > 0; i--) {
+                            const strictMinKeep = shelfStyle === 'spines' ? 5 : 3;
+                            const canGive = Math.max(0, rowCounts[i] - strictMinKeep);
+                            const give = Math.min(extraNeeded, canGive);
+                            rowCounts[i] -= give;
+                            rowCounts[rowCounts.length - 1] += give;
+                            extraNeeded -= give;
+                          }
+                        }
+                      }
+
+                      // Fase 3: Costruzione delle file e riempimento visivo adattivo (seconda copertina + decorazione)
                       const rows: Array<{
                         items: Array<{ book: Book; globalIdx: number; isFaceOut: boolean }>;
                         showPropOnRight: boolean;
                         propShelfIndex: number;
                       }> = [];
 
-                      const totalBooksInSection = section.books.length;
-                      const currentSectionFaceOutMap: Record<string, boolean> = {};
-
-                      // Calcolo bilanciato anti-orfano (Web vs Mobile):
-                      // - Da Web (bookcaseWidth >= 640px): fino a 16 libri stanno su un unico ripiano continuo; se sono di più si divide in file bilanciate.
-                      // - Da Mobile (bookcaseWidth < 640px): fino a 6 libri stanno TUTTI su un unico ripiano (evita tassativamente ripiani orfani con 1 solo libro!).
-                      //   Se i libri sono > 6, si distribuiscono in modo bilanciato (es. 7 libri -> 4 + 3; 8 libri -> 4 + 4; 9 libri -> 5 + 4),
-                      //   in modo che NESSUN ripiano abbia mai un solo libro isolato!
-                      const numRows = isWeb
-                        ? Math.max(1, Math.ceil(totalBooksInSection / 16))
-                        : totalBooksInSection <= 6
-                        ? 1
-                        : Math.max(2, Math.ceil(totalBooksInSection / 5));
-
-                      const baseCount = Math.floor(totalBooksInSection / numRows);
-                      const remainder = totalBooksInSection % numRows;
-
                       let cursor = 0;
-                      for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
-                        // Numero di libri assegnati a questa riga (bilanciato equamente)
-                        const countForThisRow = baseCount + (rowIdx < remainder ? 1 : 0);
-                        if (countForThisRow <= 0) break;
-
-                        const isTopSpinesRow =
-                          shelfStyle === 'spines' ||
-                          (rowIdx === 0 &&
-                            sectionIdx === 0 &&
-                            (shelfSections.length > 1 || totalBooksInSection > 5));
-
-                        const wantsPropOnThisRow =
-                          customization.showDecorations && rowIdx === 0 && isTopSpinesRow;
+                      for (let rowIdx = 0; rowIdx < rowCounts.length; rowIdx++) {
+                        const countForThisRow = rowCounts[rowIdx];
+                        if (countForThisRow <= 0) continue;
 
                         const items: Array<{ book: Book; globalIdx: number; isFaceOut: boolean }> = [];
                         let usedPx = 0;
@@ -1560,40 +1628,47 @@ export function BookshelfView({
                           if (cursor >= totalBooksInSection) break;
                           const book = section.books[cursor];
                           const globalIdx = cursor;
-                          const sectionBookKey = `${section.id}::${book.id}`;
+                          const isFaceOut = isDefaultFaceOut(book, idxInRow);
+                          const itemPx = isFaceOut ? faceOutWidthPx : getSpinePx(book);
 
-                          // Determina se il libro va mostrato di fronte con la copertina su basetta o di dorso:
-                          // 1. Usa la chiave specifica dello scaffale ("section.id::book.id") se l'utente ha impostato una preferenza manuale
-                          // 2. Altrimenti in modalità 'mixed':
-                          //    - Se c'è solo 1 libro in tutta la sezione, mostralo sempre con la copertina frontale
-                          //    - Su mobile mostra di fronte il 1° libro (idxInRow === 0) per non saturare la larghezza
-                          //    - Su web espone anche il 4° e l'8° libro
-                          let isFaceOut = false;
-                          if (shelfStyle === 'mixed' && Boolean(book.cover_url)) {
-                            if (faceOutOverrides[sectionBookKey] !== undefined) {
-                              isFaceOut = faceOutOverrides[sectionBookKey];
-                            } else if (!isTopSpinesRow) {
-                              if (totalBooksInSection === 1) {
-                                isFaceOut = true;
-                              } else {
-                                isFaceOut =
-                                  idxInRow === 0 ||
-                                  (isWeb && (idxInRow === 4 || idxInRow === 8));
-                              }
-                            }
-                          }
-
-                          const itemPx = isFaceOut ? faceOutWidthPx : spineWidthPx;
-                          currentSectionFaceOutMap[book.id] = isFaceOut;
                           items.push({ book, globalIdx, isFaceOut });
-                          usedPx += itemPx;
+                          usedPx += (idxInRow > 0 ? gapPx : 0) + itemPx;
                           cursor += 1;
                         }
 
-                        // Mostra il gattino/decorazione a destra se c'è spazio sufficiente sulla mensola
+                        // Se su mobile un ripiano in modalità 'mixed' ha ancora spazio libero (es. 2, 3 o 4 libri),
+                        // espone automaticamente un secondo libro con la copertina frontale su basetta per riempire con armonia la mensola
+                        if (!isWeb && shelfStyle === 'mixed' && items.length >= 2) {
+                          const widthWithProp =
+                            usedPx + (customization.showDecorations ? propWidthPx : 0);
+                          if (widthWithProp < availShelfPx * 0.82) {
+                            for (let j = items.length - 1; j >= 1; j--) {
+                              const candidate = items[j];
+                              const key = `${section.id}::${candidate.book.id}`;
+                              if (
+                                !candidate.isFaceOut &&
+                                Boolean(candidate.book.cover_url) &&
+                                faceOutOverrides[key] === undefined
+                              ) {
+                                const extraPx = faceOutWidthPx - getSpinePx(candidate.book);
+                                if (usedPx + extraPx <= availShelfPx) {
+                                  candidate.isFaceOut = true;
+                                  usedPx += extraPx;
+                                }
+                                break;
+                              }
+                            }
+                          }
+                        }
+
+                        for (const item of items) {
+                          currentSectionFaceOutMap[item.book.id] = item.isFaceOut;
+                        }
+
+                        // Mostra la decorazione a destra ogni volta che c'è spazio fisico sulla mensola
                         const showPropOnRight =
                           customization.showDecorations &&
-                          (wantsPropOnThisRow || usedPx + propWidthPx <= availShelfPx || items.length <= 4);
+                          (usedPx + propWidthPx <= availShelfPx || items.length === 1);
 
                         rows.push({
                           items,
@@ -2081,7 +2156,7 @@ export function BookshelfView({
                                   {/* Decorazione / Gattino che dorme sul lato destro della mensola */}
                                   {row.showPropOnRight && (
                                     <div
-                                      className="shrink-0 self-end ml-auto pl-1 sm:pl-3 pr-0.5 pb-0.5 pointer-events-none"
+                                      className="shrink-0 self-end ml-auto pl-0.5 xs:pl-1 sm:pl-3 pr-0.5 pb-0.5 scale-[0.88] xs:scale-95 sm:scale-100 origin-bottom-right pointer-events-none"
                                       title="Decorazione sul ripiano"
                                     >
                                       <BookshelfDecoration
