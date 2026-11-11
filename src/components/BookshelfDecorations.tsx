@@ -197,10 +197,169 @@ export function LavenderPotProp({ className = '' }: { className?: string }) {
 }
 
 /* =========================================================================
-   2. OGGETTI PER IL TEMA NATALE (Albero, Pupazzo di Neve, Globo, Candela)
+   2. OGGETTI PER IL TEMA NATALE (Gattino con Cappello di Babbo Natale, Albero, Pupazzo, Globo)
    ========================================================================= */
 
-/** Ripiano 0: Albero di Natale addobbato */
+/** Ripiano 0: Gattino tigrato grigio che dorme con cappello di Babbo Natale (stile BookTok) */
+export function SleepingSantaCatProp({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`relative select-none pointer-events-none shrink-0 ${className}`}
+      title="Gattino natalizio che dorme"
+    >
+      <svg
+        width="96"
+        height="56"
+        viewBox="0 0 112 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="overflow-visible"
+      >
+        {/* Ombra morbida sul ripiano */}
+        <ellipse cx="58" cy="60" rx="46" ry="4" fill="rgba(0,0,0,0.45)" />
+
+        {/* Corpo grigio acciambellato */}
+        <path
+          d="M28 57 C26 39 44 27 68 28 C90 29 103 40 103 53 C103 57 98 59 90 59 L32 59 C29 59 28 58 28 57 Z"
+          fill="#8b909c"
+        />
+        {/* Sfumatura inferiore pancia */}
+        <path
+          d="M32 53 C45 56 78 56 101 51 C102 55 99 59 90 59 L32 59 Z"
+          fill="#737884"
+        />
+
+        {/* Strisce tigrato grigio scuro sulla schiena */}
+        <path
+          d="M55 29 C57 35 57 41 55 46"
+          stroke="#595e68"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M65 28.5 C67.5 35 67.5 42 65.5 48"
+          stroke="#595e68"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M75 29.5 C78 36 78 43 75.5 49"
+          stroke="#595e68"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M85 32 C88 37 88 44 85.5 49"
+          stroke="#595e68"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M93 36 C95.5 40 95.5 45 93.5 49"
+          stroke="#595e68"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+        />
+
+        {/* Coda avvolta in avanti sul lato destro */}
+        <path
+          d="M99 50 C105 52 106 58 98 59.5 L68 59.5 C63 59.5 62 54.5 67 54 L92 53.5"
+          fill="#828793"
+          stroke="#686d78"
+          strokeWidth="1"
+        />
+        {/* Strisce sulla coda */}
+        <path d="M74 54.5 L75 59" stroke="#595e68" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M81 54.5 L82 59" stroke="#595e68" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M88 54.5 L89 59" stroke="#595e68" strokeWidth="2.2" strokeLinecap="round" />
+
+        {/* Zampine anteriori bianche paffute */}
+        <ellipse cx="22" cy="56.5" rx="7.5" ry="3.8" fill="#f1f3f5" stroke="#d1d5db" strokeWidth="0.6" />
+        <line x1="19" y1="56.5" x2="19" y2="59.5" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" />
+        <line x1="22" y1="56.5" x2="22" y2="59.5" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" />
+
+        <ellipse cx="45" cy="57" rx="7.5" ry="3.8" fill="#f1f3f5" stroke="#d1d5db" strokeWidth="0.6" />
+        <line x1="43" y1="57" x2="43" y2="59.8" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" />
+        <line x1="46" y1="57" x2="46" y2="59.8" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" />
+
+        {/* Orecchie */}
+        <path d="M18 39 L15 27 L26 32 Z" fill="#7c818d" />
+        <path d="M18.5 37 L16.8 29.5 L24 33 Z" fill="#d8a2aa" />
+        <path d="M48 39 L51 27 L40 32 Z" fill="#7c818d" />
+        <path d="M47.5 37 L49.2 29.5 L42 33 Z" fill="#d8a2aa" />
+
+        {/* Testa rotonda del gattino */}
+        <ellipse cx="33" cy="43.5" rx="17.5" ry="13.5" fill="#8e94a0" />
+
+        {/* Musetto inferiore bianco */}
+        <path
+          d="M17.5 46 C18 54 25 56.5 33 56.5 C41 56.5 48 54 48.5 46 C44 48.5 39 49 33 49 C27 49 22 48.5 17.5 46 Z"
+          fill="#f1f3f5"
+        />
+
+        {/* Strisce sulla fronte */}
+        <path d="M31 32 L31 37" stroke="#595e68" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M33.5 31.5 L33.5 37.5" stroke="#595e68" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M36 32 L36 37" stroke="#595e68" strokeWidth="1.8" strokeLinecap="round" />
+
+        {/* Occhietti chiusi che dormono */}
+        <path
+          d="M21.5 43.5 Q25.5 47 29.5 43.5"
+          stroke="#27272a"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M36.5 43.5 Q40.5 47 44.5 43.5"
+          stroke="#27272a"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* Nasino rosa e boccuccia */}
+        <ellipse cx="33" cy="47.5" rx="2.3" ry="1.5" fill="#e5989b" />
+        <path
+          d="M30.5 50 Q31.8 51.3 33 49.5 Q34.2 51.3 35.5 50"
+          stroke="#52525b"
+          strokeWidth="1.1"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* Baffi bianchi sottili */}
+        <line x1="18" y1="47.5" x2="8" y2="46" stroke="rgba(255,255,255,0.75)" strokeWidth="0.9" strokeLinecap="round" />
+        <line x1="18" y1="49.5" x2="7" y2="50" stroke="rgba(255,255,255,0.75)" strokeWidth="0.9" strokeLinecap="round" />
+        <line x1="48" y1="47.5" x2="58" y2="46" stroke="rgba(255,255,255,0.75)" strokeWidth="0.9" strokeLinecap="round" />
+        <line x1="48" y1="49.5" x2="59" y2="50" stroke="rgba(255,255,255,0.75)" strokeWidth="0.9" strokeLinecap="round" />
+
+        {/* Cappello di Babbo Natale rosso e bianco */}
+        <g id="santa-hat">
+          {/* Cono rosso piegato a destra */}
+          <path
+            d="M19 31 C22 18 35 13 54 20 C48 23 45 27 45 31 Z"
+            fill="#c92a2a"
+          />
+          <path
+            d="M24 27 C31 19 41 17 52 20 C47 22 44 25 43 29 Z"
+            fill="#e03131"
+          />
+          {/* Bordo soffice bianco */}
+          <path
+            d="M17 31.5 C24 28.5 40 28.5 47 31.5 C48.5 32.2 48.5 35 46.5 35 C39 32.8 25 32.8 17.5 35 C15.5 35 15.5 32.2 17 31.5 Z"
+            fill="#f8f9fa"
+          />
+          {/* Pon-pon bianco */}
+          <circle cx="55.5" cy="21" r="4.2" fill="#f8f9fa" />
+          <circle cx="54.5" cy="20" r="3" fill="#ffffff" />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+/** Ripiano 1: Albero di Natale addobbato */
 export function ChristmasTreeProp({ className = '' }: { className?: string }) {
   return (
     <div className={`relative select-none pointer-events-none shrink-0 ${className}`} title="Albero di Natale addobbato">
@@ -745,14 +904,14 @@ export function BookshelfDecoration({
   if (holiday === 'christmas') {
     switch (index) {
       case 0:
-        return <ChristmasTreeProp className={className} />;
+        return <SleepingSantaCatProp className={className} />;
       case 1:
-        return <SnowmanProp className={className} />;
+        return <ChristmasTreeProp className={className} />;
       case 2:
-        return <SnowGlobeProp className={className} />;
+        return <SnowmanProp className={className} />;
       case 3:
       default:
-        return <ChristmasCandleProp className={className} />;
+        return <SnowGlobeProp className={className} />;
     }
   }
 
@@ -813,45 +972,64 @@ export function BookshelfDecoration({
 }
 
 /* =========================================================================
-   7. LUCINE FESTIVE DI NATALE (FESTONE A MICRO-LED ANIMATO)
+   7. LUCINE FESTIVE DI NATALE (FESTONE APPESO ALLA MENSOLA IN STILE BOOKTOK)
    ========================================================================= */
 
 export function ChristmasShelfLights({ animated = true }: { animated?: boolean }) {
   const bulbs = [
-    { x: '3%', color: '#fbbf24', halo: 'rgba(251,191,36,0.9)', delay: '0s' },
-    { x: '12%', color: '#ef4444', halo: 'rgba(239,68,68,0.85)', delay: '0.5s' },
-    { x: '22%', color: '#22c55e', halo: 'rgba(34,197,94,0.85)', delay: '1s' },
-    { x: '32%', color: '#fbbf24', halo: 'rgba(251,191,36,0.9)', delay: '0.3s' },
-    { x: '42%', color: '#38bdf8', halo: 'rgba(56,189,248,0.85)', delay: '0.8s' },
-    { x: '52%', color: '#fbbf24', halo: 'rgba(251,191,36,0.9)', delay: '1.4s' },
-    { x: '62%', color: '#ef4444', halo: 'rgba(239,68,68,0.85)', delay: '0.2s' },
-    { x: '72%', color: '#22c55e', halo: 'rgba(34,197,94,0.85)', delay: '0.9s' },
-    { x: '82%', color: '#fbbf24', halo: 'rgba(251,191,36,0.9)', delay: '0.6s' },
-    { x: '92%', color: '#ec4899', halo: 'rgba(236,72,153,0.85)', delay: '1.2s' },
-    { x: '97%', color: '#fbbf24', halo: 'rgba(251,191,36,0.9)', delay: '0.4s' },
+    { x: '7.5%', color: '#ff4757', core: '#ffe0e3', halo: 'rgba(255, 71, 87, 0.85)', softHalo: 'rgba(255, 71, 87, 0.35)', delay: '0s' },
+    { x: '19.5%', color: '#facc15', core: '#fef9c3', halo: 'rgba(250, 204, 21, 0.85)', softHalo: 'rgba(250, 204, 21, 0.35)', delay: '0.4s' },
+    { x: '31.5%', color: '#4ade80', core: '#dcfce7', halo: 'rgba(74, 222, 128, 0.85)', softHalo: 'rgba(74, 222, 128, 0.35)', delay: '0.9s' },
+    { x: '43.5%', color: '#60a5fa', core: '#dbeafe', halo: 'rgba(96, 165, 250, 0.85)', softHalo: 'rgba(96, 165, 250, 0.35)', delay: '0.2s' },
+    { x: '55.5%', color: '#f472b6', core: '#fce7f3', halo: 'rgba(244, 114, 182, 0.85)', softHalo: 'rgba(244, 114, 182, 0.35)', delay: '0.7s' },
+    { x: '67.5%', color: '#ff4757', core: '#ffe0e3', halo: 'rgba(255, 71, 87, 0.85)', softHalo: 'rgba(255, 71, 87, 0.35)', delay: '1.1s' },
+    { x: '79.5%', color: '#facc15', core: '#fef9c3', halo: 'rgba(250, 204, 21, 0.85)', softHalo: 'rgba(250, 204, 21, 0.35)', delay: '0.5s' },
+    { x: '91.5%', color: '#4ade80', core: '#dcfce7', halo: 'rgba(74, 222, 128, 0.85)', softHalo: 'rgba(74, 222, 128, 0.35)', delay: '0.8s' },
   ];
 
   return (
-    <div className="w-full h-8 relative select-none pointer-events-none overflow-visible">
-      {/* Cavo verde festonato ondulato */}
-      <svg className="w-full h-5 overflow-visible" preserveAspectRatio="none" viewBox="0 0 1000 20" fill="none">
+    <div className="w-full h-7 relative select-none pointer-events-none overflow-visible">
+      {/* Cavo argentato/grigio chiaro festonato lungo il bordo della mensola */}
+      <svg
+        className="w-full h-5 overflow-visible"
+        preserveAspectRatio="none"
+        viewBox="0 0 1000 22"
+        fill="none"
+      >
+        {/* Ombra del cavo sul legno */}
         <path
-          d="M0 2 Q 50 14, 100 4 T 200 4 T 300 5 T 400 4 T 500 5 T 600 4 T 700 5 T 800 4 T 900 5 T 1000 3"
-          stroke="#162e1e"
-          strokeWidth="1.8"
+          d="M 0 3 Q 38 14, 75 13 Q 135 1, 195 13 Q 255 1, 315 13 Q 375 1, 435 13 Q 495 1, 555 13 Q 615 1, 675 13 Q 735 1, 795 13 Q 855 1, 915 13 Q 958 14, 1000 3"
+          stroke="rgba(0,0,0,0.55)"
+          strokeWidth="2.4"
+          fill="none"
+        />
+        {/* Cavo argentato principale */}
+        <path
+          d="M 0 2 Q 38 13, 75 12 Q 135 0, 195 12 Q 255 0, 315 12 Q 375 0, 435 12 Q 495 0, 555 12 Q 615 0, 675 12 Q 735 0, 795 12 Q 855 0, 915 12 Q 958 13, 1000 2"
+          stroke="#b8b3ad"
+          strokeWidth="1.6"
           fill="none"
         />
       </svg>
-      {/* Bulbi a micro-LED con riflesso e alone caldo */}
+
+      {/* Bulbi luminosi pendenti sotto il bordo della mensola */}
       {bulbs.map((b, i) => (
-        <div key={i} className="absolute -top-1" style={{ left: b.x, transform: 'translateX(-50%)' }}>
-          <div className="w-1.5 h-1.5 mx-auto bg-stone-900 rounded-t-xs" />
+        <div
+          key={i}
+          className="absolute top-[8px] flex flex-col items-center"
+          style={{ left: b.x, transform: 'translateX(-50%)' }}
+        >
+          {/* Portalampada */}
+          <div className="w-[5px] h-[3.5px] bg-stone-500 border border-stone-700 rounded-t-[1px] z-10" />
+          {/* Bulbo LED con bagliore morbido diffuso */}
           <div
-            className={`w-2.5 h-3.5 rounded-full ${animated ? 'animate-pulse' : ''}`}
+            className={`w-[9px] h-[11px] sm:w-[10px] sm:h-[12px] rounded-full -mt-[0.5px] ${
+              animated ? 'animate-pulse' : ''
+            }`}
             style={{
-              backgroundColor: b.color,
-              boxShadow: `0 0 10px 3px ${b.halo}, inset 0 1px 1px rgba(255,255,255,0.85)`,
-              animationDuration: '2.2s',
+              background: `radial-gradient(circle at 38% 35%, ${b.core} 0%, ${b.color} 55%, ${b.color} 100%)`,
+              boxShadow: `0 2px 10px 3px ${b.halo}, 0 4px 20px 7px ${b.softHalo}`,
+              animationDuration: '2.6s',
               animationDelay: b.delay,
             }}
           />
@@ -875,7 +1053,7 @@ export interface HolidayOption {
 export const HOLIDAY_OPTIONS: HolidayOption[] = [
   { id: 'auto', label: 'Auto', icon: '✨', desc: 'Rileva automaticamente la stagione' },
   { id: 'none', label: 'Piante', icon: '🌱', desc: 'Piante, succulente, pothos e lavanda' },
-  { id: 'christmas', label: 'Natale', icon: '🎄', desc: 'Albero, pupazzo, globo e lucine' },
+  { id: 'christmas', label: 'Natale', icon: '🐱', desc: 'Gattino col cappello, albero e lucine' },
   { id: 'halloween', label: 'Halloween', icon: '🎃', desc: 'Zucche, calderone e fantasmini' },
   { id: 'easter', label: 'Pasqua', icon: '🌸', desc: 'Cestino, coniglietto e tulipani' },
   { id: 'autumn', label: 'Autunno', icon: '🍂', desc: 'Zucca crema, candela e tazza' },

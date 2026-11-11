@@ -23,11 +23,11 @@ export interface BookshelfCustomization {
 
 export const DEFAULT_BOOKSHELF_CUSTOMIZATION: BookshelfCustomization = {
   wood: 'walnut',
-  background: 'clean',
-  holiday: 'auto',
+  background: 'boiserie',
+  holiday: 'christmas',
   showDecorations: true,
-  lights: 'auto',
-  showShelfLabels: true,
+  lights: 'always',
+  showShelfLabels: false,
 };
 
 const WOOD_OPTIONS: { id: ShelfWoodType; label: string; desc: string; sampleGradient: string }[] = [
@@ -192,26 +192,57 @@ export function BookshelfCustomizationModal({
             </div>
 
             {/* Scenetta di anteprima con lo sfondo e la mensola scelti */}
-            <div className={`rounded-xl p-3 sm:p-4 overflow-hidden relative ${wallBgClass}`}>
-              {/* Lucine se attive */}
-              {showPreviewLights ? (
-                <div className="relative -mt-2 -mb-2 pointer-events-none">
-                  <ChristmasShelfLights />
-                </div>
-              ) : null}
-
-              <div className="flex items-end justify-between min-h-[90px] px-2 sm:px-4">
-                {/* 2 Libri d'anteprima */}
-                <div className="flex items-end gap-1.5 pb-0.5">
-                  <div className="w-8 h-20 rounded-t-xs bg-gradient-to-r from-red-800 to-red-950 border-t border-red-500/30 shadow-md flex items-center justify-center">
-                    <span className="writing-vertical-rl text-[9px] text-red-200 font-serif font-bold truncate max-h-14">
+            <div className={`rounded-xl p-3 sm:p-4 pb-6 overflow-hidden relative ${wallBgClass}`}>
+              <div className="flex items-end justify-between min-h-[96px] px-2 sm:px-4">
+                {/* 3 Libri d'anteprima in stile 3D BookTok */}
+                <div className="flex items-end gap-[3px]">
+                  <div
+                    className="w-8 h-24 rounded-t-[3px] book-spine-cylinder flex flex-col justify-between py-1.5 items-center relative overflow-hidden"
+                    style={{ backgroundColor: '#d59ea9' }}
+                  >
+                    <div className="w-full space-y-[3px] z-10">
+                      <div className="book-spine-ridge" />
+                      <div className="book-spine-ridge" />
+                    </div>
+                    <span className="writing-vertical-rl text-[8.5px] text-[#1f191a] font-serif font-bold truncate max-h-14 z-10">
                       Classic
                     </span>
+                    <div className="w-full space-y-[3px] z-10">
+                      <div className="book-spine-ridge" />
+                      <div className="book-spine-ridge" />
+                    </div>
                   </div>
-                  <div className="w-10 h-24 rounded-t-xs bg-gradient-to-r from-amber-700 to-amber-900 border-t border-amber-500/30 shadow-md flex items-center justify-center">
-                    <span className="writing-vertical-rl text-[9px] text-amber-200 font-serif font-bold truncate max-h-16">
+                  <div
+                    className="w-7 h-20 rounded-t-[3px] book-spine-cylinder flex flex-col justify-between py-1.5 items-center relative overflow-hidden"
+                    style={{ backgroundColor: '#5c93ba' }}
+                  >
+                    <div className="w-full space-y-[3px] z-10">
+                      <div className="book-spine-ridge" />
+                      <div className="book-spine-ridge" />
+                    </div>
+                    <span className="writing-vertical-rl text-[8.5px] text-[#11243e] font-serif font-bold truncate max-h-12 z-10">
+                      Dreams
+                    </span>
+                    <div className="w-full space-y-[3px] z-10">
+                      <div className="book-spine-ridge" />
+                      <div className="book-spine-ridge" />
+                    </div>
+                  </div>
+                  <div
+                    className="w-8 h-[88px] rounded-t-[3px] book-spine-cylinder flex flex-col justify-between py-1.5 items-center relative overflow-hidden"
+                    style={{ backgroundColor: '#dcdedf' }}
+                  >
+                    <div className="w-full space-y-[3px] z-10">
+                      <div className="book-spine-ridge" />
+                      <div className="book-spine-ridge" />
+                    </div>
+                    <span className="writing-vertical-rl text-[8.5px] text-[#3a3f47] font-serif font-bold truncate max-h-14 z-10">
                       Stories
                     </span>
+                    <div className="w-full space-y-[3px] z-10">
+                      <div className="book-spine-ridge" />
+                      <div className="book-spine-ridge" />
+                    </div>
                   </div>
                 </div>
 
@@ -223,16 +254,21 @@ export function BookshelfCustomizationModal({
                 )}
               </div>
 
-              {/* Mensola in legno dell'anteprima */}
+              {/* Mensola in legno dell'anteprima con lucine appese lungo il bordo */}
               <div className={`floating-wood-shelf w-full wood-${customization.wood} relative z-10`}>
                 <div className="floating-wood-shelf-top w-full rounded-t-xs" />
-                <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3">
+                <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 relative">
                   <span className="font-serif text-[10px] font-semibold tracking-wider uppercase truncate">
                     {customization.showShelfLabels ? 'La tua Libreria' : ''}
                   </span>
                   <span className="text-[9.5px] opacity-70">
-                    {customization.showShelfLabels ? '2 volumi' : ''}
+                    {customization.showShelfLabels ? '3 volumi' : ''}
                   </span>
+                  {showPreviewLights ? (
+                    <div className="absolute inset-x-0 top-0 pointer-events-none z-20">
+                      <ChristmasShelfLights />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

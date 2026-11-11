@@ -249,23 +249,72 @@
    FINITURE DEL LEGNO DELLE MENSOLE (Shelf Wood Finishes)
    ========================================================================= */
 
-/* 1. NOCE SCURO (Walnut - Predefinito) */
+/* 1. NOCE SCURO (Walnut - Predefinito, fedele allo stile libreria BookTok con alto contrasto sulla parete) */
 .wood-walnut .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #2a160c 0%, #3d2113 40%, #4a2918 85%, #59321e 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  height: 9px;
+  background: linear-gradient(to bottom, #967459 0%, #785a43 55%, #59402e 100%);
+  border-top: 1.5px solid rgba(255, 240, 222, 0.52);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
 }
 .light .wood-walnut .floating-wood-shelf-top,
 [data-theme='light'] .wood-walnut .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #301a0e 0%, #422414 40%, #522d1a 85%, #613720 100%);
+  height: 9px;
+  background: linear-gradient(to bottom, #967459 0%, #785a43 55%, #59402e 100%);
+  border-top: 1.5px solid rgba(255, 240, 222, 0.55);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
 }
 .wood-walnut .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #7a4529 0%, #633720 18%, #482716 48%, #2c140a 78%, #180a04 100%);
+  min-height: 20px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.045) 0px,
+      rgba(255, 255, 255, 0.045) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(
+      to bottom,
+      #84644b 0%,
+      #6b4f3a 28%,
+      #523b2a 66%,
+      #362519 100%
+    );
   color: #fef3c7;
+  border-top: 1px solid rgba(255, 232, 205, 0.42);
+  border-bottom: 2px solid #1a1009;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 235, 210, 0.38),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.6),
+    0 14px 24px -2px rgba(0, 0, 0, 0.82),
+    0 5px 10px rgba(0, 0, 0, 0.6);
 }
 .light .wood-walnut .floating-wood-shelf-front,
 [data-theme='light'] .wood-walnut .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #7c4629 0%, #63361e 18%, #462514 48%, #2a1308 78%, #150803 100%);
+  min-height: 20px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.045) 0px,
+      rgba(255, 255, 255, 0.045) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(
+      to bottom,
+      #84644b 0%,
+      #6b4f3a 28%,
+      #523b2a 66%,
+      #362519 100%
+    );
   color: #fffbeb;
+  border-top: 1px solid rgba(255, 232, 205, 0.42);
+  border-bottom: 2px solid #1a1009;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 235, 210, 0.38),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.6),
+    0 14px 24px -2px rgba(0, 0, 0, 0.78),
+    0 5px 10px rgba(0, 0, 0, 0.55);
 }
 
 /* 2. ROVERE CHIARO (Light Natural Oak) */
@@ -329,32 +378,51 @@
    SFONDI DELLA LIBRERIA (Shelf Wall Backgrounds)
    ========================================================================= */
 
-/* Boiserie classica a doghe verticali in legno */
+/* Boiserie classica a riquadri incassati in legno di noce scuro (stile BookTok) */
 .bookshelf-wall-boiserie {
   position: relative;
-  background-color: #1c130d;
-  background-image: repeating-linear-gradient(
-    90deg,
-    #1c130d 0px,
-    #241911 38px,
-    #130c08 39px,
-    #0b0704 40px
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 45px rgba(0, 0, 0, 0.6), 0 20px 40px -10px rgba(0, 0, 0, 0.8);
+  background-color: #251912;
+  background-image:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.016) 0px,
+      rgba(255, 255, 255, 0.016) 2px,
+      rgba(0, 0, 0, 0.08) 2px,
+      rgba(0, 0, 0, 0.08) 5px
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='280' viewBox='0 0 320 280'%3E%3Crect width='320' height='280' fill='%23251912'/%3E%3Crect x='14' y='14' width='292' height='252' rx='3' fill='%231e140e' stroke='%23120b07' stroke-width='5'/%3E%3Crect x='18' y='18' width='284' height='244' rx='2' fill='none' stroke='%233b291e' stroke-width='2'/%3E%3Cline x1='14' y1='140' x2='306' y2='140' stroke='%23160e09' stroke-width='1.5' stroke-opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 320px 280px;
+  border: 1px solid rgba(255, 235, 215, 0.14);
+  box-shadow:
+    inset 0 0 55px rgba(0, 0, 0, 0.7),
+    0 20px 40px -10px rgba(0, 0, 0, 0.85);
 }
 .light .bookshelf-wall-boiserie,
 [data-theme='light'] .bookshelf-wall-boiserie {
-  background-color: #e8d7c5;
-  background-image: repeating-linear-gradient(
-    90deg,
-    #e8d7c5 0px,
-    #eedfcb 38px,
-    #c4b09c 39px,
-    #9f8b78 40px
-  );
-  border: 1px solid rgba(175, 145, 120, 0.6);
-  box-shadow: inset 0 0 35px rgba(110, 75, 45, 0.12), 0 15px 30px -8px rgba(70, 40, 20, 0.18);
+  background-color: #271b13;
+  background-image:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.018) 0px,
+      rgba(255, 255, 255, 0.018) 2px,
+      rgba(0, 0, 0, 0.07) 2px,
+      rgba(0, 0, 0, 0.07) 5px
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='280' viewBox='0 0 320 280'%3E%3Crect width='320' height='280' fill='%23271b13'/%3E%3Crect x='14' y='14' width='292' height='252' rx='3' fill='%2320150f' stroke='%23140c08' stroke-width='5'/%3E%3Crect x='18' y='18' width='284' height='244' rx='2' fill='none' stroke='%233e2b1f' stroke-width='2'/%3E%3Cline x1='14' y1='140' x2='306' y2='140' stroke='%23160e09' stroke-width='1.5' stroke-opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 320px 280px;
+  border: 1px solid rgba(110, 75, 50, 0.65);
+  box-shadow:
+    inset 0 0 45px rgba(0, 0, 0, 0.6),
+    0 15px 32px -8px rgba(50, 30, 15, 0.35);
+}
+
+/* Nasconde la barra di scorrimento orizzontale sui ripiani mantenendo il touch scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Intonaco caldo / Stucco vellutato */
@@ -409,6 +477,63 @@
   writing-mode: vertical-rl;
   text-orientation: mixed;
   transform: rotate(180deg);
+}
+
+/* Ombreggiatura cilindrica morbida 3D per i dorsi stile BookTok */
+.book-spine-cylinder {
+  position: relative;
+  box-shadow:
+    -2px 0 5px rgba(0, 0, 0, 0.38),
+    2px 0 6px rgba(0, 0, 0, 0.45),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.35),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.28);
+}
+
+.book-spine-cylinder::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.18) 0%,
+    rgba(255, 255, 255, 0.06) 10%,
+    rgba(255, 255, 255, 0.32) 22%,
+    rgba(255, 255, 255, 0.1) 36%,
+    rgba(0, 0, 0, 0.02) 64%,
+    rgba(0, 0, 0, 0.22) 86%,
+    rgba(0, 0, 0, 0.38) 100%
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Nervature orizzontali incise in alto e in basso sul dorso */
+.book-spine-ridge {
+  height: 2.5px;
+  width: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.26) 0%,
+    rgba(0, 0, 0, 0.12) 45%,
+    rgba(255, 255, 255, 0.32) 100%
+  );
+  pointer-events: none;
+}
+
+/* Supporto in legno alla base delle copertine esposte frontalmente sullo scaffale */
+.book-stand-ledge {
+  height: 7px;
+  background: linear-gradient(
+    180deg,
+    #785942 0%,
+    #583e2c 48%,
+    #332217 100%
+  );
+  border-top: 1px solid rgba(255, 230, 205, 0.35);
+  border-radius: 2px 2px 1px 1px;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.65),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
 /* Safe area padding bottom for iPhone swipe bar (Home Indicator) */
