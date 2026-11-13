@@ -18,6 +18,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
+import { matchesBookSearch } from '@/lib/bookSearch';
 import { BookDetailModal } from './BookDetailModal';
 import { CoverImage } from './CoverImage';
 import { EmptyReadingShelf } from './EmptyReadingShelf';
@@ -36,11 +37,8 @@ import {
   getAutoHoliday,
   type BookshelfHoliday,
 } from './BookshelfDecorations';
-import {
-  BookshelfCustomizationModal,
-  DEFAULT_BOOKSHELF_CUSTOMIZATION,
-  type BookshelfCustomization,
-} from './BookshelfCustomizationModal';
+import { BookshelfCustomizationModal } from './BookshelfCustomizationModal';
+import { useBookshelfSettings } from '@/hooks/useBookshelfSettings';
 
 // Palette curata in stile BookTok 3D opaco/vellutato (fedele allo screenshot di riferimento)
 export interface SpinePaletteItem {
@@ -312,53 +310,18 @@ export function BookshelfView({
   bestBooksOrder = [],
   onUpdateBestBooksOrder,
 }: BookshelfViewProps) {
-  // Stile di visualizzazione dello scaffale: BookTok Misto (dorsi 3D + copertine su basetta), Solo Dorsi 3D o Griglia Copertine
-  const [shelfStyle, setShelfStyle] = useState<'mixed' | 'spines' | 'covers'>(() => {
-    try {
-      const saved = localStorage.getItem('bookshelf_shelf_style_v2') as 'mixed' | 'spines' | 'covers' | null;
-      if (saved === 'mixed' || saved === 'spines' || saved === 'covers') return saved;
-      return 'mixed';
-    } catch {
-      return 'mixed';
-    }
-  });
-
-  const handleShelfStyleChange = (style: 'mixed' | 'spines' | 'covers') => {
-    setShelfStyle(style);
-    try {
-      localStorage.setItem('bookshelf_shelf_style_v2', style);
-    } catch {
-      // ignore
-    }
-  };
-
-  // Personalizzazione avanzata della libreria (legno, sfondo, festività, decorazioni, luci)
-  const [customization, setCustomization] = useState<BookshelfCustomization>(() => {
-    try {
-      const saved = localStorage.getItem('bookapp_bookshelf_customization_v3');
-      if (saved) {
-        return {
-          ...DEFAULT_BOOKSHELF_CUSTOMIZATION,
-          ...JSON.parse(saved),
-        };
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_BOOKSHELF_CUSTOMIZATION;
-  });
+  // Impostazioni visive dello scaffale sincronizzate tra dispositivi (Supabase + cache localStorage)
+  const {
+    shelfStyle,
+    customization,
+    faceOutOverrides,
+    setShelfStyle: handleShelfStyleChange,
+    setCustomization: handleUpdateCustomization,
+    toggleFaceOut: handleToggleFaceOut,
+    resetFaceOutOverrides: handleResetFaceOutOverrides,
+  } = useBookshelfSettings();
 
   const [isCustomizing, setIsCustomizing] = useState(false);
-
-  const handleUpdateCustomization = (newCustomization: BookshelfCustomization) => {
-    setCustomization(newCustomization);
-    try {
-      localStorage.setItem('bookapp_bookshelf_customization_v3', JSON.stringify(newCustomization));
-      localStorage.setItem('bookapp_bookshelf_holiday', newCustomization.holiday);
-    } catch {
-      // ignore
-    }
-  };
 
   const autoHoliday = useMemo(() => getAutoHoliday(), []);
   const activeHoliday = customization.holiday === 'auto' ? autoHoliday : customization.holiday;
@@ -368,54 +331,7 @@ export function BookshelfView({
 
   // Libro attualmente selezionato per ispezione dettagliata
   const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
-
-  // Scelta personalizzata dei libri da esporre di fronte con la copertina su basetta:
-  // usa la chiave "${sectionId}::${bookId}" così ogni scaffale (es. "I Migliori" vs "Ultime Letture") è indipendente
-  // e fissando lo stato degli altri libri dello scaffale evita che il cambio di larghezza attivi copertine sui ripiani sottostanti
-  const [faceOutOverrides, setFaceOutOverrides] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem('bookapp_faceout_overrides_v2');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
   const [isSelectingFaceOut, setIsSelectingFaceOut] = useState(false);
-
-  const handleToggleFaceOut = (
-    sectionId: string,
-    bookId: string,
-    currentlyFaceOut: boolean,
-    currentSectionState: Record<string, boolean>
-  ) => {
-    setFaceOutOverrides((prev) => {
-      const next = { ...prev };
-      // Congela lo stato attuale di tutti i libri di questo scaffale così nessun altro libro cambia da solo andando a capo
-      for (const [bId, state] of Object.entries(currentSectionState)) {
-        next[`${sectionId}::${bId}`] = state;
-      }
-      // Inverte esclusivamente il libro cliccato su questo specifico scaffale
-      next[`${sectionId}::${bookId}`] = !currentlyFaceOut;
-      try {
-        localStorage.setItem('bookapp_faceout_overrides_v2', JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-    if (shelfStyle !== 'mixed') {
-      handleShelfStyleChange('mixed');
-    }
-  };
-
-  const handleResetFaceOutOverrides = () => {
-    setFaceOutOverrides({});
-    try {
-      localStorage.removeItem('bookapp_faceout_overrides_v2');
-    } catch {
-      // ignore
-    }
-  };
 
   const hasCustomFaceOut = Object.keys(faceOutOverrides).length > 0;
 
@@ -629,13 +545,22 @@ export function BookshelfView({
   const shelfSections = useMemo(() => {
     // Se c'è una ricerca attiva, mostra un unico scaffale continuo con i risultati
     if (searchQuery.trim()) {
+      const searchedBooks =
+        activeTab === 'reading'
+          ? readingBooks
+          : activeTab === 'completed'
+            ? completedBooks
+            : activeTab === 'want'
+              ? wantBooks
+              : books.filter((b) => matchesBookSearch(b, searchQuery));
+
       return [
         {
           id: 'search-results',
           shelfLabel: 'Ricerca',
           title: `Risultati per "${searchQuery}"`,
           icon: Library,
-          books,
+          books: searchedBooks,
           accent: 'amber' as const,
         },
       ];
@@ -836,6 +761,7 @@ export function BookshelfView({
     books,
     readingBooks,
     completedBooks,
+    wantBooks,
     orderedWantBooks,
     orderedBestBooks,
     searchQuery,

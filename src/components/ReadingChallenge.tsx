@@ -54,9 +54,8 @@ function MetricCard({
 }) {
   return (
     <div
-      className={`min-w-0 rounded-xl border border-stone-700/50 light:border-orange-200/80 bg-black/25 light:bg-white/95 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${
-        compact ? 'px-2 py-1.5' : 'px-3 py-1.5'
-      }`}
+      className={`min-w-0 rounded-xl border border-stone-700/50 light:border-orange-200/80 bg-black/25 light:bg-white/95 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${compact ? 'px-2 py-1.5' : 'px-3 py-1.5'
+        }`}
     >
       <div className="flex items-center gap-1 text-[8.5px] font-bold uppercase tracking-wider text-stone-400 light:text-stone-500 whitespace-nowrap">
         <span className="shrink-0">{icon}</span>
@@ -300,7 +299,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
             {goal > 0 ? (
               completed ? (
                 <span className="text-orange-400 light:text-orange-700 font-semibold">
-                  Obiettivo raggiunto: {read} su {goal} (+{extra})
+                  Obiettivo raggiunto: {read} su {goal}
                 </span>
               ) : (
                 <>
@@ -318,18 +317,16 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
 
         <ChevronDown
           size={18}
-          className={`shrink-0 text-stone-400 light:text-stone-500 transition-transform duration-300 ${
-            open ? 'rotate-180' : ''
-          }`}
+          className={`shrink-0 text-stone-400 light:text-stone-500 transition-transform duration-300 ${open ? 'rotate-180' : ''
+            }`}
         />
       </button>
 
       {/* CORPO COMPLETO: su desktop sempre visibile identico allo screenshot; su mobile scorre verso il basso */}
       <div
         id={panelId}
-        className={`relative z-10 grid transition-[grid-template-rows,opacity] duration-300 ease-out md:grid-rows-[1fr] md:opacity-100 ${
-          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
+        className={`relative z-10 grid transition-[grid-template-rows,opacity] duration-300 ease-out md:grid-rows-[1fr] md:opacity-100 ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+          }`}
       >
         <div className="min-h-0 overflow-hidden">
           <div className="px-4 pb-3.5 pt-1 md:px-6 md:pt-4 md:pb-3">
@@ -467,11 +464,10 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                           <div
                             key={idx}
                             style={{ height: `${spine.height}px` }}
-                            className={`w-3 sm:w-[15px] rounded-t-[3px] transition-all duration-300 ${
-                              spine.filled
+                            className={`w-3 sm:w-[15px] rounded-t-[3px] transition-all duration-300 ${spine.filled
                                 ? 'spine-amber'
                                 : 'bg-stone-800/50 light:bg-stone-200/75 border border-dashed border-stone-700/70 light:border-stone-300/90'
-                            }`}
+                              }`}
                           />
                         ))}
                       </div>
