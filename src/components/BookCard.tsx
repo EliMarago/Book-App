@@ -429,7 +429,7 @@ function BookCardComponent({
             <button
               onClick={handleSaveProgress}
               disabled={savingProgress}
-              className="text-[11px] sm:text-xs px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded cursor-pointer transition-colors shrink-0 active:scale-95"
+              className="text-[11px] sm:text-xs px-2 py-0.5 btn-amber text-stone-950 font-semibold rounded-lg cursor-pointer transition-colors shrink-0 active:scale-95"
             >
               {savingProgress ? <Loader2 size={11} className="animate-spin" /> : 'Salva'}
             </button>
@@ -669,8 +669,16 @@ function BookCardComponent({
                   <div className="flex items-center gap-1.5 text-stone-400 light:text-stone-600 text-xs sm:text-sm mt-0.5 flex-wrap">
                     <span className="truncate max-w-[140px] xs:max-w-[190px] sm:max-w-[260px] md:max-w-[160px] lg:max-w-[220px]">{book.author}</span>
                     {book.pages && book.pages > 0 && (
-                      <span className="text-[11px] font-medium text-stone-300 light:text-stone-700 bg-stone-750/70 light:bg-stone-100 px-1.5 py-0.5 rounded border border-stone-600/40 light:border-stone-200 shrink-0 tabular-nums">
-                        {book.pages} pag.
+                      <span
+                        className="inline-flex items-baseline gap-1 px-2 py-[3px] rounded-full bg-stone-750/70 light:bg-stone-100 border border-stone-600/40 light:border-stone-200 shrink-0 leading-none"
+                        title={`${book.pages} pagine`}
+                      >
+                        <span className="text-xs font-bold text-stone-100 light:text-stone-800 tabular-nums">
+                          {book.pages}
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 light:text-stone-500">
+                          pag.
+                        </span>
                       </span>
                     )}
                   </div>

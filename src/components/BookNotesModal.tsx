@@ -682,7 +682,7 @@ export function BookNotesModal({
                               type="button"
                               onClick={() => handleSaveEdit(note.id)}
                               disabled={savingEdit || !editText.trim()}
-                              className="flex items-center gap-1 text-xs px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                              className="flex items-center gap-1 text-xs px-3.5 py-1.5 btn-amber text-stone-950 font-semibold rounded-lg transition-all cursor-pointer disabled:opacity-40"
                             >
                               {savingEdit ? (
                                 <Loader2 size={13} className="animate-spin" />

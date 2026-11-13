@@ -517,7 +517,7 @@ export function BookshelfCustomizationModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-md transition-all cursor-pointer active:scale-95"
+            className="px-5 py-2 rounded-xl btn-amber text-stone-950 font-semibold text-xs transition-all cursor-pointer active:scale-95"
           >
             Fatto
           </button>

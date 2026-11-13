@@ -158,7 +158,7 @@ export function BookTagsEditor({ tags, onChange }: BookTagsEditorProps) {
             <button
               type="submit"
               disabled={!draft.trim()}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 text-stone-950 text-xs font-bold disabled:opacity-40 cursor-pointer shrink-0"
+              className="px-3 py-1.5 rounded-lg btn-amber text-stone-950 text-xs font-semibold disabled:opacity-40 cursor-pointer shrink-0"
             >
               Aggiungi
             </button>

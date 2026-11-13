@@ -41,7 +41,7 @@ export function PwaUpdateBanner() {
             type="button"
             onClick={handleUpdate}
             disabled={updating}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 active:scale-95 disabled:opacity-60 text-stone-950 font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 btn-amber active:scale-95 disabled:opacity-60 text-stone-950 font-semibold text-xs rounded-xl transition-all cursor-pointer"
           >
             <RefreshCw size={13} className={updating ? 'animate-spin' : ''} />
             <span>{updating ? 'Aggiorno...' : 'Aggiorna ora'}</span>

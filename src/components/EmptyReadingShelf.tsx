@@ -128,7 +128,7 @@ export function EmptyReadingShelf({
                   disabled={startingId !== null}
                   className={`mt-2 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer active:scale-95 disabled:opacity-60 ${
                     idx === 0
-                      ? 'bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-md shadow-amber-500/20'
+                      ? 'btn-amber text-stone-950 shadow-md shadow-amber-500/20'
                       : isAlwaysDarkWall
                         ? 'border border-stone-600 bg-black/30 text-stone-200 hover:border-amber-400/60 hover:text-amber-300'
                         : 'border border-stone-700 light:border-stone-300 light:bg-white/80 text-stone-300 light:text-stone-800 hover:border-amber-500/50 hover:text-amber-300 light:hover:text-amber-800'
@@ -145,7 +145,7 @@ export function EmptyReadingShelf({
         <button
           type="button"
           onClick={onAddBook}
-          className="inline-flex items-center gap-2 py-2.5 px-5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95"
+          className="inline-flex items-center gap-2 py-2.5 px-5 btn-amber text-stone-950 font-semibold rounded-xl transition-all cursor-pointer active:scale-95"
         >
           <Plus size={18} />
           Aggiungi un libro

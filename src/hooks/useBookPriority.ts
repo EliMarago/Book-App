@@ -50,12 +50,32 @@ export function useBookPriority() {
   }, []);
 
   useEffect(() => {
-    refreshPriority(true);
+    // Legge subito i metadati dalla sessione locale in memoria (0ms) senza bloccare le query all'avvio
+    supabase.auth.getSession().then(({ data }) => {
+      const meta = data.session?.user?.user_metadata;
+      if (!meta) return;
+      if (Array.isArray(meta.want_priority) && meta.want_priority.length > 0 && priorityRef.current.length === 0) {
+        priorityRef.current = meta.want_priority;
+        saveStoredWantPriority(meta.want_priority);
+        setPriorityOrder(meta.want_priority);
+      }
+      if (Array.isArray(meta.best_books_order) && meta.best_books_order.length > 0 && bestBooksRef.current.length === 0) {
+        bestBooksRef.current = meta.best_books_order;
+        saveStoredBestBooksOrder(meta.best_books_order);
+        setBestBooksOrderState(meta.best_books_order);
+      }
+    });
+
+    const timer = setTimeout(() => {
+      refreshPriority(true);
+    }, 1800);
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') refreshPriority(false);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [refreshPriority]);

@@ -66,6 +66,26 @@ import { APP_VERSION_LABEL } from '@/version';
 const UNDO_DELETE_MS = 6000;
 // Intervallo minimo tra sincronizzazioni automatiche in background quando si riapre l'app (5 minuti)
 const AUTO_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
+const BOOKS_CACHE_KEY = 'bookapp_cached_books_v1';
+
+function getCachedBooks(): Book[] {
+  try {
+    const raw = localStorage.getItem(BOOKS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedBooks(books: Book[]) {
+  try {
+    localStorage.setItem(BOOKS_CACHE_KEY, JSON.stringify(books));
+  } catch {
+    // ignore quota errors
+  }
+}
 
 type ViewTab = 'all' | 'reading' | 'completed' | 'want';
 
@@ -85,11 +105,11 @@ export function Dashboard() {
   const [isReorderingWantCards, setIsReorderingWantCards] = useState(false);
   const [draggedCardBookId, setDraggedCardBookId] = useState<string | null>(null);
   const [dragOverCardBookId, setDragOverCardBookId] = useState<string | null>(null);
-  const [rawBooks, setBooks] = useState<Book[]>([]);
+  const [rawBooks, setBooks] = useState<Book[]>(() => getCachedBooks());
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const pendingDeletes = useRef<Map<string, { book: Book; timer: ReturnType<typeof setTimeout> }>>(new Map());
   const [sortBy, setSortBy] = useState<SortKey>(() => getStoredSort());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => getCachedBooks().length === 0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -231,12 +251,9 @@ export function Dashboard() {
           checkForAppUpdate().catch(() => {});
         }
 
-        const { data } = await supabase
-          .from('books')
-          .select('*')
-          .order('created_at', { ascending: false });
-
+        // Esegue la query dei libri e quella dei metadati note IN PARALLELO anziché in sequenza (dimezza il tempo di rete!)
         const [
+          booksRes,
           storedLocalDates,
           storedLocalPages,
           storedLocalReadPages,
@@ -245,6 +262,7 @@ export function Dashboard() {
           storedLocalStartedDates,
           notesMeta,
         ] = await Promise.all([
+          supabase.from('books').select('*').order('created_at', { ascending: false }),
           getStoredDates(),
           getStoredPages(),
           getStoredReadPages(),
@@ -253,6 +271,8 @@ export function Dashboard() {
           getStoredStartedReadingDates(),
           fetchNotesMetadataFromSupabase(),
         ]);
+
+        const data = booksRes.data;
 
         const booksWithDatesAndPages = (data ?? []).map((b) => ({
           ...b,
@@ -276,6 +296,7 @@ export function Dashboard() {
         }));
 
         setBooks(booksWithDatesAndPages);
+        saveCachedBooks(booksWithDatesAndPages);
         const now = new Date();
         lastSyncTimestampRef.current = now.getTime();
         setLastSyncedAt(now);
@@ -283,9 +304,7 @@ export function Dashboard() {
         console.error('Errore durante la sincronizzazione:', err);
       } finally {
         loadInFlightRef.current = false;
-        if (showFullLoader) {
-          setLoading(false);
-        }
+        setLoading(false);
         if (!silent) {
           setIsSyncing(false);
         }
@@ -294,8 +313,18 @@ export function Dashboard() {
     []
   );
 
+  // Sincronizza la cache locale ogni volta che i libri vengono modificati/aggiunti/rimossi localmente
   useEffect(() => {
-    loadBooks(true, { force: true });
+    if (rawBooks.length > 0) {
+      saveCachedBooks(rawBooks);
+    }
+  }, [rawBooks]);
+
+  useEffect(() => {
+    // Se abbiamo già i libri in cache locale, mostriamo subito la libreria in 0ms
+    // e sincronizziamo silenziosamente in background senza mostrare lo skeleton
+    const hasCached = getCachedBooks().length > 0;
+    loadBooks(!hasCached, { silent: hasCached, force: true });
 
     let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
     const scheduleSilentRealtimeSync = () => {
@@ -732,7 +761,7 @@ export function Dashboard() {
                 onClick={() => handleViewModeChange('grid')}
                 className={`flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   viewMode === 'grid'
-                    ? 'bg-amber-500 text-stone-900 font-semibold shadow-xs'
+                    ? 'btn-amber text-stone-950 font-semibold'
                     : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
                 }`}
                 title="Vista a schede dettagliate"
@@ -745,7 +774,7 @@ export function Dashboard() {
                 onClick={() => handleViewModeChange('shelf')}
                 className={`flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   viewMode === 'shelf'
-                    ? 'bg-amber-500 text-stone-900 font-semibold shadow-xs'
+                    ? 'btn-amber text-stone-950 font-semibold'
                     : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
                 }`}
                 title="Vista libreria a scaffale con libri fisici"
@@ -757,7 +786,7 @@ export function Dashboard() {
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="hidden sm:flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 sm:px-5 bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-900 font-semibold rounded-xl transition-all whitespace-nowrap shadow-md shadow-amber-500/10 cursor-pointer shrink-0 text-sm"
+              className="hidden sm:flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 sm:px-5 btn-amber active:scale-95 text-stone-950 font-semibold rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 text-sm"
             >
               <Plus size={19} />
               <span>Aggiungi libro</span>
@@ -997,7 +1026,7 @@ export function Dashboard() {
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-2 py-2 px-4 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-lg transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-2 py-2.5 px-5 btn-amber text-stone-950 font-semibold rounded-xl transition-all cursor-pointer active:scale-95"
                 >
                   <Plus size={18} />
                   Aggiungi libro

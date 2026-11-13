@@ -12,8 +12,13 @@ export interface ExtractedSpinePalette {
 }
 
 const STORAGE_KEY = 'bookapp_cover_spine_palettes_v2';
+const FAILED_STORAGE_KEY = 'bookapp_cover_spine_failed_v1';
 const memoryCache = new Map<string, ExtractedSpinePalette>();
+const failedCache = new Set<string>();
 const pendingPromises = new Map<string, Promise<ExtractedSpinePalette | null>>();
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let sharedCanvas: HTMLCanvasElement | null = null;
+let sharedCtx: CanvasRenderingContext2D | null = null;
 
 // Carica la cache persistente da localStorage all'avvio
 try {
@@ -26,22 +31,37 @@ try {
       }
     }
   }
+  const rawFailed = localStorage.getItem(FAILED_STORAGE_KEY);
+  if (rawFailed) {
+    const parsedFailed = JSON.parse(rawFailed);
+    if (Array.isArray(parsedFailed)) {
+      for (const u of parsedFailed) {
+        if (typeof u === 'string') failedCache.add(u);
+      }
+    }
+  }
 } catch {
   // Ignora errori localStorage
 }
 
-function persistCache() {
-  try {
-    // Mantiene al massimo 400 copertine in cache per leggerezza
-    const entries = Array.from(memoryCache.entries()).slice(-400);
-    const obj: Record<string, ExtractedSpinePalette> = {};
-    for (const [k, v] of entries) {
-      obj[k] = v;
+function schedulePersistCache() {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      // Mantiene al massimo 400 copertine in cache per leggerezza
+      const entries = Array.from(memoryCache.entries()).slice(-400);
+      const obj: Record<string, ExtractedSpinePalette> = {};
+      for (const [k, v] of entries) {
+        obj[k] = v;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+      const failedArr = Array.from(failedCache).slice(-400);
+      localStorage.setItem(FAILED_STORAGE_KEY, JSON.stringify(failedArr));
+    } catch {
+      // Ignora errori quota localStorage
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-  } catch {
-    // Ignora errori quota localStorage
-  }
+  }, 300);
 }
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -311,10 +331,15 @@ export function getCachedCoverSpinePalette(coverUrl?: string): ExtractedSpinePal
   return memoryCache.get(coverUrl) ?? null;
 }
 
+export function isCoverSpineExtractionSkipped(coverUrl?: string): boolean {
+  if (!coverUrl) return true;
+  return memoryCache.has(coverUrl) || failedCache.has(coverUrl);
+}
+
 /**
  * Estrae in modo asincrono il colore reale dominante della copertina tramite <canvas>.
- * Se l'immagine non supporta CORS, restituisce null (e il componente userà il livello
- * immagine sfumato + colore deterministico del libro).
+ * Se l'immagine non supporta CORS, memorizza l'URL tra quelli non estraibili per non
+ * riprovare ad ogni apertura dell'app.
  */
 export function extractSpinePaletteFromCoverUrl(
   coverUrl: string,
@@ -324,6 +349,7 @@ export function extractSpinePaletteFromCoverUrl(
 
   const cached = memoryCache.get(coverUrl);
   if (cached) return Promise.resolve(cached);
+  if (failedCache.has(coverUrl)) return Promise.resolve(null);
 
   const existingPromise = pendingPromises.get(coverUrl);
   if (existingPromise) return existingPromise;
@@ -348,30 +374,37 @@ export function extractSpinePaletteFromCoverUrl(
       try {
         const w = 24;
         const h = 36;
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) {
+        if (!sharedCanvas) {
+          sharedCanvas = document.createElement('canvas');
+          sharedCanvas.width = w;
+          sharedCanvas.height = h;
+          sharedCtx = sharedCanvas.getContext('2d', { willReadFrequently: true });
+        }
+        if (!sharedCtx) {
           cleanup();
           resolve(null);
           return;
         }
-        ctx.drawImage(img, 0, 0, w, h);
-        const imageData = ctx.getImageData(0, 0, w, h);
+        sharedCtx.clearRect(0, 0, w, h);
+        sharedCtx.drawImage(img, 0, 0, w, h);
+        const imageData = sharedCtx.getImageData(0, 0, w, h);
         const palette = analyzeCoverPixels(imageData.data, w, h, bookSeed);
         memoryCache.set(coverUrl, palette);
-        persistCache();
+        schedulePersistCache();
         cleanup();
         resolve(palette);
       } catch {
-        // Blocco CORS sul canvas: risolviamo null senza errori in console
+        // Blocco CORS sul canvas: memorizza il fallimento per non riprovare mai più questo URL
+        failedCache.add(coverUrl);
+        schedulePersistCache();
         cleanup();
         resolve(null);
       }
     };
 
     img.onerror = () => {
+      failedCache.add(coverUrl);
+      schedulePersistCache();
       cleanup();
       resolve(null);
     };

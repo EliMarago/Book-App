@@ -27,6 +27,7 @@ import { formatReadingDuration } from '@/lib/bookDates';
 import {
   extractSpinePaletteFromCoverUrl,
   getCachedCoverSpinePalette,
+  isCoverSpineExtractionSkipped,
   type ExtractedSpinePalette,
 } from '@/lib/spineColorExtractor';
 import {
@@ -432,11 +433,8 @@ export function BookshelfView({
 
   useEffect(() => {
     let cancelled = false;
-    const toExtract = books.filter(
-      (b) => b.cover_url && !coverSpinePalettes[b.cover_url] && !getCachedCoverSpinePalette(b.cover_url)
-    );
 
-    // Sincronizza subito eventuali colori già presenti nella cache in memoria
+    // Sincronizza subito eventuali colori già presenti nella cache in memoria (0ms)
     const newlyCached: Record<string, ExtractedSpinePalette> = {};
     for (const b of books) {
       if (b.cover_url && !coverSpinePalettes[b.cover_url]) {
@@ -448,30 +446,43 @@ export function BookshelfView({
       setCoverSpinePalettes((prev) => ({ ...prev, ...newlyCached }));
     }
 
+    const toExtract = books.filter(
+      (b) =>
+        b.cover_url &&
+        !coverSpinePalettes[b.cover_url] &&
+        !isCoverSpineExtractionSkipped(b.cover_url)
+    );
+
     if (toExtract.length === 0) return;
 
-    Promise.all(
-      toExtract.map(async (b) => {
-        const url = b.cover_url!;
-        const seed = getBookHash(b.id, b.title);
-        const palette = await extractSpinePaletteFromCoverUrl(url, seed);
-        return palette ? { url, palette } : null;
-      })
-    ).then((results) => {
-      if (cancelled) return;
+    // Rimanda l'estrazione canvas dopo il primo render e processa a piccoli blocchi
+    // per non rallentare l'apertura dello scaffale o il caricamento delle copertine frontali
+    const timer = setTimeout(async () => {
       const updates: Record<string, ExtractedSpinePalette> = {};
-      for (const item of results) {
-        if (item) {
-          updates[item.url] = item.palette;
+      const BATCH_SIZE = 4;
+      for (let i = 0; i < toExtract.length; i += BATCH_SIZE) {
+        if (cancelled) return;
+        const batch = toExtract.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(async (b) => {
+            const url = b.cover_url!;
+            const seed = getBookHash(b.id, b.title);
+            const palette = await extractSpinePaletteFromCoverUrl(url, seed);
+            return palette ? { url, palette } : null;
+          })
+        );
+        for (const item of results) {
+          if (item) updates[item.url] = item.palette;
         }
       }
-      if (Object.keys(updates).length > 0) {
+      if (!cancelled && Object.keys(updates).length > 0) {
         setCoverSpinePalettes((prev) => ({ ...prev, ...updates }));
       }
-    });
+    }, 450);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [books, coverSpinePalettes]);
 
@@ -1018,7 +1029,7 @@ export function BookshelfView({
             </p>
             <button
               onClick={onAddBook}
-              className="inline-flex items-center gap-2 py-2.5 px-5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-2 py-2.5 px-5 btn-amber text-stone-950 font-semibold rounded-xl transition-all cursor-pointer active:scale-95"
             >
               <Plus size={18} />
               Aggiungi libro sullo scaffale
@@ -1054,7 +1065,7 @@ export function BookshelfView({
                   <button
                     type="button"
                     onClick={() => setIsSelectingFaceOut(false)}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] cursor-pointer shadow-xs"
+                    className="px-3 py-1.5 rounded-lg btn-amber text-stone-950 font-semibold text-[11px] cursor-pointer"
                   >
                     Fatto
                   </button>
@@ -1243,7 +1254,7 @@ export function BookshelfView({
                       <button
                         type="button"
                         onClick={() => setIsReorderingBest(false)}
-                        className="w-full xs:w-auto px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs text-center"
+                        className="w-full xs:w-auto px-2.5 py-1 rounded-lg btn-amber text-stone-950 font-semibold text-[11px] shrink-0 cursor-pointer text-center"
                       >
                         Salva classifica
                       </button>
@@ -1992,9 +2003,7 @@ export function BookshelfView({
                                               }${book.title} — ${book.author}`
                                           }
                                         >
-                                          {/* IMMAGINE DI COPERTINA SFOCATA SUL DORSO 3D:
-                                              mostra la copertina reale con sfocatura morbida (blur) così i colori e la grafica
-                                              della copertina vestono il dorso lasciando il titolo verticale perfettamente leggibile */}
+                                          {/* Copertina reale sfocata sul dorso 3D (miniatura piccola e caricamento lazy per restare leggeri) */}
                                           {book.cover_url ? (
                                             <div
                                               aria-hidden="true"
@@ -2003,15 +2012,15 @@ export function BookshelfView({
                                               <CoverImage
                                                 src={book.cover_url}
                                                 alt=""
-                                                thumbWidth={180}
+                                                thumbWidth={90}
                                                 loading="lazy"
+                                                decoding="async"
                                                 className="w-full h-full object-cover object-center scale-[1.28] blur-[3.5px] sm:blur-[2px] saturate-[1.18] brightness-[0.82] contrast-[1.05]"
                                               />
                                               {/* Velatura verticale morbida per garantire contrasto al titolo e profondità cilindrica */}
                                               <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/35 to-black/60" />
                                             </div>
                                           ) : (
-                                            /* Fallback bicolore solo per i libri senza immagine di copertina */
                                             spine.twoToneCap && (
                                               <>
                                                 <div

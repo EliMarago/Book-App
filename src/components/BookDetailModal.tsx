@@ -689,7 +689,7 @@ export function BookDetailModal({
                           <button
                             type="submit"
                             disabled={savingProgress}
-                            className="flex items-center gap-1 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                            className="flex items-center gap-1 px-3.5 py-1.5 btn-amber text-stone-950 font-semibold text-xs rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                           >
                             {savingProgress ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} className="stroke-[3]" />}
                             <span>Salva</span>
@@ -816,7 +816,137 @@ export function BookDetailModal({
               </div>
             )}
 
-            <BookTagsEditor tags={book.tags || []} onChange={handleTagsChange} />
+            {/* 3. STATO DI LETTURA E VALUTAZIONE PERSONALE */}
+            <div className="bg-stone-850/60 light:bg-stone-50/70 border border-stone-800 light:border-stone-200 rounded-2xl p-3 sm:p-4 space-y-2.5">
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 pb-2.5 border-b border-stone-800/80 light:border-stone-200/80">
+                <span className="text-xs font-semibold text-stone-300 light:text-stone-700">
+                  Stato nella tua libreria:
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { value: 'want', label: 'Da leggere' },
+                      { value: 'reading', label: 'In lettura' },
+                      { value: 'completed', label: 'Completato' },
+                    ] as const
+                  ).map((opt) => {
+                    const active = book.status === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleStatusChange(opt.value)}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${active
+                            ? opt.value === 'reading'
+                              ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/40'
+                              : opt.value === 'completed'
+                                ? 'bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border-emerald-500/40'
+                                : 'bg-sky-500/20 light:bg-sky-100 text-sky-300 light:text-sky-800 border-sky-500/40'
+                            : 'bg-stone-900/70 light:bg-white text-stone-400 light:text-stone-600 border-stone-750 light:border-stone-200 hover:text-stone-200'
+                          }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Controllo Priorità se il libro è nella lista Da Leggere */}
+              {book.status === 'want' && priorityRank !== undefined && (
+                <div className="p-2.5 rounded-xl bg-sky-950/40 light:bg-sky-50 border border-sky-500/25 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-xs shadow-xs ${
+                        priorityRank === 1
+                          ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-stone-950 ring-1 ring-amber-300'
+                          : 'bg-sky-500/20 text-sky-300 light:text-sky-800 border border-sky-500/30'
+                      }`}
+                    >
+                      #{priorityRank}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-stone-100 light:text-stone-900 block truncate">
+                        {priorityRank === 1 ? '★ Prossima lettura in programma' : `Priorità #${priorityRank} nella lista da leggere`}
+                      </span>
+                      <p className="text-[11px] text-stone-400 light:text-stone-600 truncate">
+                        {priorityRank === 1
+                          ? 'Questo è il 1° libro che leggerai'
+                          : `Posizione ${priorityRank} di ${totalWantCount || 'varie'} libri da leggere`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {onShiftPriority && totalWantCount && totalWantCount > 1 && (
+                    <div className="flex items-center gap-1.5 self-end xs:self-auto shrink-0">
+                      {priorityRank !== 1 && (
+                        <button
+                          type="button"
+                          onClick={() => onShiftPriority('first')}
+                          className="px-2 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-stone-950 transition-colors cursor-pointer"
+                          title="Metti come prima lettura assoluta"
+                        >
+                          ★ 1°
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={priorityRank === 1}
+                        onClick={() => onShiftPriority('left')}
+                        className="w-7 h-7 rounded-lg bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 text-stone-200 light:text-stone-800 hover:border-amber-500/50 disabled:opacity-20 flex items-center justify-center text-sm font-bold cursor-pointer"
+                        title="Sposta prima (aumenta priorità)"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        disabled={priorityRank === totalWantCount}
+                        onClick={() => onShiftPriority('right')}
+                        className="w-7 h-7 rounded-lg bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 text-stone-200 light:text-stone-800 hover:border-amber-500/50 disabled:opacity-20 flex items-center justify-center text-sm font-bold cursor-pointer"
+                        title="Sposta dopo (diminuisci priorità)"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Valutazione con stelle (solo per i libri già letti, bloccata di default se già votato) */}
+              {book.status === 'completed' && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-stone-300 light:text-stone-700 font-semibold">
+                    La tua valutazione:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <StarRating
+                      value={book.rating}
+                      readOnly={book.rating > 0 && !editingRating}
+                      onChange={async (newRating) => {
+                        const updated = { ...book, rating: newRating };
+                        setBook(updated);
+                        setEditingRating(false);
+                        onUpdateBook(updated);
+                        await supabase
+                          .from('books')
+                          .update({ rating: newRating, updated_at: new Date().toISOString() })
+                          .eq('id', book.id);
+                      }}
+                      size={19}
+                    />
+                    {book.rating > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingRating((v) => !v)}
+                        className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 border border-stone-700 light:border-stone-300 cursor-pointer transition-colors"
+                      >
+                        {editingRating ? 'Blocca' : 'Cambia'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* 2. SEZIONE TRAMA E SINOSSI (VERIFICATA IN ITALIANO + RICERCA MULTI-FONTE) */}
             <div className="bg-stone-850/90 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-xs">
@@ -989,137 +1119,7 @@ export function BookDetailModal({
               )}
             </div>
 
-            {/* 3. STATO DI LETTURA E VALUTAZIONE PERSONALE */}
-            <div className="bg-stone-850/60 light:bg-stone-50/70 border border-stone-800 light:border-stone-200 rounded-2xl p-3 sm:p-4 space-y-2.5">
-              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 pb-2.5 border-b border-stone-800/80 light:border-stone-200/80">
-                <span className="text-xs font-semibold text-stone-300 light:text-stone-700">
-                  Stato nella tua libreria:
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(
-                    [
-                      { value: 'want', label: 'Da leggere' },
-                      { value: 'reading', label: 'In lettura' },
-                      { value: 'completed', label: 'Completato' },
-                    ] as const
-                  ).map((opt) => {
-                    const active = book.status === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => handleStatusChange(opt.value)}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${active
-                            ? opt.value === 'reading'
-                              ? 'bg-amber-500/20 light:bg-amber-100 text-amber-300 light:text-amber-800 border-amber-500/40'
-                              : opt.value === 'completed'
-                                ? 'bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border-emerald-500/40'
-                                : 'bg-sky-500/20 light:bg-sky-100 text-sky-300 light:text-sky-800 border-sky-500/40'
-                            : 'bg-stone-900/70 light:bg-white text-stone-400 light:text-stone-600 border-stone-750 light:border-stone-200 hover:text-stone-200'
-                          }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Controllo Priorità se il libro è nella lista Da Leggere */}
-              {book.status === 'want' && priorityRank !== undefined && (
-                <div className="p-2.5 rounded-xl bg-sky-950/40 light:bg-sky-50 border border-sky-500/25 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-xs shadow-xs ${
-                        priorityRank === 1
-                          ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-stone-950 ring-1 ring-amber-300'
-                          : 'bg-sky-500/20 text-sky-300 light:text-sky-800 border border-sky-500/30'
-                      }`}
-                    >
-                      #{priorityRank}
-                    </span>
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-stone-100 light:text-stone-900 block truncate">
-                        {priorityRank === 1 ? '★ Prossima lettura in programma' : `Priorità #${priorityRank} nella lista da leggere`}
-                      </span>
-                      <p className="text-[11px] text-stone-400 light:text-stone-600 truncate">
-                        {priorityRank === 1
-                          ? 'Questo è il 1° libro che leggerai'
-                          : `Posizione ${priorityRank} di ${totalWantCount || 'varie'} libri da leggere`}
-                      </p>
-                    </div>
-                  </div>
-
-                  {onShiftPriority && totalWantCount && totalWantCount > 1 && (
-                    <div className="flex items-center gap-1.5 self-end xs:self-auto shrink-0">
-                      {priorityRank !== 1 && (
-                        <button
-                          type="button"
-                          onClick={() => onShiftPriority('first')}
-                          className="px-2 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-stone-950 transition-colors cursor-pointer"
-                          title="Metti come prima lettura assoluta"
-                        >
-                          ★ 1°
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={priorityRank === 1}
-                        onClick={() => onShiftPriority('left')}
-                        className="w-7 h-7 rounded-lg bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 text-stone-200 light:text-stone-800 hover:border-amber-500/50 disabled:opacity-20 flex items-center justify-center text-sm font-bold cursor-pointer"
-                        title="Sposta prima (aumenta priorità)"
-                      >
-                        ‹
-                      </button>
-                      <button
-                        type="button"
-                        disabled={priorityRank === totalWantCount}
-                        onClick={() => onShiftPriority('right')}
-                        className="w-7 h-7 rounded-lg bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 text-stone-200 light:text-stone-800 hover:border-amber-500/50 disabled:opacity-20 flex items-center justify-center text-sm font-bold cursor-pointer"
-                        title="Sposta dopo (diminuisci priorità)"
-                      >
-                        ›
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Valutazione con stelle (solo per i libri già letti, bloccata di default se già votato) */}
-              {book.status === 'completed' && (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-stone-300 light:text-stone-700 font-semibold">
-                    La tua valutazione:
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <StarRating
-                      value={book.rating}
-                      readOnly={book.rating > 0 && !editingRating}
-                      onChange={async (newRating) => {
-                        const updated = { ...book, rating: newRating };
-                        setBook(updated);
-                        setEditingRating(false);
-                        onUpdateBook(updated);
-                        await supabase
-                          .from('books')
-                          .update({ rating: newRating, updated_at: new Date().toISOString() })
-                          .eq('id', book.id);
-                      }}
-                      size={19}
-                    />
-                    {book.rating > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingRating((v) => !v)}
-                        className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 border border-stone-700 light:border-stone-300 cursor-pointer transition-colors"
-                      >
-                        {editingRating ? 'Blocca' : 'Cambia'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <BookTagsEditor tags={book.tags || []} onChange={handleTagsChange} />
 
             {/* Data inizio lettura se in lettura */}
             {book.status === 'reading' && (
@@ -1162,7 +1162,7 @@ export function BookDetailModal({
                     <button
                       type="button"
                       onClick={() => handleSaveStartDate()}
-                      className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-lg text-xs cursor-pointer active:scale-95 transition-all"
+                      className="px-3 py-1 btn-amber text-stone-950 font-semibold rounded-lg text-xs cursor-pointer active:scale-95 transition-all"
                     >
                       Salva data
                     </button>
@@ -1320,7 +1320,7 @@ export function BookDetailModal({
                 <button
                   type="submit"
                   disabled={searchingPlots || !searchQuery.trim()}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold text-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95 shrink-0"
+                  className="px-4 py-2 rounded-xl btn-amber disabled:opacity-50 text-stone-950 font-semibold text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shrink-0"
                 >
                   {searchingPlots ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
                   <span>Cerca</span>
@@ -1507,7 +1507,7 @@ export function BookDetailModal({
                           <button
                             type="button"
                             onClick={() => handleApplyPlot(res)}
-                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-[0.98]"
+                            className="w-full py-2 px-3 rounded-xl btn-amber text-stone-950 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-[0.98]"
                           >
                             <Check size={14} strokeWidth={2.5} />
                             <span>Usa questa trama</span>
@@ -1616,7 +1616,7 @@ export function BookDetailModal({
                 <button
                   type="button"
                   onClick={handleSaveCustomPlot}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  className="px-4 py-2 rounded-xl btn-amber text-stone-950 font-semibold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                 >
                   <Check size={14} />
                   <span>Salva Trama</span>

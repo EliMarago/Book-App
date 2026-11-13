@@ -54,12 +54,27 @@ export function useReadingGoals() {
   }, []);
 
   useEffect(() => {
-    refreshGoals(true);
+    // Legge subito dalla sessione locale senza bloccare la rete all'avvio,
+    // poi sincronizza in background da Supabase dopo il primo render
+    supabase.auth.getSession().then(({ data }) => {
+      const localMeta = data.session?.user?.user_metadata?.reading_goals as ReadingGoals | undefined;
+      if (localMeta && Object.keys(goalsRef.current).length === 0) {
+        goalsRef.current = localMeta;
+        storeGoals(localMeta);
+        setGoals(localMeta);
+      }
+    });
+
+    const timer = setTimeout(() => {
+      refreshGoals(true);
+    }, 1500);
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') refreshGoals(false);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [refreshGoals]);

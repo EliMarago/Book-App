@@ -483,7 +483,7 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isExporting || isRestoring}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-sm shadow-amber-500/10"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl btn-amber text-stone-950 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 "
             title="Carica un file JSON di backup precedente"
           >
             {isRestoring ? (
@@ -633,7 +633,7 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
                 type="button"
                 onClick={handleConfirmRestore}
                 disabled={isRestoring}
-                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 transition-all cursor-pointer active:scale-95 disabled:opacity-50 shadow-md shadow-amber-500/20"
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl btn-amber text-stone-950 transition-all cursor-pointer active:scale-95 disabled:opacity-50 "
               >
                 {isRestoring ? (
                   <>
