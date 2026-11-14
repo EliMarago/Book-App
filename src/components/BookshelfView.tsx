@@ -39,6 +39,7 @@ import {
 } from './BookshelfDecorations';
 import { BookshelfCustomizationModal } from './BookshelfCustomizationModal';
 import { useBookshelfSettings } from '@/hooks/useBookshelfSettings';
+import { BookmarkRibbon } from './BookmarkRibbon';
 
 // Palette curata in stile BookTok 3D opaco/vellutato (fedele allo screenshot di riferimento)
 export interface SpinePaletteItem {
@@ -1215,7 +1216,7 @@ export function BookshelfView({
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
                     <>
                       <div className="rounded-2xl pt-4 pb-2 px-1 sm:px-3 mb-0.5 relative">
-                        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-5 items-end px-1 sm:px-2 pt-2 pb-1 min-h-[200px]">
+                        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-5 sm:gap-5 items-end px-1 sm:px-2 pt-3.5 sm:pt-4 pb-1 min-h-[200px]">
                           {section.books.map((book, bookIdx) => {
                             const spine = getBookSpineStyle(
                               book.id,
@@ -1313,7 +1314,8 @@ export function BookshelfView({
                                   }${book.title} — ${book.author}`}
                               >
                                 {/* Libro appoggiato sullo scaffale con struttura tridimensionale */}
-                                <div className="relative w-full aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden book-3d-cover transition-all group-hover:scale-105 group-hover:shadow-[0_20px_28px_-4px_rgba(245,158,11,0.3)]">
+                                <div className="relative w-full transition-transform duration-300 group-hover:scale-105">
+                                <div className="relative w-full aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden book-3d-cover transition-shadow group-hover:shadow-[0_20px_28px_-4px_rgba(245,158,11,0.3)]">
                                   {/* Scanalatura e cerniera rilegatura copertina a sinistra */}
                                   <div className="absolute top-0 left-0 bottom-0 w-3 bg-gradient-to-r from-white/20 via-black/15 to-black/45 z-20 pointer-events-none" />
                                   <div className="absolute top-0 left-2.5 bottom-0 w-[1px] bg-black/40 z-20 pointer-events-none" />
@@ -1391,18 +1393,25 @@ export function BookshelfView({
 
                                   {/* Badge note se presenti */}
                                   {book.notes_count && book.notes_count > 0 ? (
-                                    <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[11px] font-bold flex items-center gap-0.5 shadow-md">
+                                    <div
+                                      className={`absolute right-1.5 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[11px] font-bold flex items-center gap-0.5 shadow-md ${
+                                        book.status === 'reading' && book.pages && book.pages > 0
+                                          ? 'bottom-2.5 sm:bottom-3'
+                                          : 'bottom-1.5 sm:bottom-2'
+                                      }`}
+                                    >
                                       <StickyNote size={8} />
                                       <span>{book.notes_count}</span>
                                     </div>
                                   ) : null}
+                                </div>
                                 </div>
 
                                 {/* Ombra di contatto realistica sul ripiano in legno */}
                                 <div className="w-[85%] h-2 mx-auto -mt-1 bg-black/75 light:bg-stone-900/35 rounded-full blur-[3px] pointer-events-none transition-transform group-hover:scale-75 group-hover:opacity-30" />
 
                                 {/* Titolo e autore sotto la copertina con altezza uniforme per allineare perfettamente tutte le copertine */}
-                                <div className="text-center mt-2 px-0.5 w-full h-[46px] xs:h-[50px] flex flex-col justify-start overflow-hidden">
+                                <div className="text-center mt-2 px-0.5 w-full min-h-[48px] xs:min-h-[54px] flex flex-col justify-start">
                                   <p className={`font-serif text-[11px] xs:text-xs sm:text-sm font-semibold line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors break-words ${isAlwaysDarkWall ? 'text-amber-100' : 'text-stone-200 light:text-stone-900'}`}>
                                     {book.title}
                                   </p>
@@ -1619,8 +1628,8 @@ export function BookshelfView({
                           {rows.map((row, rIdx) => (
                             <div key={`${section.id}-row-${rIdx}`} className="relative">
                               {/* Area libri sopra la mensola (no-scrollbar evita la barra grigia sopra la mensola in legno) */}
-                              <div className="pt-1.5 sm:pt-2 px-0.5 sm:px-2">
-                                <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 overflow-x-auto overflow-y-hidden no-scrollbar min-h-[196px] xs:min-h-[208px] sm:min-h-[234px] touch-manipulation">
+                              <div className="pt-2 sm:pt-3 px-0.5 sm:px-2">
+                                <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 pt-3 sm:pt-4 overflow-x-auto overflow-y-hidden no-scrollbar min-h-[212px] xs:min-h-[226px] sm:min-h-[252px] touch-manipulation">
                                   {/* Sequenza di libri (dorsi cilindrici 3D + eventuali copertine frontali su basetta) */}
                                   <div className="flex items-end gap-[2px] xs:gap-[3px] sm:gap-1.5 shrink-0">
                                     {row.items.map(({ book, globalIdx, isFaceOut }) => {
@@ -1645,13 +1654,10 @@ export function BookshelfView({
                                       const priorityRank = isWantSection ? globalIdx + 1 : null;
                                       const bestRank = isBestSection ? globalIdx + 1 : null;
 
-                                      // Nella Classifica ("Ripiano d'Onore") mostra il numero di posizione (1°, 2°, 3°, 4°...) su tutti i libri;
-                                      // in "Da Leggere" mostra la priorità sui primi 3 libri (e su tutti durante il riordino)
+                                      // Nella Classifica ("Ripiano d'Onore") e in "Da Leggere" mostra il numero di posizione (1°, 2°, 3°, 4°...) su tutti i libri
                                       const showSpineRankBadge =
                                         (isBestSection && bestRank !== null) ||
-                                        (isWantSection &&
-                                          priorityRank !== null &&
-                                          (priorityRank <= 3 || isReorderingWant));
+                                        (isWantSection && priorityRank !== null);
 
                                       // Riduce leggermente i caratteri massimi del titolo quando c'è il badge in testa per non toccare mai il cognome dell'autore
                                       const effectiveMaxChars = showSpineRankBadge
@@ -1756,15 +1762,18 @@ export function BookshelfView({
                                             }
                                           >
                                             {/* Copertina frontale verticale */}
+                                            <div className="relative">
                                             <div
                                               className={`relative w-[96px] xs:w-[106px] sm:w-[136px] h-[152px] xs:h-[168px] sm:h-[210px] rounded-t-[3px] overflow-hidden shadow-[-4px_4px_12px_rgba(0,0,0,0.65),4px_4px_12px_rgba(0,0,0,0.55)] border ${isSelectingFaceOut
                                                 ? 'border-amber-400 ring-2 ring-amber-400/70'
                                                 : 'border-white/15'
                                                 }`}
                                             >
-                                              {/* Riflesso rilegatura sui bordi */}
-                                              <div className="absolute inset-y-0 left-0 w-2 bg-gradient-to-r from-black/35 via-white/20 to-transparent z-20 pointer-events-none" />
+                                              {/* Riflesso rilegatura sui bordi e taglio superiore pagine */}
+                                              <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/35 via-white/20 to-transparent z-20 pointer-events-none" />
                                               <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-l from-black/45 to-transparent z-20 pointer-events-none" />
+                                              <div className="absolute top-0 left-2 right-1.5 h-[2px] bg-[#f5ecdd]/90 border-b border-stone-400/40 z-20 pointer-events-none" />
+                                              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none z-10" />
 
                                               <CoverImage
                                                 src={book.cover_url}
@@ -1773,19 +1782,29 @@ export function BookshelfView({
                                                 loading="lazy"
                                               />
 
+                                              {/* Barra avanzamento pagine in basso se in lettura */}
+                                              {!isDraggable && book.status === 'reading' && book.pages && book.pages > 0 && (
+                                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
+                                                  <div
+                                                    className="h-full bg-amber-400"
+                                                    style={{
+                                                      width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
+                                                    }}
+                                                  />
+                                                </div>
+                                              )}
+
                                               {/* Badge classifica (1°, 2°, 3°, 4°...) o priorità (1°, 2°, 3°) coerente con i dorsi */}
                                               {isBestSection && bestRank !== null && (
                                                 <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
                                                   <RankSeal rank={bestRank} kind="best" size="md" />
                                                 </div>
                                               )}
-                                              {isWantSection &&
-                                                priorityRank !== null &&
-                                                (priorityRank <= 3 || isReorderingWant) && (
-                                                  <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
-                                                    <RankSeal rank={priorityRank} kind="want" size="md" />
-                                                  </div>
-                                                )}
+                                              {isWantSection && priorityRank !== null && (
+                                                <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
+                                                  <RankSeal rank={priorityRank} kind="want" size="md" />
+                                                </div>
+                                              )}
 
                                               {/* Frecce rapide ‹ / › per spostare il libro anche da smartphone durante "Modifica classifica / ordine" */}
                                               {isDraggable && (
@@ -1834,6 +1853,7 @@ export function BookshelfView({
                                                 </div>
                                               )}
                                             </div>
+                                            </div>
 
                                             {/* Basetta / supporto in legno su cui poggia la copertina (come nello screenshot) */}
                                             <div className="w-[104px] xs:w-[114px] sm:w-[146px] book-stand-ledge z-20" />
@@ -1845,6 +1865,9 @@ export function BookshelfView({
                                       return (
                                         <div
                                           key={book.id}
+                                          className="group relative shrink-0 transition-transform duration-300 sm:hover:-translate-y-3"
+                                        >
+                                        <div
                                           role="button"
                                           tabIndex={0}
                                           draggable={isDraggable}
@@ -1904,7 +1927,7 @@ export function BookshelfView({
                                             backgroundColor: spine.baseColor,
                                             touchAction: isDraggable ? 'none' : 'manipulation',
                                           }}
-                                          className={`group relative ${dim.width} ${dim.height} rounded-t-[4px] rounded-b-[1px] shrink-0 flex flex-col justify-between cursor-pointer transition-transform duration-300 sm:hover:-translate-y-3 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 book-spine-cylinder select-none overflow-hidden ${isSelectingFaceOut && book.cover_url
+                                          className={`relative ${dim.width} ${dim.height} rounded-t-[4px] rounded-b-[1px] shrink-0 flex flex-col justify-between cursor-pointer transition-transform duration-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 book-spine-cylinder select-none overflow-hidden ${isSelectingFaceOut && book.cover_url
                                             ? 'ring-1 ring-amber-300/60 hover:ring-2 hover:ring-amber-400'
                                             : ''
                                             } ${isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
@@ -2083,6 +2106,10 @@ export function BookshelfView({
                                             <div className="book-spine-ridge" />
                                             <div className="book-spine-ridge" />
                                           </div>
+                                        </div>
+                                        {book.status === 'reading' && (
+                                          <BookmarkRibbon variant="loop" className="right-[7%]" width={10} up={5} down="40%" />
+                                        )}
                                         </div>
                                       );
                                     })}

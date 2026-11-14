@@ -36,6 +36,7 @@ import {
   removeBookReadPages,
   getStoredPlots,
   getStoredTags,
+  getStoredCharacters,
   getStoredStartedReadingDates,
   saveBookStartedReadingDate,
   removeBookStartedReadingDate,
@@ -259,6 +260,7 @@ export function Dashboard() {
           storedLocalReadPages,
           storedLocalPlots,
           storedLocalTags,
+          storedLocalCharacters,
           storedLocalStartedDates,
           notesMeta,
         ] = await Promise.all([
@@ -268,6 +270,7 @@ export function Dashboard() {
           getStoredReadPages(),
           getStoredPlots(),
           getStoredTags(),
+          getStoredCharacters(),
           getStoredStartedReadingDates(),
           fetchNotesMetadataFromSupabase(),
         ]);
@@ -293,6 +296,7 @@ export function Dashboard() {
           notes_count: notesMeta.counts[b.id] || 0,
           plot: b.plot || notesMeta.plots[b.id] || storedLocalPlots[b.id] || null,
           tags: notesMeta.tags[b.id] || storedLocalTags[b.id] || [],
+          characters: notesMeta.characters[b.id] || storedLocalCharacters[b.id] || null,
         }));
 
         setBooks(booksWithDatesAndPages);

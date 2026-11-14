@@ -107,10 +107,11 @@ export function matchesBookSearch(book: Book, rawQuery: string): boolean {
   const titleNorm = normalizeSearchText(book.title);
   const authorNorm = normalizeSearchText(book.author);
   const tagsNorm = Array.isArray(book.tags) ? normalizeSearchText(book.tags.join(' ')) : '';
+  const charactersNorm = normalizeSearchText(book.characters);
   const plotNorm = normalizeSearchText(book.plot);
 
   // Testo combinato completo del libro
-  const combined = `${titleNorm} ${authorNorm} ${tagsNorm} ${plotNorm}`.trim();
+  const combined = `${titleNorm} ${authorNorm} ${tagsNorm} ${charactersNorm} ${plotNorm}`.trim();
 
   // 1. Corrispondenza sottostringa diretta sul testo combinato
   if (combined.includes(qNorm)) return true;

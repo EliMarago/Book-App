@@ -125,6 +125,7 @@ export type Book = {
   notes_count?: number;
   plot?: string | null;
   tags?: string[];
+  characters?: string | null;
 };
 
 export type Note = {

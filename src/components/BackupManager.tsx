@@ -96,7 +96,8 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
           !note.content.startsWith('__READ_AT__:') &&
           !note.content.startsWith('__PAGES__:') &&
           !note.content.startsWith('__READ_PAGES__:') &&
-          !note.content.startsWith('__TAGS__:')
+          !note.content.startsWith('__TAGS__:') &&
+          !note.content.startsWith('__CHARACTERS__:')
         ) {
           if (!notesByBook[note.book_id]) {
             notesByBook[note.book_id] = [];

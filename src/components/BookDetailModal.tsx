@@ -20,6 +20,7 @@ import {
   Search,
   Check,
   Clock,
+  Heart,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import { StarRating } from './StarRating';
@@ -33,6 +34,7 @@ import {
   syncBookPagesToSupabase,
   syncBookPlotToSupabase,
   syncBookTagsToSupabase,
+  syncBookCharactersToSupabase,
   syncBookStartedReadingToSupabase,
   removeBookStartedReadingDate,
   formatReadingDuration,
@@ -92,6 +94,8 @@ export function BookDetailModal({
   const [plotExpanded, setPlotExpanded] = useState(false);
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [editingRating, setEditingRating] = useState(false);
+  const [editingCharacters, setEditingCharacters] = useState(false);
+  const [charactersInput, setCharactersInput] = useState(initialBook.characters || '');
   const touchStartYRef = useRef<number | null>(null);
 
   // Stato per la modifica manuale delle pagine lette
@@ -256,6 +260,19 @@ export function BookDetailModal({
     setBook(updatedBook);
     onUpdateBook(updatedBook);
     await syncBookTagsToSupabase(book.id, tags);
+  };
+
+  const handleSaveCharacters = async () => {
+    const cleaned = charactersInput.trim() || null;
+    const updatedBook = { ...book, characters: cleaned };
+    setBook(updatedBook);
+    setEditingCharacters(false);
+    onUpdateBook(updatedBook);
+    await syncBookCharactersToSupabase(book.id, cleaned);
+    toast({
+      message: cleaned ? 'Protagonisti salvati!' : 'Protagonisti rimossi',
+      type: 'success',
+    });
   };
 
   const handleOpenEditPlot = () => {
@@ -636,6 +653,98 @@ export function BookDetailModal({
 
           {/* Contenuto scrollabile della Scheda Libro */}
           <div className="p-3.5 sm:p-5 overflow-y-auto space-y-3 sm:space-y-4 flex-1">
+            {/* PROTAGONISTI / COPPIA DELLA STORIA */}
+            {editingCharacters ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSaveCharacters();
+                }}
+                className="bg-rose-500/10 light:bg-rose-50/80 border border-rose-400/35 light:border-rose-200 rounded-2xl p-3 space-y-2"
+              >
+                <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-300 light:text-rose-800">
+                  <Heart size={12} className="text-rose-400 light:text-rose-500 fill-rose-400/30 shrink-0" />
+                  <span>Protagonisti / Coppia</span>
+                </label>
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <input
+                    type="text"
+                    autoFocus
+                    maxLength={120}
+                    value={charactersInput}
+                    onChange={(e) => setCharactersInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        e.stopPropagation();
+                        setEditingCharacters(false);
+                        setCharactersInput(book.characters || '');
+                      }
+                    }}
+                    placeholder="Es. Kai & Miller, oppure nomi protagonisti..."
+                    className="flex-1 min-w-0 px-3 py-1.5 bg-stone-900/90 light:bg-white border border-stone-700 light:border-rose-200 rounded-xl text-xs sm:text-sm text-stone-100 light:text-stone-900 placeholder:text-stone-500 focus:outline-none focus:border-rose-400"
+                  />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 rounded-xl btn-amber text-stone-950 font-semibold text-xs cursor-pointer active:scale-95 transition-all"
+                    >
+                      Salva
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCharacters(false);
+                        setCharactersInput(book.characters || '');
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 text-xs font-medium border border-stone-700 light:border-stone-300 cursor-pointer transition-colors"
+                    >
+                      Annulla
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : book.characters ? (
+              <div className="bg-gradient-to-r from-rose-500/12 via-amber-500/8 to-transparent light:from-rose-50 light:via-amber-50/70 light:to-white border border-rose-400/30 light:border-rose-200 rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2.5 shadow-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-xl bg-rose-500/20 light:bg-rose-100 border border-rose-400/30 light:border-rose-200 flex items-center justify-center shrink-0">
+                    <Heart size={13} className="text-rose-400 light:text-rose-600 fill-rose-400/35" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-300/90 light:text-rose-700">
+                      Protagonisti / Coppia
+                    </span>
+                    <p className="font-serif font-bold text-sm sm:text-base text-rose-100 light:text-rose-950 leading-snug break-words">
+                      {book.characters}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCharactersInput(book.characters || '');
+                    setEditingCharacters(true);
+                  }}
+                  className="p-1.5 rounded-lg text-stone-400 light:text-stone-500 hover:text-rose-300 light:hover:text-rose-700 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                  title="Modifica protagonisti o coppia"
+                  aria-label="Modifica protagonisti o coppia"
+                >
+                  <Pencil size={13} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setCharactersInput('');
+                  setEditingCharacters(true);
+                }}
+                className="w-full px-3.5 py-2 rounded-xl border border-dashed border-stone-750 light:border-stone-300 bg-stone-850/40 light:bg-stone-50/60 hover:border-rose-400/45 light:hover:border-rose-300 hover:bg-rose-500/[0.04] flex items-center gap-2 text-xs text-stone-400 light:text-stone-600 hover:text-rose-200 light:hover:text-rose-800 transition-colors cursor-pointer text-left"
+              >
+                <Heart size={13} className="text-rose-400/80 light:text-rose-500 shrink-0" />
+                <span>Aggiungi protagonisti o coppia della storia...</span>
+              </button>
+            )}
+
             {/* 1. SEZIONE AVANZAMENTO RAPIDO SE IN LETTURA */}
             {book.status === 'reading' && (
               <div className="bg-amber-500/10 light:bg-amber-50/80 border border-amber-500/25 light:border-amber-300/80 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-xs transition-all">
