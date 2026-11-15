@@ -250,7 +250,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
       {/* Selettore Tema chiaro/scuro/auto in alto a destra */}
       <button
         onClick={toggleTheme}
-        className="absolute top-5 right-5 p-2.5 rounded-2xl bg-stone-900/80 light:bg-white/90 border border-stone-800 light:border-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 shadow-md backdrop-blur-md transition-all cursor-pointer hover:scale-105 active:scale-95"
+        className="absolute top-[max(1.25rem,env(safe-area-inset-top,1.25rem))] right-5 p-2.5 rounded-2xl bg-stone-900/80 light:bg-white/90 border border-stone-800 light:border-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 shadow-md backdrop-blur-md transition-all cursor-pointer hover:scale-105 active:scale-95"
         title={
           themePreference === 'system'
             ? `Tema: Automatico di sistema (${theme === 'dark' ? 'Scura attiva' : 'Chiara attiva'})`
@@ -379,27 +379,46 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Campo Email (signin, signup, forgot) */}
             {mode !== 'update-password' && (
-              <div>
-                <label className="block text-xs font-semibold text-stone-300 light:text-stone-700 uppercase tracking-wider mb-1.5">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail
-                    size={17}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400 pointer-events-none"
-                  />
-                  <input
-                    type="email"
-                    name="email"
-                    autoComplete="username"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
-                    placeholder="nome@esempio.it"
-                  />
+              mode === 'forgot' && emailSent ? (
+                <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-stone-950/50 light:bg-stone-50 border border-stone-800 light:border-stone-200 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Mail size={15} className="text-amber-400 light:text-amber-600 shrink-0" />
+                    <span className="text-stone-200 light:text-stone-800 font-medium truncate">{email}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailSent(false);
+                      setSuccessMessage(null);
+                    }}
+                    className="text-amber-400 light:text-amber-700 hover:underline font-semibold shrink-0 cursor-pointer"
+                  >
+                    Cambia
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-stone-300 light:text-stone-700 uppercase tracking-wider mb-1.5">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      size={17}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 light:text-stone-400 pointer-events-none"
+                    />
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="username"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                      placeholder="nome@esempio.it"
+                    />
+                  </div>
+                </div>
+              )
             )}
 
             {/* Campo Password (signin, signup, update-password) */}

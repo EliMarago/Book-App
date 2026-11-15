@@ -147,9 +147,9 @@ export function BookshelfCustomizationModal({
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Contenitore Modal / Bottom Sheet */}
-      <div className="relative w-full max-w-xl max-h-[92vh] sm:max-h-[85vh] flex flex-col bg-stone-900 light:bg-white border-t sm:border border-stone-750 light:border-stone-200 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+      <div className="relative w-full max-w-xl h-[94dvh] sm:h-auto sm:max-h-[85dvh] flex flex-col bg-stone-900 light:bg-white border-t sm:border border-stone-750 light:border-stone-200 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 modal-sheet">
         {/* Barra di trascinamento / handle per mobile */}
-        <div className="sm:hidden w-12 h-1.5 mx-auto mt-2.5 -mb-1 bg-stone-700 light:bg-stone-300 rounded-full shrink-0" />
+        <div className="sm:hidden w-10 h-1 mx-auto mt-2.5 bg-stone-700 light:bg-stone-300 rounded-full shrink-0" />
 
         {/* Intestazione */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-stone-800 light:border-stone-200 shrink-0">
@@ -170,8 +170,9 @@ export function BookshelfCustomizationModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-200 light:text-stone-500 light:hover:text-stone-900 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-full bg-stone-800/90 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-200 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-950 hover:bg-stone-750 light:hover:bg-stone-200 transition-colors cursor-pointer shrink-0 active:scale-95"
             title="Chiudi"
+            aria-label="Chiudi personalizzazione"
           >
             <X size={18} />
           </button>

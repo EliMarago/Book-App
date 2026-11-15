@@ -366,9 +366,10 @@ export function BookNotesModal({
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-2xl w-full max-h-[82dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain"
+        className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-2xl w-full h-[94dvh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain modal-sheet"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mt-2.5 sm:hidden shrink-0" />
         {/* HEADER MODALE */}
         <div className="flex items-center justify-between px-3.5 py-3 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
           <div className="flex items-center gap-3 min-w-0">

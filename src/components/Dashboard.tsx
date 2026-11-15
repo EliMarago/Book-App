@@ -693,7 +693,7 @@ export function Dashboard() {
               <span>{stats.completed}</span>
               <Trophy size={18} className="text-emerald-400 light:text-emerald-600 hidden sm:inline" />
             </div>
-            <div className="text-[11px] sm:text-xs md:text-sm text-stone-300 light:text-stone-600 mt-0.5 sm:mt-1 font-semibold tracking-normal truncate">Letti<span className="hidden sm:inline"> (per anno)</span></div>
+            <div className="text-[11px] sm:text-xs md:text-sm text-stone-300 light:text-stone-600 mt-0.5 sm:mt-1 font-semibold tracking-normal truncate">Letti</div>
           </button>
 
           <button
@@ -733,33 +733,36 @@ export function Dashboard() {
             )}
           </div>
 
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5">
-            <div className="relative flex-1 sm:flex-1 lg:w-52 min-w-[145px]">
-              <ArrowUpDown
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 light:text-amber-600 pointer-events-none"
-              />
-              <select
-                id="sort-select"
-                value={sortBy}
-                onChange={(e) => handleSortChange(e.target.value as SortKey)}
-                aria-label="Ordina libri"
-                className="w-full appearance-none pl-9 pr-8 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-xs sm:text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs cursor-pointer truncate"
-              >
-                {SORT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value} className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none"
-              />
-            </div>
+          <div className="flex flex-col sm:flex-row sm:flex-nowrap items-stretch sm:items-center gap-2 sm:gap-2.5">
+            {/* Barra di ordinamento disattivata temporaneamente */}
+            {false && viewMode === 'grid' && (
+              <div className="relative order-2 sm:order-1 w-full sm:flex-1 lg:w-52 sm:min-w-[145px]">
+                <ArrowUpDown
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 light:text-amber-600 pointer-events-none"
+                />
+                <select
+                  id="sort-select"
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value as SortKey)}
+                  aria-label="Ordina libri"
+                  className="w-full appearance-none pl-9 pr-8 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-xs sm:text-sm text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs cursor-pointer truncate"
+                >
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value} className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none"
+                />
+              </div>
+            )}
 
             {/* Toggle Vista: Schede vs Scaffale */}
-            <div className="flex items-center bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-1 shrink-0 justify-center">
+            <div className="order-1 sm:order-2 w-full sm:w-auto grid grid-cols-2 sm:flex items-center bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-1 shrink-0 justify-center">
               <button
                 type="button"
                 onClick={() => handleViewModeChange('grid')}
@@ -1204,7 +1207,7 @@ export function Dashboard() {
                         </div>
                         <div className="min-w-0">
                           <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900 truncate">
-                            Già Letti
+                            Letti
                           </h2>
                           <p className="text-xs text-stone-400 light:text-stone-500 truncate">
                             I libri che hai terminato di leggere
@@ -1428,9 +1431,10 @@ export function Dashboard() {
           }}
         >
           <div
-            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800/90 light:border-stone-200 max-w-2xl w-full shadow-2xl max-h-[82dvh] sm:max-h-[85dvh] flex flex-col overflow-hidden overscroll-contain"
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800/90 light:border-stone-200 max-w-2xl w-full shadow-2xl h-[94dvh] sm:h-auto sm:max-h-[85dvh] flex flex-col overflow-hidden overscroll-contain modal-sheet"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mt-2.5 sm:hidden shrink-0" />
             <div className="flex items-center justify-between px-4 py-3.5 sm:p-6 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-600 shrink-0">

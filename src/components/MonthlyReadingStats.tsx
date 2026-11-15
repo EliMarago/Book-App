@@ -169,9 +169,9 @@ export function MonthlyReadingStats({
           </div>
         </div>
 
-        {/* Pulsanti Azione: Rimuovi Filtro (se attivo) + Toggle Menu Scorrevole Nascosto */}
+        {/* Pulsanti Azione: Rimuovi Filtro (se attivo e menu chiuso) + Toggle Menu Scorrevole Nascosto */}
         <div className="flex items-center gap-2 shrink-0">
-          {isSelectedActive && (
+          {isSelectedActive && !isMenuOpen && (
             <button
               type="button"
               onClick={() => onSelectMonth(null)}
@@ -203,38 +203,10 @@ export function MonthlyReadingStats({
       {/* Menu Scorrevole Orizzontale (A Scomparsa) */}
       {isMenuOpen && (
         <div className="pt-2 border-t border-stone-800/80 light:border-stone-200 animate-in fade-in slide-in-from-top-2 duration-200 space-y-2">
-          <div className="flex items-center justify-between gap-2 px-0.5">
+          <div className="px-0.5">
             <span className="text-[11px] font-medium text-stone-400 light:text-stone-600">
               Scorri orizzontalmente e tocca un mese per filtrare:
             </span>
-            {availableYears.length > 1 && onSelectYear && (
-              <div className="flex items-center gap-1 text-[11px]">
-                <span className="text-stone-500">Anno:</span>
-                {availableYears
-                  .filter((y) => y !== 'Senza data')
-                  .slice(0, 4)
-                  .map((yr) => {
-                    const isYrActive = String(activeYearNum) === yr;
-                    return (
-                      <button
-                        key={yr}
-                        type="button"
-                        onClick={() => {
-                          onSelectYear(yr);
-                          onSelectMonth(null);
-                        }}
-                        className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                          isYrActive
-                            ? 'bg-amber-500 text-stone-950 font-bold'
-                            : 'text-stone-400 light:text-stone-600 hover:text-stone-200'
-                        }`}
-                      >
-                        {yr}
-                      </button>
-                    );
-                  })}
-              </div>
-            )}
           </div>
 
           {/* Barra Scorrevole Orizzontale dei 12 Mesi */}

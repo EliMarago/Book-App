@@ -574,7 +574,7 @@ export function BookDetailModal({
                   <div className="w-full h-full flex flex-col items-center justify-center p-1.5 text-center bg-stone-850 light:bg-stone-100">
                     <BookMarked size={18} className="text-stone-500 mb-0.5" />
                     <span className="text-[10px] text-stone-400 leading-tight">
-                      No cover
+                      Nessuna copertina
                     </span>
                   </div>
                 )}
@@ -893,9 +893,9 @@ export function BookDetailModal({
                       </div>
                     )}
 
-                    {/* Controlli rapidi: Avanza +10/+25/+50 e tasto Finito */}
-                    <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5">
+                    {/* Controlli rapidi: Avanza +10/+25/+50 e tasto Finito separati per evitare tocchi accidentali */}
+                    <div className="pt-1.5 space-y-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[11px] text-stone-400 light:text-stone-600 font-medium">Avanza:</span>
                         {[10, 25, 50].map((num) => (
                           <button
@@ -910,15 +910,20 @@ export function BookDetailModal({
                         ))}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setShowFinishDialog(true)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95 ml-auto"
-                        title="Ho finito di leggere tutto il libro! Segna come Completato"
-                      >
-                        <CheckCircle2 size={12} />
-                        <span>Finito</span>
-                      </button>
+                      <div className="flex items-center justify-between pt-2 border-t border-amber-500/15 light:border-amber-200/60">
+                        <span className="text-[11px] text-stone-400 light:text-stone-600">
+                          Hai terminato il libro?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowFinishDialog(true)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+                          title="Ho finito di leggere tutto il libro! Segna come Letto"
+                        >
+                          <CheckCircle2 size={12} />
+                          <span>Finito</span>
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
@@ -1074,31 +1079,31 @@ export function BookDetailModal({
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* Tasto Cerca Online (Google Books + Wikipedia IT + Open Library) */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenSearchModal()}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-stone-800/90 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 border border-stone-700/80 light:border-stone-300/80 transition-all cursor-pointer shadow-xs"
-                    title="Cerca edizioni e trame verificate nei cataloghi online"
-                  >
-                    <Search size={12} className="text-amber-400 light:text-amber-600" />
-                    <span>Cerca trama online</span>
-                  </button>
+                {bookDetails?.description && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Tasto Cerca Online (Google Books + Wikipedia IT + Open Library) */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSearchModal()}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg bg-stone-800/90 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 border border-stone-700/80 light:border-stone-300/80 transition-all cursor-pointer shadow-xs"
+                      title="Cerca edizioni e trame verificate nei cataloghi online"
+                    >
+                      <Search size={12} className="text-amber-400 light:text-amber-600" />
+                      <span>Cerca trama online</span>
+                    </button>
 
-                  {/* Tasto Modifica Manuale */}
-                  <button
-                    type="button"
-                    onClick={handleOpenEditPlot}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg bg-stone-800/90 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 border border-stone-700/80 light:border-stone-300/80 transition-all cursor-pointer shadow-xs"
-                    title="Modifica o scrivi la trama manualmente"
-                  >
-                    <Pencil size={12} />
-                    <span className="hidden xs:inline">Modifica</span>
-                  </button>
+                    {/* Tasto Modifica Manuale */}
+                    <button
+                      type="button"
+                      onClick={handleOpenEditPlot}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg bg-stone-800/90 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-300 light:text-stone-700 hover:text-amber-400 light:hover:text-amber-600 border border-stone-700/80 light:border-stone-300/80 transition-all cursor-pointer shadow-xs"
+                      title="Modifica o scrivi la trama manualmente"
+                    >
+                      <Pencil size={12} />
+                      <span className="hidden xs:inline">Modifica</span>
+                    </button>
 
-                  {/* Tasto Rimuovi Trama Errata (se presente) */}
-                  {bookDetails?.description && (
+                    {/* Tasto Rimuovi Trama Errata */}
                     <button
                       type="button"
                       onClick={handleRemovePlot}
@@ -1108,23 +1113,23 @@ export function BookDetailModal({
                     >
                       <Trash2 size={13} />
                     </button>
-                  )}
 
-                  {/* Tasto Ricarica Automatica */}
-                  <button
-                    type="button"
-                    onClick={handleRefreshDetails}
-                    disabled={loadingDetails}
-                    className="p-1.5 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 light:hover:bg-stone-200/70 transition-colors cursor-pointer disabled:opacity-40"
-                    title="Ricarica trama automatica dai cataloghi"
-                    aria-label="Ricarica trama automatica"
-                  >
-                    <RefreshCw
-                      size={13}
-                      className={loadingDetails ? 'animate-spin text-amber-400' : ''}
-                    />
-                  </button>
-                </div>
+                    {/* Tasto Ricarica Automatica */}
+                    <button
+                      type="button"
+                      onClick={handleRefreshDetails}
+                      disabled={loadingDetails}
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 light:hover:bg-stone-200/70 transition-colors cursor-pointer disabled:opacity-40"
+                      title="Ricarica trama automatica dai cataloghi"
+                      aria-label="Ricarica trama automatica"
+                    >
+                      <RefreshCw
+                        size={13}
+                        className={loadingDetails ? 'animate-spin text-amber-400' : ''}
+                      />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {loadingDetails ? (
@@ -1375,6 +1380,7 @@ export function BookDetailModal({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del modal */}
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mt-2.5 sm:hidden shrink-0" />
             <div className="p-4 border-b border-stone-800 light:border-stone-200 flex items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
@@ -1660,9 +1666,10 @@ export function BookDetailModal({
           onClick={() => setShowEditPlotModal(false)}
         >
           <div
-            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden"
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden modal-sheet"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mt-2.5 sm:hidden shrink-0" />
             <div className="p-4 border-b border-stone-800 light:border-stone-200 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 flex items-center justify-center text-amber-400 light:text-amber-700">

@@ -62,9 +62,10 @@ export function FinishBookDialog({ book, onConfirm, onCancel }: FinishBookDialog
       onClick={() => !saving && onCancel()}
     >
       <div
-        className="relative w-full sm:max-w-sm bg-stone-900 light:bg-white border-t sm:border border-stone-800 light:border-stone-200 rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-6 pb-[max(1.25rem,calc(env(safe-area-inset-bottom,0px)+1rem))] sm:pb-6 text-center animate-scale-in"
+        className="relative w-full sm:max-w-sm bg-stone-900 light:bg-white border-t sm:border border-stone-800 light:border-stone-200 rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-3 pb-[max(1.25rem,calc(env(safe-area-inset-bottom,0px)+1rem))] sm:pt-6 sm:pb-6 text-center modal-sheet"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-3 sm:hidden" />
         <button
           type="button"
           onClick={onCancel}
@@ -110,15 +111,25 @@ export function FinishBookDialog({ book, onConfirm, onCancel }: FinishBookDialog
             className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-stone-800 light:disabled:bg-stone-200 disabled:text-stone-500 text-stone-950 font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
           >
             {saving ? <Loader2 size={17} className="animate-spin" /> : <Trophy size={17} />}
-            Salva voto e sposta in Letti
+            {rating > 0 ? `Salva voto (${rating} ★) e sposta in Letti` : 'Salva voto e sposta in Letti'}
           </button>
+          {rating === 0 && (
+            <button
+              type="button"
+              onClick={() => confirm(0)}
+              disabled={saving}
+              className="w-full py-2.5 rounded-xl text-sm font-medium text-stone-300 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-950 bg-stone-800/50 light:bg-stone-100 hover:bg-stone-800 light:hover:bg-stone-200 transition-colors cursor-pointer"
+            >
+              Sposta in Letti senza voto
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => confirm(0)}
+            onClick={onCancel}
             disabled={saving}
-            className="w-full py-2.5 rounded-xl text-sm font-medium text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 hover:bg-stone-800/60 light:hover:bg-stone-100 transition-colors cursor-pointer"
+            className="w-full py-2 rounded-xl text-xs font-medium text-stone-400 light:text-stone-500 hover:text-stone-200 light:hover:text-stone-800 transition-colors cursor-pointer"
           >
-            Sposta in Letti senza voto
+            Annulla
           </button>
         </div>
       </div>

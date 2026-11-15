@@ -773,8 +773,8 @@ export function BookshelfView({
     <div className="space-y-6">
       {/* BARRA CONTROLLI DELLO SCAFFALE */}
       <div className="flex flex-col gap-2.5 bg-stone-850/80 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-sm">
-        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 min-w-0 order-1">
             <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
               <Library size={15} />
             </div>
@@ -788,74 +788,55 @@ export function BookshelfView({
             </div>
           </div>
 
-          {/* Controlli Scaffale: Esponi Copertine + Personalizza + Toggle Misto/Dorsi/Copertine */}
-          <div className="flex flex-wrap items-center justify-between xs:justify-end gap-1.5 sm:gap-2 w-full xs:w-auto pt-1 xs:pt-0 border-t xs:border-t-0 border-stone-800/40 light:border-stone-200/50">
-            {/* Pulsante Scelta Copertine in Mostra (Vetrina) */}
-            {shelfStyle !== 'covers' && books.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsSelectingFaceOut((v) => !v)}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 ${isSelectingFaceOut
-                  ? 'bg-amber-500 text-stone-950 border-amber-300 font-bold ring-2 ring-amber-400/50'
-                  : 'border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-300 light:text-stone-700 hover:text-white light:hover:text-stone-950'
-                  }`}
-                title="Scegli quali libri mostrare di fronte con la copertina sullo scaffale"
-              >
-                <Eye size={13} className={isSelectingFaceOut ? 'text-stone-950' : 'text-amber-400 light:text-amber-600'} />
-                <span>{isSelectingFaceOut ? 'Fine vetrina' : 'Scegli copertine'}</span>
-              </button>
-            )}
+          {/* Pulsante Personalizzazione Libreria (Legno, Parete, Tema, Luci, Dettagli) */}
+          <button
+            type="button"
+            onClick={() => setIsCustomizing(true)}
+            className="order-2 sm:ml-auto flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-300 light:text-stone-700 hover:text-white light:hover:text-stone-950 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+            title="Personalizza l'aspetto della libreria (legno, sfondo, decorazioni)"
+          >
+            <SlidersHorizontal size={13} className="text-amber-400 light:text-amber-600" />
+            <span>Personalizza</span>
+          </button>
 
-            {/* Pulsante Personalizzazione Libreria (Legno, Parete, Tema, Luci, Dettagli) */}
+          {/* Toggle Stile Scaffale: Misto BookTok vs Solo Dorsi vs Griglia Copertine */}
+          <div className="order-3 w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1 bg-stone-900/90 light:bg-stone-100 p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
             <button
               type="button"
-              onClick={() => setIsCustomizing(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-300 light:text-stone-700 hover:text-white light:hover:text-stone-950 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
-              title="Personalizza l'aspetto della libreria (legno, sfondo, decorazioni)"
+              onClick={() => handleShelfStyleChange('mixed')}
+              className={`flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${shelfStyle === 'mixed'
+                ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
+              title="Stile BookTok: dorsi 3D cilindrici alternati a copertine frontali su basetta"
             >
-              <SlidersHorizontal size={13} className="text-amber-400 light:text-amber-600" />
-              <span>Personalizza</span>
+              <BookMarked size={13} />
+              <span>Misto</span>
             </button>
-
-            {/* Toggle Stile Scaffale: Misto BookTok vs Solo Dorsi vs Griglia Copertine */}
-            <div className="flex items-center gap-0.5 sm:gap-1 bg-stone-900/90 light:bg-stone-100 p-0.5 sm:p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
-              <button
-                type="button"
-                onClick={() => handleShelfStyleChange('mixed')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${shelfStyle === 'mixed'
-                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-                  }`}
-                title="Stile BookTok: dorsi 3D cilindrici alternati a copertine frontali su basetta"
-              >
-                <BookMarked size={13} />
-                <span>Misto</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleShelfStyleChange('spines')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${shelfStyle === 'spines'
-                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-                  }`}
-                title="Mostra tutti i dorsi 3D cilindrici dei libri"
-              >
-                <Layers size={13} />
-                <span>Dorsi</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleShelfStyleChange('covers')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${shelfStyle === 'covers'
-                  ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
-                  : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
-                  }`}
-                title="Mostra tutte le copertine frontali in griglia"
-              >
-                <BookOpen size={13} />
-                <span>Copertine</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleShelfStyleChange('spines')}
+              className={`flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${shelfStyle === 'spines'
+                ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
+              title="Mostra tutti i dorsi 3D cilindrici dei libri"
+            >
+              <Layers size={13} />
+              <span>Dorsi</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleShelfStyleChange('covers')}
+              className={`flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${shelfStyle === 'covers'
+                ? 'bg-amber-500 text-stone-950 font-semibold shadow-xs'
+                : 'text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900'
+                }`}
+              title="Mostra tutte le copertine frontali in griglia"
+            >
+              <BookOpen size={13} />
+              <span>Copertine</span>
+            </button>
           </div>
         </div>
 
@@ -964,6 +945,32 @@ export function BookshelfView({
           </div>
         ) : (
           <div className="space-y-8 sm:space-y-9 relative z-10">
+            {/* Micro-barra Vetrina dentro la libreria (quando non è attiva la selezione) */}
+            {shelfStyle !== 'covers' && books.length > 0 && !isSelectingFaceOut && (
+              <div
+                className={`-mb-4 sm:-mb-5 flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-[11px] sm:text-xs backdrop-blur-xs ${customization.background === 'boiserie'
+                  ? 'bg-black/25 border-amber-200/10 text-amber-100/75'
+                  : 'bg-black/25 border-amber-200/10 text-amber-100/75 light:bg-white/75 light:border-stone-300/80 light:text-stone-600'
+                  }`}
+              >
+                <span className="truncate">
+                  Esposizione sui ripiani
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSelectingFaceOut(true)}
+                  className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shrink-0 active:scale-95 ${customization.background === 'boiserie'
+                    ? 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60'
+                    : 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60 light:bg-white light:text-amber-950 light:border-amber-300 hover:light:bg-amber-50'
+                    }`}
+                  title="Scegli quali libri mostrare di fronte con la copertina sullo scaffale"
+                >
+                  <Eye size={11} />
+                  <span>Scegli copertine</span>
+                </button>
+              </div>
+            )}
+
             {/* Banner guida interattivo quando si scelgono le copertine da mettere in mostra */}
             {isSelectingFaceOut && shelfStyle !== 'covers' && (
               <div className="p-3 sm:px-4 sm:py-3 rounded-2xl bg-stone-950/85 border border-amber-400/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-amber-100 shadow-xl backdrop-blur-md">
