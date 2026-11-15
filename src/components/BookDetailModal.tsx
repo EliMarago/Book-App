@@ -549,7 +549,7 @@ export function BookDetailModal({
         onClick={onClose}
       >
         <div
-          className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-xl w-full max-h-[82dvh] sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden animate-scale-in overscroll-contain"
+          className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-xl w-full h-[94dvh] sm:h-auto sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden modal-sheet overscroll-contain"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Editoriale Compatto della Scheda Libro (con supporto swipe-down da mobile) */}
@@ -559,7 +559,7 @@ export function BookDetailModal({
             className="relative px-3.5 pt-2.5 pb-3.5 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white overflow-hidden"
           >
             {/* Indicatore visivo di trascinamento verso il basso su mobile */}
-            { /*<div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-2.5 sm:hidden" />*/}
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-2.5 sm:hidden" />
 
             {/* Copertina 3D + Info Principali + Pulsante Chiudi prominente */}
             <div className="relative z-10 flex items-start gap-3 sm:gap-4">
@@ -1371,7 +1371,7 @@ export function BookDetailModal({
           onClick={() => setShowSearchModal(false)}
         >
           <div
-            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-xl w-full max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-xl w-full h-[94dvh] sm:h-auto sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden modal-sheet"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del modal */}

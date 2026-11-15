@@ -572,7 +572,7 @@ export function BookshelfView({
         {
           id: 'reading',
           shelfLabel: 'Ripiano',
-          title: 'Attualmente In Lettura',
+          title: 'In Lettura',
           icon: Flame,
           books: readingBooks,
           accent: 'amber' as const,
@@ -698,7 +698,7 @@ export function BookshelfView({
       sections.push({
         id: 'reading',
         shelfLabel: 'Ripiano I',
-        title: 'Attualmente In Lettura',
+        title: 'In Lettura',
         icon: Flame,
         books: readingBooks,
         accent: 'amber',

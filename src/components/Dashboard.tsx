@@ -850,7 +850,7 @@ export function Dashboard() {
                 </div>
                 <div>
                   <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900">
-                    Attualmente In Lettura
+                    In Lettura
                   </h2>
                   <p className="text-xs text-stone-400 light:text-stone-500">I libri che stai leggendo adesso</p>
                 </div>
