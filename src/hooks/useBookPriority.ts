@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, type Book } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getStoredWantPriority,
   saveStoredWantPriority,
@@ -16,6 +17,7 @@ import {
 const PRIORITY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 
 export function useBookPriority() {
+  const { user, authReady } = useAuth();
   const [priorityOrder, setPriorityOrder] = useState<string[]>(() => getStoredWantPriority());
   const priorityRef = useRef<string[]>(priorityOrder);
 
@@ -28,10 +30,10 @@ export function useBookPriority() {
     if (!force && Date.now() - lastRefreshRef.current < PRIORITY_SYNC_COOLDOWN_MS) {
       return;
     }
-    lastRefreshRef.current = Date.now();
     try {
       const { data, error } = await supabase.auth.getUser();
       if (error || !data.user) return;
+      lastRefreshRef.current = Date.now();
       const remoteWant = data.user.user_metadata?.want_priority;
       if (Array.isArray(remoteWant) && remoteWant.length > 0) {
         priorityRef.current = remoteWant;
@@ -49,36 +51,36 @@ export function useBookPriority() {
     }
   }, []);
 
+  // Identa subito dai metadati presenti nella sessione utente corrente (es. appena effettuato il login)
   useEffect(() => {
-    // Legge subito i metadati dalla sessione locale in memoria (0ms) senza bloccare le query all'avvio
-    supabase.auth.getSession().then(({ data }) => {
-      const meta = data.session?.user?.user_metadata;
-      if (!meta) return;
-      if (Array.isArray(meta.want_priority) && meta.want_priority.length > 0 && priorityRef.current.length === 0) {
-        priorityRef.current = meta.want_priority;
-        saveStoredWantPriority(meta.want_priority);
-        setPriorityOrder(meta.want_priority);
-      }
-      if (Array.isArray(meta.best_books_order) && meta.best_books_order.length > 0 && bestBooksRef.current.length === 0) {
-        bestBooksRef.current = meta.best_books_order;
-        saveStoredBestBooksOrder(meta.best_books_order);
-        setBestBooksOrderState(meta.best_books_order);
-      }
-    });
+    const meta = user?.user_metadata;
+    if (!meta) return;
+    if (Array.isArray(meta.want_priority) && meta.want_priority.length > 0) {
+      priorityRef.current = meta.want_priority;
+      saveStoredWantPriority(meta.want_priority);
+      setPriorityOrder(meta.want_priority);
+    }
+    if (Array.isArray(meta.best_books_order) && meta.best_books_order.length > 0) {
+      bestBooksRef.current = meta.best_books_order;
+      saveStoredBestBooksOrder(meta.best_books_order);
+      setBestBooksOrderState(meta.best_books_order);
+    }
+  }, [user]);
 
-    const timer = setTimeout(() => {
+  useEffect(() => {
+    if (!authReady || !user) return;
+    if (navigator.onLine) {
       refreshPriority(true);
-    }, 1800);
+    }
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') refreshPriority(false);
+      if (document.visibilityState === 'visible' && navigator.onLine) refreshPriority(false);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [refreshPriority]);
+  }, [authReady, user?.id, refreshPriority]);
 
   // Aggiorna l'ordine locale dei libri da leggere e lo sincronizza in background
   const setPriority = useCallback(async (newOrder: string[]) => {

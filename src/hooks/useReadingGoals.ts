@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 export type ReadingGoals = Record<string, number>;
 
@@ -29,6 +30,7 @@ function storeGoals(goals: ReadingGoals) {
  * con una copia in localStorage per il caricamento immediato / offline.
  */
 export function useReadingGoals() {
+  const { user, authReady } = useAuth();
   const [goals, setGoals] = useState<ReadingGoals>(() => getStoredGoals());
   const goalsRef = useRef<ReadingGoals>(goals);
 
@@ -38,10 +40,10 @@ export function useReadingGoals() {
     if (!force && Date.now() - lastRefreshRef.current < GOALS_SYNC_COOLDOWN_MS) {
       return;
     }
-    lastRefreshRef.current = Date.now();
     try {
       const { data, error } = await supabase.auth.getUser();
       if (error || !data.user) return;
+      lastRefreshRef.current = Date.now();
       const remote = data.user.user_metadata?.reading_goals as ReadingGoals | undefined;
       if (!remote) return;
       // I dati remoti sono la fonte di verità (sincronizzati tra dispositivi)
@@ -53,31 +55,30 @@ export function useReadingGoals() {
     }
   }, []);
 
+  // Identa subito dai metadati presenti nella sessione utente corrente (es. appena effettuato il login)
   useEffect(() => {
-    // Legge subito dalla sessione locale senza bloccare la rete all'avvio,
-    // poi sincronizza in background da Supabase dopo il primo render
-    supabase.auth.getSession().then(({ data }) => {
-      const localMeta = data.session?.user?.user_metadata?.reading_goals as ReadingGoals | undefined;
-      if (localMeta && Object.keys(goalsRef.current).length === 0) {
-        goalsRef.current = localMeta;
-        storeGoals(localMeta);
-        setGoals(localMeta);
-      }
-    });
+    const metaGoals = user?.user_metadata?.reading_goals as ReadingGoals | undefined;
+    if (metaGoals && Object.keys(metaGoals).length > 0) {
+      goalsRef.current = metaGoals;
+      storeGoals(metaGoals);
+      setGoals(metaGoals);
+    }
+  }, [user]);
 
-    const timer = setTimeout(() => {
+  useEffect(() => {
+    if (!authReady || !user) return;
+    if (navigator.onLine) {
       refreshGoals(true);
-    }, 1500);
+    }
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') refreshGoals(false);
+      if (document.visibilityState === 'visible' && navigator.onLine) refreshGoals(false);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [refreshGoals]);
+  }, [authReady, user?.id, refreshGoals]);
 
   const setGoal = useCallback(async (year: number | string, target: number | null) => {
     const key = String(year);

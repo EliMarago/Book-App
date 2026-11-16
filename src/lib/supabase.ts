@@ -17,6 +17,50 @@ export function setExplicitSignOut(value: boolean) {
   explicitSignOutInProgress = value;
 }
 
+export function clearAuthBackup() {
+  try {
+    localStorage.removeItem(SESSION_BACKUP_KEY);
+    // Rimuove anche eventuali chiavi sb-*-auth-token di Supabase scadute/revocate
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+        localStorage.removeItem(k);
+        sessionStorage.removeItem(k);
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function clearUserLocalCaches(userId?: string | null) {
+  try {
+    const sensitiveKeys = [
+      SESSION_BACKUP_KEY,
+      'bookapp_cached_books_v1',
+      'books_read_at',
+      'books_started_reading_at',
+      'books_pages',
+      'books_read_pages',
+      'books_plots',
+      'books_tags',
+      'books_characters',
+      'reading_goals',
+      'books_want_priority',
+      'books_best_order',
+      'bookshelf_book_details_it_v10',
+    ];
+    for (const k of sensitiveKeys) {
+      localStorage.removeItem(k);
+    }
+    if (userId) {
+      localStorage.removeItem(`bookapp_cached_books_v1_${userId}`);
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export function isRememberMeEnabled(): boolean {
   try {
     return localStorage.getItem(REMEMBER_ME_KEY) !== 'false';

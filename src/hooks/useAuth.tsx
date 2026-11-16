@@ -5,6 +5,8 @@ import {
   isRememberMeEnabled,
   setRememberMePreference,
   setExplicitSignOut,
+  clearAuthBackup,
+  clearUserLocalCaches,
   SESSION_BACKUP_KEY,
 } from '@/lib/supabase';
 
@@ -12,6 +14,7 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  authReady: boolean;
   isPasswordRecovery: boolean;
   recoveryError: string | null;
   clearRecoveryError: () => void;
@@ -25,6 +28,24 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isSessionExpired(session: Session | null, bufferSeconds = 45): boolean {
+  if (!session?.expires_at) return true;
+  return Date.now() / 1000 >= session.expires_at - bufferSeconds;
+}
+
+function isInvalidRefreshError(err: { message?: string; status?: number } | null | undefined): boolean {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  return (
+    msg.includes('invalid refresh token') ||
+    msg.includes('refresh token not found') ||
+    msg.includes('invalid_grant') ||
+    msg.includes('session_not_found') ||
+    msg.includes('already used') ||
+    err.status === 400
+  );
+}
 
 function getBackupSessionObject(): Session | null {
   try {
@@ -44,49 +65,104 @@ function getBackupSessionObject(): Session | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => getBackupSessionObject());
   const [loading, setLoading] = useState(() => !getBackupSessionObject());
+  const [authReady, setAuthReady] = useState(() => {
+    const backup = getBackupSessionObject();
+    if (!backup) return false;
+    return !navigator.onLine || !isSessionExpired(backup, 60);
+  });
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const explicitSignOutRef = useRef(false);
+  const sessionRef = useRef<Session | null>(session);
+  sessionRef.current = session;
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) {
-        setSession(data.session);
-        setLoading(false);
-        return;
-      }
+    let cancelled = false;
 
-      // Se "Ricordami" è attivo e la sessione primaria non è stata trovata (es. risveglio da standby),
-      // proviamo a ripristinarla dal backup locale senza disconnettere l'utente.
-      const backup = getBackupSessionObject();
-      if (backup && !explicitSignOutRef.current) {
-        setSession(backup);
-        setLoading(false);
-        if (navigator.onLine) {
-          supabase.auth
-            .setSession({
-              access_token: backup.access_token,
-              refresh_token: backup.refresh_token,
-            })
-            .then(({ data: restored }) => {
-              if (restored.session) {
-                setSession(restored.session);
-              }
-            })
-            .catch(() => {});
+    const ensureFreshSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (cancelled) return;
+
+        if (data.session) {
+          if (isSessionExpired(data.session, 60) && navigator.onLine) {
+            const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+            if (cancelled) return;
+            if (refreshed?.session) {
+              setSession(refreshed.session);
+            } else if (isInvalidRefreshError(refreshErr)) {
+              clearAuthBackup();
+              setSession(null);
+            } else {
+              setSession(data.session);
+            }
+          } else {
+            setSession(data.session);
+          }
+          setLoading(false);
+          setAuthReady(true);
+          return;
         }
-        return;
-      }
 
-      setSession(null);
-      setLoading(false);
-    });
+        // Se "Ricordami" è attivo e la sessione primaria non è stata trovata (es. risveglio da standby),
+        // proviamo a ripristinarla dal backup locale e a rinfrescarla se online.
+        const backup = getBackupSessionObject();
+        if (backup && !explicitSignOutRef.current) {
+          if (navigator.onLine) {
+            try {
+              const { data: restored, error: restoreErr } = await supabase.auth.setSession({
+                access_token: backup.access_token,
+                refresh_token: backup.refresh_token,
+              });
+              if (cancelled) return;
+              if (restored?.session) {
+                setSession(restored.session);
+              } else if (isInvalidRefreshError(restoreErr)) {
+                // Token scaduto/revocato definitivamente: puliamo il backup zombie per evitare loop vuoti
+                clearAuthBackup();
+                setSession(null);
+              } else {
+                setSession(backup);
+              }
+            } catch {
+              if (!cancelled) setSession(backup);
+            }
+          } else {
+            setSession(backup);
+          }
+          if (!cancelled) {
+            setLoading(false);
+            setAuthReady(true);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setSession(null);
+          setLoading(false);
+          setAuthReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoading(false);
+          setAuthReady(true);
+        }
+      }
+    };
+
+    ensureFreshSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (newSession) {
         setSession(newSession);
+        setAuthReady(true);
       } else if (explicitSignOutRef.current || !isRememberMeEnabled()) {
         setSession(null);
+        setAuthReady(true);
+      } else if (event === 'SIGNED_OUT') {
+        clearAuthBackup();
+        setSession(null);
+        setAuthReady(true);
       } else {
         // Evita che uno sbalzo temporaneo di rete durante il refresh del token butti fuori l'utente
         const backup = getBackupSessionObject();
@@ -103,6 +179,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     });
+
+    // Quando la PWA torna in primo piano o torna online, rinfresca subito il token se vicino alla scadenza
+    const refreshOnWake = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        navigator.onLine &&
+        sessionRef.current &&
+        isSessionExpired(sessionRef.current, 120)
+      ) {
+        supabase.auth
+          .refreshSession()
+          .then(({ data, error }) => {
+            if (data?.session) {
+              setSession(data.session);
+            } else if (isInvalidRefreshError(error)) {
+              clearAuthBackup();
+              setSession(null);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', refreshOnWake);
+    window.addEventListener('online', refreshOnWake);
 
     // 1. Controlla se l'URL contiene un errore restituito da Supabase (da query o hash)
     const searchParams = new URLSearchParams(window.location.search);
@@ -161,7 +262,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return () => {
+      cancelled = true;
       listener.subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', refreshOnWake);
+      window.removeEventListener('online', refreshOnWake);
     };
   }, []);
 
@@ -312,6 +416,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    const currentUserId = sessionRef.current?.user?.id;
     explicitSignOutRef.current = true;
     setExplicitSignOut(true);
     try {
@@ -319,25 +424,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore network error on signout
     }
-    try {
-      const sensitiveKeys = [
-        SESSION_BACKUP_KEY,
-        'books_read_at',
-        'books_pages',
-        'books_read_pages',
-        'books_plots',
-        'books_tags',
-        'reading_goals',
-        'books_want_priority',
-        'books_best_order',
-        'bookshelf_book_details_it_v10',
-      ];
-      for (const k of sensitiveKeys) {
-        localStorage.removeItem(k);
-      }
-    } catch {
-      // ignore storage errors
-    }
+    clearAuthBackup();
+    clearUserLocalCaches(currentUserId);
     setSession(null);
     setIsPasswordRecovery(false);
     setRecoveryError(null);
@@ -350,6 +438,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user: session?.user ?? null,
         loading,
+        authReady,
         isPasswordRecovery,
         recoveryError,
         clearRecoveryError,

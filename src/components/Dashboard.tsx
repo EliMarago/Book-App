@@ -69,20 +69,35 @@ const UNDO_DELETE_MS = 6000;
 const AUTO_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 const BOOKS_CACHE_KEY = 'bookapp_cached_books_v1';
 
-function getCachedBooks(): Book[] {
+function getBooksCacheKey(userId?: string): string {
+  return userId ? `${BOOKS_CACHE_KEY}_${userId}` : BOOKS_CACHE_KEY;
+}
+
+function getCachedBooks(userId?: string): Book[] {
   try {
+    if (userId) {
+      const scopedRaw = localStorage.getItem(getBooksCacheKey(userId));
+      if (scopedRaw) {
+        const parsed = JSON.parse(scopedRaw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    }
     const raw = localStorage.getItem(BOOKS_CACHE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    if (userId) {
+      return parsed.filter((b: Book) => !b.user_id || b.user_id === userId);
+    }
+    return parsed;
   } catch {
     return [];
   }
 }
 
-function saveCachedBooks(books: Book[]) {
+function saveCachedBooks(books: Book[], userId?: string) {
   try {
-    localStorage.setItem(BOOKS_CACHE_KEY, JSON.stringify(books));
+    localStorage.setItem(getBooksCacheKey(userId), JSON.stringify(books));
   } catch {
     // ignore quota errors
   }
@@ -91,7 +106,8 @@ function saveCachedBooks(books: Book[]) {
 type ViewTab = 'all' | 'reading' | 'completed' | 'want';
 
 export function Dashboard() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, session, authReady } = useAuth();
+  const userId = user?.id;
   const { isDark, themePreference, toggleTheme } = useTheme();
   const { toast } = useToast();
   const {
@@ -106,12 +122,15 @@ export function Dashboard() {
   const [isReorderingWantCards, setIsReorderingWantCards] = useState(false);
   const [draggedCardBookId, setDraggedCardBookId] = useState<string | null>(null);
   const [dragOverCardBookId, setDragOverCardBookId] = useState<string | null>(null);
-  const [rawBooks, setBooks] = useState<Book[]>(() => getCachedBooks());
+  const [rawBooks, setBooks] = useState<Book[]>(() => getCachedBooks(userId));
+  const rawBooksRef = useRef<Book[]>(rawBooks);
+  rawBooksRef.current = rawBooks;
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const pendingDeletes = useRef<Map<string, { book: Book; timer: ReturnType<typeof setTimeout> }>>(new Map());
   const [sortBy, setSortBy] = useState<SortKey>(() => getStoredSort());
-  const [loading, setLoading] = useState<boolean>(() => getCachedBooks().length === 0);
+  const [loading, setLoading] = useState<boolean>(() => getCachedBooks(userId).length === 0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -230,6 +249,10 @@ export function Dashboard() {
       const silent = options?.silent ?? false;
       const force = options?.force ?? false;
 
+      if (!authReady || !userId) {
+        return;
+      }
+
       if (loadInFlightRef.current && !force) {
         return;
       }
@@ -252,9 +275,16 @@ export function Dashboard() {
           checkForAppUpdate().catch(() => {});
         }
 
-        // Esegue la query dei libri e quella dei metadati note IN PARALLELO anziché in sequenza (dimezza il tempo di rete!)
+        const fetchBooksQuery = () =>
+          supabase
+            .from('books')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        // Esegue la query dei libri e quella dei metadati note IN PARALLELO anziché in sequenza
         const [
-          booksRes,
+          initialBooksRes,
           storedLocalDates,
           storedLocalPages,
           storedLocalReadPages,
@@ -262,9 +292,9 @@ export function Dashboard() {
           storedLocalTags,
           storedLocalCharacters,
           storedLocalStartedDates,
-          notesMeta,
+          initialNotesMeta,
         ] = await Promise.all([
-          supabase.from('books').select('*').order('created_at', { ascending: false }),
+          fetchBooksQuery(),
           getStoredDates(),
           getStoredPages(),
           getStoredReadPages(),
@@ -275,37 +305,90 @@ export function Dashboard() {
           fetchNotesMetadataFromSupabase(),
         ]);
 
-        const data = booksRes.data;
+        let booksRes = initialBooksRes;
+        let notesMeta = initialNotesMeta;
 
-        const booksWithDatesAndPages = (data ?? []).map((b) => ({
-          ...b,
-          read_at: b.read_at || notesMeta.dates[b.id] || storedLocalDates[b.id] || null,
-          started_at:
-            (b as any).started_at ||
-            notesMeta.startedDates[b.id] ||
-            storedLocalStartedDates[b.id] ||
-            (b.status === 'reading' ? b.created_at : null),
-          pages: b.pages !== undefined && b.pages !== null ? Number(b.pages) : (notesMeta.pages[b.id] || storedLocalPages[b.id] || null),
-          read_pages: b.read_pages !== undefined && b.read_pages !== null
-            ? Number(b.read_pages)
-            : (notesMeta.readPages[b.id] !== undefined
-                ? notesMeta.readPages[b.id]
-                : (storedLocalReadPages[b.id] !== undefined
-                    ? storedLocalReadPages[b.id]
-                    : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
-          notes_count: notesMeta.counts[b.id] || 0,
-          plot: b.plot || notesMeta.plots[b.id] || storedLocalPlots[b.id] || null,
-          tags: notesMeta.tags[b.id] || storedLocalTags[b.id] || [],
-          characters: notesMeta.characters[b.id] || storedLocalCharacters[b.id] || null,
-        }));
+        // Se la query fallisce per token JWT scaduto al risveglio su mobile, rinfresca la sessione e riprova una volta
+        if (booksRes.error) {
+          const msg = (booksRes.error.message || '').toLowerCase();
+          const code = (booksRes.error as { code?: string }).code || '';
+          const isAuthErr =
+            msg.includes('jwt') ||
+            msg.includes('expired') ||
+            msg.includes('unauthorized') ||
+            code === 'PGRST301' ||
+            code === '401';
 
+          if (isAuthErr && navigator.onLine) {
+            const { data: refreshed } = await supabase.auth.refreshSession().catch(() => ({ data: { session: null } }));
+            if (refreshed?.session) {
+              const [retryBooksRes, retryNotesMeta] = await Promise.all([
+                fetchBooksQuery(),
+                notesMeta.ok ? Promise.resolve(notesMeta) : fetchNotesMetadataFromSupabase(),
+              ]);
+              booksRes = retryBooksRes;
+              notesMeta = retryNotesMeta;
+            }
+          }
+        }
+
+        // CRITICO: se la query libri fallisce, NON sovrascrivere mai stato e cache locale con array vuoto!
+        if (booksRes.error) {
+          console.error('Errore caricamento libri da Supabase:', booksRes.error);
+          setSyncError(
+            navigator.onLine
+              ? 'Sincronizzazione con il cloud non riuscita. Mostro i dati salvati sul dispositivo.'
+              : 'Sei offline: mostro i libri salvati in memoria sul dispositivo.'
+          );
+          return;
+        }
+
+        const data = booksRes.data ?? [];
+        const prevMap = new Map(rawBooksRef.current.map((b) => [b.id, b]));
+
+        const booksWithDatesAndPages = data.map((b) => {
+          const prev = prevMap.get(b.id);
+          return {
+            ...b,
+            read_at:
+              b.read_at ||
+              (notesMeta.ok ? notesMeta.dates[b.id] : prev?.read_at) ||
+              storedLocalDates[b.id] ||
+              null,
+            started_at:
+              (b as any).started_at ||
+              (notesMeta.ok ? notesMeta.startedDates[b.id] : prev?.started_at) ||
+              storedLocalStartedDates[b.id] ||
+              (b.status === 'reading' ? b.created_at : null),
+            pages:
+              b.pages !== undefined && b.pages !== null
+                ? Number(b.pages)
+                : ((notesMeta.ok ? notesMeta.pages[b.id] : prev?.pages) || storedLocalPages[b.id] || null),
+            read_pages:
+              b.read_pages !== undefined && b.read_pages !== null
+                ? Number(b.read_pages)
+                : ((notesMeta.ok ? notesMeta.readPages[b.id] : prev?.read_pages) !== undefined
+                    ? (notesMeta.ok ? notesMeta.readPages[b.id] : prev?.read_pages)!
+                    : (storedLocalReadPages[b.id] !== undefined
+                        ? storedLocalReadPages[b.id]
+                        : (b.status === 'completed' && b.pages ? Number(b.pages) : 0))),
+            notes_count: notesMeta.ok ? (notesMeta.counts[b.id] || 0) : (prev?.notes_count || 0),
+            plot: b.plot || (notesMeta.ok ? notesMeta.plots[b.id] : prev?.plot) || storedLocalPlots[b.id] || null,
+            tags: notesMeta.ok ? (notesMeta.tags[b.id] || storedLocalTags[b.id] || []) : (prev?.tags || storedLocalTags[b.id] || []),
+            characters:
+              (notesMeta.ok ? notesMeta.characters[b.id] : prev?.characters) || storedLocalCharacters[b.id] || null,
+          };
+        });
+
+        setSyncError(null);
         setBooks(booksWithDatesAndPages);
-        saveCachedBooks(booksWithDatesAndPages);
+        saveCachedBooks(booksWithDatesAndPages, userId);
         const now = new Date();
         lastSyncTimestampRef.current = now.getTime();
         setLastSyncedAt(now);
       } catch (err) {
         console.error('Errore durante la sincronizzazione:', err);
+        setSyncError('Errore di rete durante la sincronizzazione. Controlla la connessione e riprova.');
       } finally {
         loadInFlightRef.current = false;
         setLoading(false);
@@ -314,20 +397,29 @@ export function Dashboard() {
         }
       }
     },
-    []
+    [authReady, userId]
   );
 
   // Sincronizza la cache locale ogni volta che i libri vengono modificati/aggiunti/rimossi localmente
   useEffect(() => {
     if (rawBooks.length > 0) {
-      saveCachedBooks(rawBooks);
+      saveCachedBooks(rawBooks, userId);
     }
-  }, [rawBooks]);
+  }, [rawBooks, userId]);
 
   useEffect(() => {
+    if (!authReady || !userId) {
+      return;
+    }
+
     // Se abbiamo già i libri in cache locale, mostriamo subito la libreria in 0ms
     // e sincronizziamo silenziosamente in background senza mostrare lo skeleton
-    const hasCached = getCachedBooks().length > 0;
+    const cached = getCachedBooks(userId);
+    if (cached.length > 0 && rawBooksRef.current.length === 0) {
+      setBooks(cached);
+      setLoading(false);
+    }
+    const hasCached = cached.length > 0 || rawBooksRef.current.length > 0;
     loadBooks(!hasCached, { silent: hasCached, force: true });
 
     let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -382,7 +474,14 @@ export function Dashboard() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
     };
-  }, [loadBooks]);
+  }, [authReady, userId, loadBooks]);
+
+  // Se il token di sessione viene rinfrescato dopo un errore di sync precedente, ritenta subito
+  useEffect(() => {
+    if (authReady && userId && session?.access_token && syncError) {
+      loadBooks(rawBooksRef.current.length === 0, { silent: false, force: true });
+    }
+  }, [authReady, userId, session?.access_token, syncError, loadBooks]);
 
   const handleAddBook = (book: Book) => {
     markLocalMutation();
@@ -646,6 +745,21 @@ export function Dashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 pb-36 sm:pb-14">
+        {syncError && (
+          <div className="mb-4 p-3 sm:px-4 rounded-2xl bg-amber-500/10 light:bg-amber-50 border border-amber-500/35 light:border-amber-300 flex items-center justify-between gap-3 text-xs text-amber-200 light:text-amber-900">
+            <span className="leading-snug">{syncError}</span>
+            <button
+              type="button"
+              onClick={() => loadBooks(rawBooks.length === 0, { force: true })}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 text-stone-950 font-semibold shrink-0 cursor-pointer active:scale-95 disabled:opacity-60"
+            >
+              <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+              <span>Riprova</span>
+            </button>
+          </div>
+        )}
+
         {/* Obiettivo di lettura annuale */}
         <ReadingChallenge books={books} goals={goals} onSetGoal={setGoal} />
 

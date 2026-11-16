@@ -305,6 +305,7 @@ export async function syncBookDateToSupabase(bookId: string, readAt: string | nu
 }
 
 export async function fetchNotesMetadataFromSupabase(): Promise<{
+  ok: boolean;
   dates: Record<string, string>;
   startedDates: Record<string, string>;
   pages: Record<string, number>;
@@ -314,13 +315,37 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
   characters: Record<string, string>;
   counts: Record<string, number>;
 }> {
+  const emptyResult = {
+    ok: false,
+    dates: {},
+    startedDates: {},
+    pages: {},
+    readPages: {},
+    plots: {},
+    tags: {},
+    characters: {},
+    counts: {},
+  };
   try {
-    const { data, error } = await supabase
-      .from('notes')
-      .select('book_id, content');
+    const PAGE_SIZE = 1000;
+    const allRows: Array<{ book_id: string; content: string }> = [];
+    let from = 0;
 
-    if (error || !data) {
-      return { dates: {}, startedDates: {}, pages: {}, readPages: {}, plots: {}, tags: {}, characters: {}, counts: {} };
+    while (true) {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('book_id, content')
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error || !data) {
+        return emptyResult;
+      }
+
+      allRows.push(...data);
+      if (data.length < PAGE_SIZE) {
+        break;
+      }
+      from += PAGE_SIZE;
     }
 
     const dates: Record<string, string> = {};
@@ -332,7 +357,7 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
     const characters: Record<string, string> = {};
     const counts: Record<string, number> = {};
 
-    for (const item of data) {
+    for (const item of allRows) {
       if (item.content.startsWith('__READ_AT__:')) {
         dates[item.book_id] = item.content.replace('__READ_AT__:', '');
       } else if (item.content.startsWith('__STARTED_AT__:')) {
@@ -363,10 +388,10 @@ export async function fetchNotesMetadataFromSupabase(): Promise<{
       }
     }
 
-    return { dates, startedDates, pages, readPages, plots, tags, characters, counts };
+    return { ok: true, dates, startedDates, pages, readPages, plots, tags, characters, counts };
   } catch (err) {
     console.error('Errore nel recupero note, date e pagine da Supabase:', err);
-    return { dates: {}, startedDates: {}, pages: {}, readPages: {}, plots: {}, tags: {}, characters: {}, counts: {} };
+    return emptyResult;
   }
 }
 
