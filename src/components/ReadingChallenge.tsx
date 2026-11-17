@@ -401,7 +401,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                       }}
                       autoFocus
                       placeholder="12"
-                      className="w-16 px-2 py-0.5 bg-stone-900 light:bg-white border border-orange-500/60 rounded-md font-serif font-bold text-xs text-stone-100 light:text-stone-900 outline-none focus:ring-1 focus:ring-orange-500 text-center tabular-nums"
+                      className="w-16 px-2 py-0.5 bg-stone-900 light:bg-white border border-orange-500/60 rounded-md font-serif font-bold text-base sm:text-xs text-stone-100 light:text-stone-900 outline-none focus:ring-1 focus:ring-orange-500 text-center tabular-nums"
                     />
                     <span className="text-xs text-stone-300 light:text-stone-700 font-medium">libri</span>
                     <div className="flex items-center gap-1 ml-1">
@@ -458,7 +458,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                     </div>
 
                     {/* Dorsini + "+20 extra" appoggiati sulla linea mensola (sotto, lunga fino a destra) */}
-                    <div className="mt-10 sm:mt-12 flex items-end border-b-2 border-stone-600/70 light:border-stone-300/90">
+                    <div className="mt-5 sm:mt-8 flex items-end border-b-2 border-stone-600/70 light:border-stone-300/90">
                       <div className="flex items-end gap-1 shrink-0">
                         {spines.map((spine, idx) => (
                           <div

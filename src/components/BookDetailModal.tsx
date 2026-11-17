@@ -681,7 +681,7 @@ export function BookDetailModal({
                       }
                     }}
                     placeholder="Es. Kai & Miller, oppure nomi protagonisti..."
-                    className="flex-1 min-w-0 px-3 py-1.5 bg-stone-900/90 light:bg-white border border-stone-700 light:border-rose-200 rounded-xl text-xs sm:text-sm text-stone-100 light:text-stone-900 placeholder:text-stone-500 focus:outline-none focus:border-rose-400"
+                    className="flex-1 min-w-0 px-3 py-1.5 bg-stone-900/90 light:bg-white border border-stone-700 light:border-rose-200 rounded-xl text-base sm:text-sm text-stone-100 light:text-stone-900 placeholder:text-stone-500 focus:outline-none focus:border-rose-400"
                   />
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -785,7 +785,7 @@ export function BookDetailModal({
                             }}
                             autoFocus
                             placeholder="0"
-                            className="w-28 px-3 py-1.5 bg-stone-900 light:bg-white border-2 border-amber-500 rounded-xl text-sm font-bold text-stone-100 light:text-stone-900 outline-none focus:ring-2 focus:ring-amber-400/50 tabular-nums shadow-inner"
+                            className="w-28 px-3 py-1.5 bg-stone-900 light:bg-white border-2 border-amber-500 rounded-xl text-base sm:text-sm font-bold text-stone-100 light:text-stone-900 outline-none focus:ring-2 focus:ring-amber-400/50 tabular-nums shadow-inner"
                           />
                           {book.pages && book.pages > 0 && (
                             <span className="text-xs text-stone-400 light:text-stone-600 font-medium">
@@ -1271,7 +1271,7 @@ export function BookDetailModal({
                       type="date"
                       value={startDateInput}
                       onChange={(e) => setStartDateInput(e.target.value)}
-                      className="px-2.5 py-1 bg-stone-950 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 text-xs focus:outline-none focus:border-amber-500"
+                      className="px-2.5 py-1 bg-stone-950 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 text-base sm:text-xs focus:outline-none focus:border-amber-500"
                     />
                     <button
                       type="button"
@@ -1419,7 +1419,7 @@ export function BookDetailModal({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Titolo, autore o parole chiave..."
-                    className="w-full pl-3 pr-8 py-2 bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm focus:outline-none focus:border-amber-500/60"
+                    className="w-full pl-3 pr-8 py-2 bg-stone-800 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-base sm:text-sm focus:outline-none focus:border-amber-500/60"
                     autoFocus
                   />
                   {searchQuery && (
@@ -1442,10 +1442,10 @@ export function BookDetailModal({
                 </button>
               </form>
 
-              {/* Filtri per fonte e lingua */}
+              {/* Filtri per fonte e lingua (su righe avvolgibili per non tagliare i filtri lingua su mobile) */}
               <div className="flex flex-col gap-1.5 pt-0.5 text-[11px]">
-                <div className="flex items-center justify-between gap-2 overflow-x-auto">
-                  <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setSelectedSourceFilter('all')}
@@ -1666,11 +1666,11 @@ export function BookDetailModal({
           onClick={() => setShowEditPlotModal(false)}
         >
           <div
-            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden modal-sheet"
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-800 light:border-stone-200 max-w-lg w-full max-h-[92dvh] sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden modal-sheet"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mt-2.5 sm:hidden shrink-0" />
-            <div className="p-4 border-b border-stone-800 light:border-stone-200 flex items-center justify-between gap-3">
+            <div className="p-4 border-b border-stone-800 light:border-stone-200 flex items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 flex items-center justify-center text-amber-400 light:text-amber-700">
                   <Pencil size={15} />
@@ -1693,7 +1693,7 @@ export function BookDetailModal({
               </button>
             </div>
 
-            <div className="p-4 space-y-3">
+            <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom,1rem))] sm:pb-4 space-y-3 overflow-y-auto flex-1">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-xs text-stone-400 light:text-stone-600">
                   Puoi incollare la trama da un sito, riassunto o retro di copertina:
@@ -1716,8 +1716,8 @@ export function BookDetailModal({
                 value={customPlotText}
                 onChange={(e) => setCustomPlotText(e.target.value)}
                 placeholder="Incolla o scrivi qui la trama del libro..."
-                rows={10}
-                className="w-full p-3.5 bg-stone-850 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 font-serif text-[13px] sm:text-sm leading-relaxed focus:outline-none focus:border-amber-500/60 resize-y"
+                rows={8}
+                className="w-full p-3.5 bg-stone-850 light:bg-stone-50 border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 font-serif text-base sm:text-sm leading-relaxed focus:outline-none focus:border-amber-500/60 resize-y"
                 autoFocus
               />
 

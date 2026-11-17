@@ -375,7 +375,7 @@ export function BookshelfCustomizationModal({
                       <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
                         {h.label}
                       </div>
-                      <div className="text-[10px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="hidden sm:block text-[10px] text-stone-400 light:text-stone-500 truncate">
                         {h.desc}
                       </div>
                     </div>

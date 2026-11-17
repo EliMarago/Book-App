@@ -7,6 +7,7 @@ import {
   setExplicitSignOut,
   clearAuthBackup,
   clearUserLocalCaches,
+  safeRefreshSession,
   SESSION_BACKUP_KEY,
 } from '@/lib/supabase';
 
@@ -32,19 +33,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function isSessionExpired(session: Session | null, bufferSeconds = 45): boolean {
   if (!session?.expires_at) return true;
   return Date.now() / 1000 >= session.expires_at - bufferSeconds;
-}
-
-function isInvalidRefreshError(err: { message?: string; status?: number } | null | undefined): boolean {
-  if (!err) return false;
-  const msg = (err.message || '').toLowerCase();
-  return (
-    msg.includes('invalid refresh token') ||
-    msg.includes('refresh token not found') ||
-    msg.includes('invalid_grant') ||
-    msg.includes('session_not_found') ||
-    msg.includes('already used') ||
-    err.status === 400
-  );
 }
 
 function getBackupSessionObject(): Session | null {
@@ -86,11 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (data.session) {
           if (isSessionExpired(data.session, 60) && navigator.onLine) {
-            const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+            const { session: refreshed, permanentInvalid } = await safeRefreshSession();
             if (cancelled) return;
-            if (refreshed?.session) {
-              setSession(refreshed.session);
-            } else if (isInvalidRefreshError(refreshErr)) {
+            if (refreshed) {
+              setSession(refreshed);
+            } else if (permanentInvalid) {
               clearAuthBackup();
               setSession(null);
             } else {
@@ -105,27 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Se "Ricordami" è attivo e la sessione primaria non è stata trovata (es. risveglio da standby),
-        // proviamo a ripristinarla dal backup locale e a rinfrescarla se online.
+        // usiamo safeRefreshSession (mai setSession concurrent) così non consumiamo due volte lo stesso refresh token.
         const backup = getBackupSessionObject();
         if (backup && !explicitSignOutRef.current) {
           if (navigator.onLine) {
-            try {
-              const { data: restored, error: restoreErr } = await supabase.auth.setSession({
-                access_token: backup.access_token,
-                refresh_token: backup.refresh_token,
-              });
-              if (cancelled) return;
-              if (restored?.session) {
-                setSession(restored.session);
-              } else if (isInvalidRefreshError(restoreErr)) {
-                // Token scaduto/revocato definitivamente: puliamo il backup zombie per evitare loop vuoti
-                clearAuthBackup();
-                setSession(null);
-              } else {
-                setSession(backup);
-              }
-            } catch {
-              if (!cancelled) setSession(backup);
+            const { session: refreshed, permanentInvalid } = await safeRefreshSession(true);
+            if (cancelled) return;
+            if (refreshed) {
+              setSession(refreshed);
+            } else if (permanentInvalid) {
+              clearAuthBackup();
+              setSession(null);
+            } else {
+              setSession(backup);
             }
           } else {
             setSession(backup);
@@ -160,9 +140,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setAuthReady(true);
       } else if (event === 'SIGNED_OUT') {
-        clearAuthBackup();
-        setSession(null);
-        setAuthReady(true);
+        // Non buttare fuori subito l'utente su un evento SIGNED_OUT spurio (es. race tra tab/auto-refresh):
+        // verifica prima tramite safeRefreshSession se esiste un token valido o se è davvero revocato.
+        const backup = getBackupSessionObject();
+        if (!backup) {
+          setSession(null);
+          setAuthReady(true);
+        } else if (navigator.onLine) {
+          safeRefreshSession()
+            .then(({ session: recovered, permanentInvalid }) => {
+              if (cancelled) return;
+              if (recovered) {
+                setSession(recovered);
+              } else if (permanentInvalid) {
+                clearAuthBackup();
+                setSession(null);
+              } else {
+                setSession(backup);
+              }
+              setAuthReady(true);
+            })
+            .catch(() => {
+              if (!cancelled) setSession(backup);
+            });
+        } else {
+          setSession(backup);
+          setAuthReady(true);
+        }
       } else {
         // Evita che uno sbalzo temporaneo di rete durante il refresh del token butti fuori l'utente
         const backup = getBackupSessionObject();
@@ -180,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Quando la PWA torna in primo piano o torna online, rinfresca subito il token se vicino alla scadenza
+    // Quando la PWA torna in primo piano o torna online, rinfresca in modo serializzato se vicino alla scadenza
     const refreshOnWake = () => {
       if (
         document.visibilityState === 'visible' &&
@@ -188,12 +192,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionRef.current &&
         isSessionExpired(sessionRef.current, 120)
       ) {
-        supabase.auth
-          .refreshSession()
-          .then(({ data, error }) => {
-            if (data?.session) {
-              setSession(data.session);
-            } else if (isInvalidRefreshError(error)) {
+        safeRefreshSession()
+          .then(({ session: refreshed, permanentInvalid }) => {
+            if (cancelled) return;
+            if (refreshed) {
+              setSession(refreshed);
+            } else if (permanentInvalid) {
               clearAuthBackup();
               setSession(null);
             }
@@ -202,8 +206,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Sincronizza la sessione se un'altra scheda del browser ha appena rinfrescato i token in localStorage
+    const handleStorageSync = (e: StorageEvent) => {
+      if (e.key === SESSION_BACKUP_KEY && e.newValue && isRememberMeEnabled()) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.access_token && parsed?.refresh_token && parsed?.user) {
+            setSession(parsed as Session);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+
     document.addEventListener('visibilitychange', refreshOnWake);
     window.addEventListener('online', refreshOnWake);
+    window.addEventListener('storage', handleStorageSync);
 
     // 1. Controlla se l'URL contiene un errore restituito da Supabase (da query o hash)
     const searchParams = new URLSearchParams(window.location.search);
@@ -266,6 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
       document.removeEventListener('visibilitychange', refreshOnWake);
       window.removeEventListener('online', refreshOnWake);
+      window.removeEventListener('storage', handleStorageSync);
     };
   }, []);
 

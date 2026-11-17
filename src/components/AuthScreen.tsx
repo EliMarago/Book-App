@@ -413,7 +413,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
                       placeholder="nome@esempio.it"
                     />
                   </div>
@@ -453,7 +453,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                     minLength={mode === 'signin' ? 6 : 8}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                    className="w-full pl-10 pr-10 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
                     placeholder={mode === 'signin' ? 'Inserisci la tua password' : 'Minimo 8 caratteri'}
                   />
                   <button
@@ -518,7 +518,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                     minLength={8}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm font-medium"
+                    className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-sm font-medium"
                     placeholder="Ripeti la password"
                   />
                 </div>
@@ -567,7 +567,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                       type="text"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.trim())}
-                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-xs font-mono"
+                      className="w-full pl-10 pr-4 py-2.5 bg-stone-950/50 light:bg-stone-50/80 border border-stone-800 light:border-stone-300/80 rounded-xl text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-base sm:text-xs font-mono"
                       placeholder="Incolla qui l'URL completo o il token"
                     />
                   </div>

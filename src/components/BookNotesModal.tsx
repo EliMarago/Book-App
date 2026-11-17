@@ -161,6 +161,13 @@ export function BookNotesModal({
   // Conferma eliminazione
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
+  // Su mobile separa lettura e scrittura in due schede pulite per evitare che le note restino schiacciate in basso
+  const [mobileTab, setMobileTab] = useState<'list' | 'write'>(() => {
+    const count = initialNotes ? initialNotes.length : (book.notes_count ?? 0);
+    return count > 0 ? 'list' : 'write';
+  });
+  const userSwitchedTabRef = useRef(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Caricamento note se non fornite
@@ -176,6 +183,9 @@ export function BookNotesModal({
       if (error) throw error;
       const userNotes = (data ?? []).filter((n) => !n.content.startsWith('__'));
       setNotes(userNotes);
+      if (!userSwitchedTabRef.current) {
+        setMobileTab(userNotes.length > 0 ? 'list' : 'write');
+      }
     } catch (e) {
       console.error('Errore nel caricamento delle note:', e);
       toast({ message: 'Impossibile caricare le note', type: 'error' });
@@ -247,6 +257,7 @@ export function BookNotesModal({
         setNewText('');
         // Non resettiamo pageInput se l'utente sta leggendo a quella pagina
         onUpdateBook({ ...book, notes_count: updated.length });
+        setMobileTab('list');
         toast({ message: 'Nota salvata con successo!', type: 'success' });
       }
     } catch (e) {
@@ -362,16 +373,15 @@ export function BookNotesModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-5 animate-fade-up"
+      className="fixed inset-0 bg-stone-950/80 light:bg-stone-900/60 backdrop-blur-sm z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-5 animate-fade-up"
       onClick={onClose}
     >
       <div
-        className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 max-w-2xl w-full h-[94dvh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain modal-sheet"
+        className="bg-stone-900 light:bg-white rounded-none sm:rounded-3xl sm:border border-stone-800 light:border-stone-200 max-w-2xl w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mt-2.5 sm:hidden shrink-0" />
-        {/* HEADER MODALE */}
-        <div className="flex items-center justify-between px-3.5 py-3 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
+        {/* HEADER MODALE (con safe-area-inset-top su mobile full-screen) */}
+        <div className="flex items-center justify-between px-4 pt-[max(0.875rem,env(safe-area-inset-top,0.875rem))] pb-3 sm:p-5 border-b border-stone-800 light:border-stone-200 shrink-0 bg-stone-900 light:bg-white">
           <div className="flex items-center gap-3 min-w-0">
             {/* Miniatura copertina */}
             <div className="w-10 h-14 rounded-lg bg-stone-800 light:bg-stone-100 border border-stone-700/80 light:border-stone-300 overflow-hidden shrink-0 shadow-sm relative book-spine-effect">
@@ -413,12 +423,53 @@ export function BookNotesModal({
           </button>
         </div>
 
+        {/* SELETTORE SCHEDE SU MOBILE: Leggi note vs Scrivi nota */}
+        <div className="sm:hidden px-4 py-2.5 bg-stone-900/95 light:bg-stone-50 border-b border-stone-800 light:border-stone-200 shrink-0">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-stone-850 light:bg-stone-200/70 border border-stone-800 light:border-stone-300/70">
+            <button
+              type="button"
+              onClick={() => {
+                userSwitchedTabRef.current = true;
+                setMobileTab('list');
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                mobileTab === 'list'
+                  ? 'bg-amber-500 text-stone-950 shadow-xs'
+                  : 'text-stone-400 light:text-stone-600'
+              }`}
+            >
+              <StickyNote size={14} />
+              <span>Le tue note ({notes ? notes.length : 0})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                userSwitchedTabRef.current = true;
+                setMobileTab('write');
+                setTimeout(() => textareaRef.current?.focus(), 60);
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                mobileTab === 'write'
+                  ? 'bg-amber-500 text-stone-950 shadow-xs'
+                  : 'text-stone-400 light:text-stone-600'
+              }`}
+            >
+              <Plus size={14} strokeWidth={2.5} />
+              <span>Scrivi nota</span>
+            </button>
+          </div>
+        </div>
+
         {/* CORPO MODALE (SCROLLABILE) */}
-        <div className="p-4 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] sm:pb-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-4 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] sm:pb-6 overflow-y-auto flex-1 flex flex-col gap-5 sm:block sm:space-y-6">
           {/* SEZIONE 1: AREA DI SCRITTURA SPAZIOSA E CONFORTEVOLE */}
-          <div className="bg-stone-850/80 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-4 sm:p-5 shadow-xs transition-all focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/30">
+          <div
+            className={`${
+              mobileTab === 'write' ? 'flex flex-col flex-1 sm:block' : 'hidden sm:block'
+            } bg-stone-850/80 light:bg-stone-50/90 border border-stone-800 light:border-stone-200/90 rounded-2xl p-4 sm:p-5 shadow-xs transition-all focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/30`}
+          >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700">
                   <StickyNote size={15} />
                 </div>
@@ -437,7 +488,7 @@ export function BookNotesModal({
                       key={t.id}
                       type="button"
                       onClick={() => setSelectedTag(isSelected ? null : t.id)}
-                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+                      className={`text-[11px] font-semibold px-2.5 py-1.5 sm:py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
                         isSelected
                           ? `${t.badgeBg} ${t.badgeText} ${t.badgeBorder} ring-1 ring-amber-500/30 shadow-xs font-bold`
                           : 'bg-stone-800/60 light:bg-white text-stone-400 light:text-stone-600 border-stone-700 light:border-stone-200 hover:text-stone-200 light:hover:text-stone-800'
@@ -452,7 +503,7 @@ export function BookNotesModal({
             </div>
 
             {/* Riferimento Pagina opzionale */}
-            <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex items-center gap-2 mb-3">
               <span className="text-xs text-stone-400 light:text-stone-500 font-medium flex items-center gap-1">
                 <BookOpen size={13} className="text-amber-400 light:text-amber-600" />
                 Pagina del libro:
@@ -473,8 +524,8 @@ export function BookNotesModal({
               </div>
             </div>
 
-            {/* Area di testo grande con comoda interlinea e font */}
-            <div className="relative">
+            {/* Area di testo grande con comoda interlinea e font (espandibile su mobile) */}
+            <div className="relative flex-1 flex flex-col">
               <textarea
                 ref={textareaRef}
                 value={newText}
@@ -485,7 +536,7 @@ export function BookNotesModal({
                     handleAddNote();
                   }
                 }}
-                rows={4}
+                rows={5}
                 placeholder={
                   selectedTag === 'Citazione'
                     ? 'Incolla o scrivi la citazione che ti ha colpito...'
@@ -493,30 +544,30 @@ export function BookNotesModal({
                       ? 'Riassumi i punti salienti del capitolo o del libro...'
                       : 'Scrivi le tue riflessioni, pensieri o appunti su questo libro...'
                 }
-                className="w-full bg-stone-900/90 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-3.5 text-base sm:text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all leading-relaxed shadow-inner"
+                className="w-full flex-1 min-h-[160px] sm:min-h-[110px] bg-stone-900/90 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl p-3.5 text-base sm:text-sm text-stone-100 light:text-stone-900 placeholder-stone-500 light:placeholder-stone-400 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all leading-relaxed shadow-inner resize-none sm:resize-y"
               />
             </div>
 
             {/* Barra azioni inferiore dell'editor */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-2 border-t border-stone-800/80 light:border-stone-200/80 text-xs">
-              <div className="flex items-center gap-3 text-stone-500 light:text-stone-400">
+            <div className="flex items-center justify-between gap-2.5 mt-3 pt-2.5 border-t border-stone-800/80 light:border-stone-200/80 text-xs shrink-0">
+              <div className="flex items-center gap-2 text-stone-500 light:text-stone-400">
                 <span>
                   {wordCount} {wordCount === 1 ? 'parola' : 'parole'}
                 </span>
                 <span>·</span>
-                <span>{charCount} caratteri</span>
+                <span>{charCount} car.</span>
                 <span className="hidden sm:inline-block">·</span>
                 <span className="hidden sm:inline-block text-[11px] text-stone-500 light:text-stone-400">
                   Premi <kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[11px]">⌘</kbd>+<kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[11px]">Invio</kbd> per salvare
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-auto">
+              <div className="flex items-center gap-2">
                 {newText.trim() && (
                   <button
                     type="button"
                     onClick={() => setNewText('')}
-                    className="text-xs px-2.5 py-1.5 text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 transition-colors"
+                    className="text-xs px-2.5 py-1.5 text-stone-400 light:text-stone-600 hover:text-stone-200 light:hover:text-stone-900 transition-colors cursor-pointer"
                   >
                     Cancella
                   </button>
@@ -525,7 +576,7 @@ export function BookNotesModal({
                   type="button"
                   onClick={handleAddNote}
                   disabled={savingNote || !newText.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-semibold rounded-xl transition-all shadow-md shadow-amber-500/10 disabled:opacity-40 cursor-pointer active:scale-95 whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-4 py-2.5 sm:py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-semibold rounded-xl transition-all shadow-md shadow-amber-500/10 disabled:opacity-40 cursor-pointer active:scale-95 whitespace-nowrap"
                 >
                   {savingNote ? (
                     <>
@@ -544,9 +595,9 @@ export function BookNotesModal({
           </div>
 
           {/* SEZIONE 2: NOTE SALVATE */}
-          <div className="space-y-3">
+          <div className={`${mobileTab === 'list' ? 'flex flex-col flex-1 space-y-3 sm:block' : 'hidden sm:block'} space-y-3`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 <span className="font-serif font-bold text-sm text-stone-200 light:text-stone-900">
                   Tutte le note
                 </span>
@@ -557,19 +608,19 @@ export function BookNotesModal({
 
               {/* Barra di ricerca se ci sono 2 o più note */}
               {notes && notes.length >= 2 && (
-                <div className="relative sm:w-60">
-                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500" />
+                <div className="relative w-full sm:w-60">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cerca nelle note..."
-                    className="w-full pl-8 pr-3 py-1 bg-stone-850 light:bg-stone-100 border border-stone-700 light:border-stone-300 rounded-lg text-xs text-stone-100 light:text-stone-900 placeholder-stone-500 focus:outline-none focus:border-amber-500/50"
+                    className="w-full pl-8 pr-7 py-2 sm:py-1 bg-stone-850 light:bg-stone-100 border border-stone-700 light:border-stone-300 rounded-xl sm:rounded-lg text-base sm:text-xs text-stone-100 light:text-stone-900 placeholder-stone-500 focus:outline-none focus:border-amber-500/50"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-stone-400 hover:text-stone-200"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400 hover:text-stone-200"
                     >
                       ✕
                     </button>
@@ -697,9 +748,9 @@ export function BookNotesModal({
                       ) : (
                         /* VISTA NORMALE DELLA NOTA */
                         <div className="space-y-2.5">
-                          {/* Intestazione della singola nota: Badges e Azioni */}
+                          {/* Intestazione della singola nota: Badges e Azioni pulite */}
                           <div className="flex items-center justify-between gap-2 border-b border-stone-800/60 light:border-stone-200/60 pb-2">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                               {tagMeta && (
                                 <span
                                   className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${tagMeta.badgeBg} ${tagMeta.badgeText} ${tagMeta.badgeBorder} flex items-center gap-1 shrink-0`}
@@ -716,16 +767,18 @@ export function BookNotesModal({
                                 </span>
                               )}
 
-                              <span className="text-[11px] text-stone-500 light:text-stone-400 flex items-center gap-1">
-                                <Calendar size={11} />
-                                <span>
-                                  {new Date(note.created_at).toLocaleDateString('it-IT', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })}
+                              {!tagMeta && !parsed.page && (
+                                <span className="text-[11px] text-stone-500 light:text-stone-400 flex items-center gap-1">
+                                  <Calendar size={11} />
+                                  <span>
+                                    {new Date(note.created_at).toLocaleDateString('it-IT', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </span>
                                 </span>
-                              </span>
+                              )}
                             </div>
 
                             {/* Azioni sulla nota (Copia, Modifica, Elimina) */}
@@ -796,12 +849,25 @@ export function BookNotesModal({
                           <div
                             className={
                               parsed.tag === 'Citazione'
-                                ? 'pl-3.5 border-l-2 border-emerald-500/50 italic font-serif text-sm sm:text-base text-stone-100 light:text-stone-900 leading-relaxed whitespace-pre-wrap break-words'
-                                : 'text-sm sm:text-base text-stone-200 light:text-stone-800 leading-relaxed whitespace-pre-wrap break-words'
+                                ? 'pl-3.5 border-l-2 border-emerald-500/50 italic font-serif text-[15px] sm:text-base text-stone-100 light:text-stone-900 leading-relaxed whitespace-pre-wrap break-words'
+                                : 'text-[15px] sm:text-base text-stone-200 light:text-stone-800 leading-relaxed whitespace-pre-wrap break-words'
                             }
                           >
                             {parsed.text}
                           </div>
+
+                          {(tagMeta || parsed.page) && (
+                            <div className="flex items-center gap-1 text-[11px] text-stone-500 light:text-stone-400 pt-1">
+                              <Calendar size={10} />
+                              <span>
+                                {new Date(note.created_at).toLocaleDateString('it-IT', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -811,6 +877,24 @@ export function BookNotesModal({
             )}
           </div>
         </div>
+
+        {/* Barra rapida in basso su mobile quando si leggono le note */}
+        {mobileTab === 'list' && (
+          <div className="sm:hidden px-4 pt-2.5 pb-[max(0.85rem,env(safe-area-inset-bottom,0.85rem))] border-t border-stone-800 light:border-stone-200 bg-stone-900 light:bg-white shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                userSwitchedTabRef.current = true;
+                setMobileTab('write');
+                setTimeout(() => textareaRef.current?.focus(), 60);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-400 text-stone-950 font-semibold text-sm rounded-xl shadow-md shadow-amber-500/15 active:scale-[0.98] transition-transform cursor-pointer"
+            >
+              <Plus size={17} strokeWidth={2.5} />
+              <span>Nuova nota</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body

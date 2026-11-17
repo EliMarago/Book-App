@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type Session } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder';
@@ -151,6 +151,87 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: resilientAuthStorage,
   },
 });
+
+function isSessionFresh(session: Session | null, bufferSeconds = 60): boolean {
+  if (!session?.expires_at) return false;
+  return Date.now() / 1000 < session.expires_at - bufferSeconds;
+}
+
+function getBackupRefreshToken(): string | null {
+  try {
+    const raw = localStorage.getItem(SESSION_BACKUP_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.refresh_token === 'string' ? parsed.refresh_token : null;
+  } catch {
+    return null;
+  }
+}
+
+let inFlightRefresh: Promise<{ session: Session | null; permanentInvalid: boolean }> | null = null;
+
+/**
+ * Esegue al massimo un refresh alla volta per evitare race condition di Refresh Token Reuse
+ * (quando autoRefreshToken, risveglio da standby e Dashboard si attivano insieme su mobile/multi-tab).
+ */
+export async function safeRefreshSession(forceRefresh = false): Promise<{
+  session: Session | null;
+  permanentInvalid: boolean;
+}> {
+  if (inFlightRefresh) {
+    return inFlightRefresh;
+  }
+
+  inFlightRefresh = (async () => {
+    try {
+      const { data: current } = await supabase.auth.getSession();
+      if (current?.session && !forceRefresh && isSessionFresh(current.session, 60)) {
+        return { session: current.session, permanentInvalid: false };
+      }
+
+      if (!navigator.onLine) {
+        return { session: current?.session ?? null, permanentInvalid: false };
+      }
+
+      const tokenBefore = current?.session?.refresh_token ?? getBackupRefreshToken();
+      const { data: refreshed, error } = await supabase.auth.refreshSession();
+
+      if (refreshed?.session) {
+        return { session: refreshed.session, permanentInvalid: false };
+      }
+
+      // Se un altro tab o l'auto-refresh interno ha appena salvato un refresh_token più nuovo, usiamo quello!
+      const tokenAfter = getBackupRefreshToken();
+      if (tokenAfter && tokenBefore && tokenAfter !== tokenBefore) {
+        const { data: latest } = await supabase.auth.getSession();
+        if (latest?.session) {
+          return { session: latest.session, permanentInvalid: false };
+        }
+      }
+
+      const msg = (error?.message || '').toLowerCase();
+      const isPermanent =
+        msg.includes('refresh token not found') ||
+        msg.includes('invalid refresh token') ||
+        msg.includes('session_not_found') ||
+        msg.includes('invalid_grant');
+
+      // "Already Used" senza nuovo token in storage indica token revocato dal server
+      const isAlreadyUsedWithoutUpdate = msg.includes('already used') && tokenAfter === tokenBefore;
+
+      return {
+        session: null,
+        permanentInvalid: isPermanent || isAlreadyUsedWithoutUpdate,
+      };
+    } catch {
+      return { session: null, permanentInvalid: false };
+    } finally {
+      inFlightRefresh = null;
+    }
+  })();
+
+  return inFlightRefresh;
+}
 
 export type Book = {
   id: string;

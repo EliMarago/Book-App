@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
-import { supabase, type Book } from '@/lib/supabase';
+import { supabase, safeRefreshSession, type Book } from '@/lib/supabase';
 import { matchesBookSearch } from '@/lib/bookSearch';
 import {
   getStoredDates,
@@ -320,8 +320,8 @@ export function Dashboard() {
             code === '401';
 
           if (isAuthErr && navigator.onLine) {
-            const { data: refreshed } = await supabase.auth.refreshSession().catch(() => ({ data: { session: null } }));
-            if (refreshed?.session) {
+            const { session: refreshedSession } = await safeRefreshSession(true);
+            if (refreshedSession) {
               const [retryBooksRes, retryNotesMeta] = await Promise.all([
                 fetchBooksQuery(),
                 notesMeta.ok ? Promise.resolve(notesMeta) : fetchNotesMetadataFromSupabase(),
@@ -835,7 +835,7 @@ export function Dashboard() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cerca per titolo, autore o trope..."
-              className="w-full pl-10 pr-16 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-sm sm:text-base placeholder-stone-400 light:placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs"
+              className="w-full pl-10 pr-16 py-2.5 sm:py-3 bg-stone-850/70 light:bg-white border border-stone-700 light:border-stone-300 rounded-xl text-stone-100 light:text-stone-900 text-base sm:text-sm placeholder-stone-400 light:placeholder-stone-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-colors shadow-xs"
             />
             {search && (
               <button

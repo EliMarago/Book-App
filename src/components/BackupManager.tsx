@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Download,
   Upload,
@@ -437,6 +438,143 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
     }
   };
 
+  useEffect(() => {
+    if (!previewBackup) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isRestoring) {
+        setPreviewBackup(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [previewBackup, isRestoring]);
+
+  // Modale di Anteprima e Conferma Ripristino (renderizzata in Portal per evitare clipping da trasformazioni CSS)
+  const previewModal = previewBackup
+    ? createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Conferma Ripristino Backup"
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/80 backdrop-blur-xs"
+          onClick={() => !isRestoring && setPreviewBackup(null)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-stone-900 light:bg-white border-t sm:border border-stone-800 light:border-stone-200 rounded-t-3xl sm:rounded-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] sm:p-6 shadow-2xl space-y-4 modal-sheet"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto sm:hidden" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-stone-100 light:text-stone-900 font-serif font-bold text-base sm:text-lg">
+                <FileJson size={20} className="text-amber-400 light:text-amber-600 shrink-0" />
+                <span>Conferma Ripristino Backup</span>
+              </div>
+              <button
+                onClick={() => !isRestoring && setPreviewBackup(null)}
+                disabled={isRestoring}
+                className="w-9 h-9 rounded-full bg-stone-800/90 light:bg-stone-100 border border-stone-700 light:border-stone-300 flex items-center justify-center text-stone-300 light:text-stone-700 hover:text-stone-100 light:hover:text-stone-900 cursor-pointer shrink-0"
+                aria-label="Chiudi anteprima backup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-400 light:text-stone-600 leading-relaxed break-words">
+              Hai selezionato il file di backup <strong className="text-stone-200 light:text-stone-800 font-semibold">{previewBackup.fileName}</strong> ({previewBackup.fileSize}).
+            </p>
+
+            {/* Riepilogo contenuti rilevati nel JSON */}
+            <div className="bg-stone-850/80 light:bg-stone-50 border border-stone-800 light:border-stone-200 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-stone-300 light:text-stone-700">
+                <span className="flex items-center gap-1.5">
+                  <BookOpen size={13} className="text-amber-400 light:text-amber-600" />
+                  Libri da importare:
+                </span>
+                <span className="font-bold text-stone-100 light:text-stone-900">
+                  {previewBackup.payload.books.length}
+                </span>
+              </div>
+
+              {previewBackup.totalNotes > 0 && (
+                <div className="flex items-center justify-between text-stone-300 light:text-stone-700">
+                  <span className="flex items-center gap-1.5">
+                    <FileText size={13} className="text-emerald-400 light:text-emerald-600" />
+                    Note da importare:
+                  </span>
+                  <span className="font-bold text-stone-100 light:text-stone-900">
+                    {previewBackup.totalNotes}
+                  </span>
+                </div>
+              )}
+
+              {previewBackup.payload.reading_goals &&
+                Object.keys(previewBackup.payload.reading_goals).length > 0 && (
+                  <div className="flex items-center justify-between text-stone-300 light:text-stone-700">
+                    <span className="flex items-center gap-1.5">
+                      <Target size={13} className="text-amber-400 light:text-amber-600" />
+                      Obiettivi di lettura:
+                    </span>
+                    <span className="font-bold text-stone-100 light:text-stone-900">
+                      {Object.keys(previewBackup.payload.reading_goals).length} anni
+                    </span>
+                  </div>
+                )}
+
+              {previewBackup.payload.exported_at && (
+                <div className="pt-2 border-t border-stone-750 light:border-stone-200/80 text-[11px] text-stone-500 light:text-stone-400">
+                  Data creazione backup:{' '}
+                  {new Date(previewBackup.payload.exported_at).toLocaleString('it-IT')}
+                </div>
+              )}
+            </div>
+
+            <div className="text-[11px] text-stone-400 light:text-stone-500 bg-amber-500/10 light:bg-amber-50 p-2.5 rounded-lg border border-amber-500/20 light:border-amber-200">
+              💡 <strong>Nota:</strong> I libri con lo stesso titolo e autore verranno aggiornati mantenendo intatte le tue informazioni. I nuovi libri verranno aggiunti alla tua libreria.
+            </div>
+
+            {/* Progresso in tempo reale */}
+            {isRestoring && restoreProgress && (
+              <div className="flex items-center gap-2 text-xs text-amber-300 light:text-amber-700 py-1">
+                <Loader2 size={14} className="animate-spin text-amber-400 light:text-amber-600 shrink-0" />
+                <span className="line-clamp-2">{restoreProgress}</span>
+              </div>
+            )}
+
+            {/* Azioni Modale */}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPreviewBackup(null)}
+                disabled={isRestoring}
+                className="px-4 py-2.5 sm:py-2 text-xs font-semibold rounded-xl text-stone-400 hover:text-stone-200 light:hover:text-stone-800 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestore}
+                disabled={isRestoring}
+                className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 text-xs font-semibold rounded-xl btn-amber text-stone-950 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {isRestoring ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Ripristino in corso...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    <span>Conferma e Ripristina</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
     <div className="bg-stone-850/60 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-5 sm:p-6 shadow-sm transition-all">
       {/* Header contenitore */}
@@ -541,117 +679,7 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
         )}
       </div>
 
-      {/* Modale di Anteprima e Conferma Ripristino */}
-      {previewBackup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-stone-900 light:bg-white border border-stone-800 light:border-stone-200 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-stone-100 light:text-stone-900 font-serif font-bold text-lg">
-                <FileJson size={20} className="text-amber-400 light:text-amber-600" />
-                <span>Conferma Ripristino Backup</span>
-              </div>
-              <button
-                onClick={() => !isRestoring && setPreviewBackup(null)}
-                disabled={isRestoring}
-                className="text-stone-400 hover:text-stone-200 light:hover:text-stone-800 p-1 rounded-md"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p className="text-xs text-stone-400 light:text-stone-600 leading-relaxed">
-              Hai selezionato il file di backup <strong className="text-stone-200 light:text-stone-800 font-semibold">{previewBackup.fileName}</strong> ({previewBackup.fileSize}).
-            </p>
-
-            {/* Riepilogo contenuti rilevati nel JSON */}
-            <div className="bg-stone-850/80 light:bg-stone-50 border border-stone-800 light:border-stone-200 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-stone-300 light:text-stone-700">
-                <span className="flex items-center gap-1.5">
-                  <BookOpen size={13} className="text-amber-400 light:text-amber-600" />
-                  Libri da importare:
-                </span>
-                <span className="font-bold text-stone-100 light:text-stone-900">
-                  {previewBackup.payload.books.length}
-                </span>
-              </div>
-
-              {previewBackup.totalNotes > 0 && (
-                <div className="flex items-center justify-between text-stone-300 light:text-stone-700">
-                  <span className="flex items-center gap-1.5">
-                    <FileText size={13} className="text-emerald-400 light:text-emerald-600" />
-                    Note da importare:
-                  </span>
-                  <span className="font-bold text-stone-100 light:text-stone-900">
-                    {previewBackup.totalNotes}
-                  </span>
-                </div>
-              )}
-
-              {previewBackup.payload.reading_goals &&
-                Object.keys(previewBackup.payload.reading_goals).length > 0 && (
-                  <div className="flex items-center justify-between text-stone-300 light:text-stone-700">
-                    <span className="flex items-center gap-1.5">
-                      <Target size={13} className="text-amber-400 light:text-amber-600" />
-                      Obiettivi di lettura:
-                    </span>
-                    <span className="font-bold text-stone-100 light:text-stone-900">
-                      {Object.keys(previewBackup.payload.reading_goals).length} anni
-                    </span>
-                  </div>
-                )}
-
-              {previewBackup.payload.exported_at && (
-                <div className="pt-2 border-t border-stone-750 light:border-stone-200/80 text-[11px] text-stone-500 light:text-stone-400">
-                  Data creazione backup:{' '}
-                  {new Date(previewBackup.payload.exported_at).toLocaleString('it-IT')}
-                </div>
-              )}
-            </div>
-
-            <div className="text-[11px] text-stone-400 light:text-stone-500 bg-amber-500/10 light:bg-amber-50 p-2.5 rounded-lg border border-amber-500/20 light:border-amber-200">
-              💡 <strong>Nota:</strong> I libri con lo stesso titolo e autore verranno aggiornati mantenendo intatte le tue informazioni. I nuovi libri verranno aggiunti alla tua libreria.
-            </div>
-
-            {/* Progresso in tempo reale */}
-            {isRestoring && restoreProgress && (
-              <div className="flex items-center gap-2 text-xs text-amber-300 light:text-amber-700 py-1">
-                <Loader2 size={14} className="animate-spin text-amber-400 light:text-amber-600 shrink-0" />
-                <span className="truncate">{restoreProgress}</span>
-              </div>
-            )}
-
-            {/* Azioni Modale */}
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setPreviewBackup(null)}
-                disabled={isRestoring}
-                className="px-4 py-2 text-xs font-semibold rounded-xl text-stone-400 hover:text-stone-200 light:hover:text-stone-800 hover:bg-stone-800 light:hover:bg-stone-100 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRestore}
-                disabled={isRestoring}
-                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl btn-amber text-stone-950 transition-all cursor-pointer active:scale-95 disabled:opacity-50 "
-              >
-                {isRestoring ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Ripristino in corso...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload size={14} />
-                    <span>Conferma e Ripristina</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {previewModal}
     </div>
   );
 }

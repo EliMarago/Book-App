@@ -489,7 +489,7 @@ export function AddBookModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-5 pt-5 sm:px-6 sm:pt-6 space-y-6 sm:space-y-5 overflow-y-auto flex-1 flex flex-col">
+        <form onSubmit={handleSubmit} className="px-5 pt-5 sm:px-6 sm:pt-6 space-y-6 sm:space-y-5 overflow-y-auto overflow-x-hidden flex-1 flex flex-col">
           <div className="flex flex-col sm:flex-row gap-5 sm:gap-4 items-center sm:items-start">
             {/* Box Anteprima Copertina */}
             <div className="relative shrink-0 w-28 h-[168px] sm:w-24 sm:h-36 rounded-xl overflow-hidden bg-stone-950 light:bg-stone-100 flex flex-col items-center justify-center shadow-lg border border-stone-800 light:border-stone-200 book-spine-effect group">

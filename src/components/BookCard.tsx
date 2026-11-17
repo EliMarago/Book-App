@@ -11,8 +11,6 @@ import {
   Flame,
   Sparkles,
   CheckCircle2,
-  ChevronDown,
-  GripVertical,
   Clock,
 } from 'lucide-react';
 import type { Book, Note } from '@/lib/supabase';
@@ -165,6 +163,8 @@ function BookCardComponent({
 
     if (status === 'completed' && book.status !== 'completed') {
       toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
+    } else if (status === 'reading' && book.status !== 'reading') {
+      toast({ message: `Buona lettura con "${book.title}"! 📖`, type: 'success' });
     }
   };
 
@@ -297,61 +297,34 @@ function BookCardComponent({
 
   const renderBottomBar = () => (
     <>
-      {/* Riga 1: stato + priorità / data */}
-      <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 min-w-0 max-w-full">
-        {/* Selettore Stato del libro */}
-        <div className="relative shrink-0 inline-flex items-center">
-          <select
-            data-compact="true"
-            value={book.status}
-            onChange={(e) => {
-              const next = e.target.value as Book['status'];
-              // Passando a "Letto" chiede prima il voto
-              if (next === 'completed' && book.status !== 'completed') setShowFinishDialog(true);
-              else handleStatusChange(next);
-            }}
-            aria-label="Stato del libro"
-            className={`appearance-none h-7 lg:h-8 text-xs font-semibold pl-2 lg:pl-3 pr-5 lg:pr-6 rounded-full border cursor-pointer outline-none transition-colors inline-flex items-center shadow-xs active:scale-95 ${STATUS_COLORS[book.status]}`}
-          >
-            <option value="reading" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">In lettura</option>
-            <option value="completed" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Letto</option>
-            <option value="want" className="bg-stone-900 light:bg-white text-stone-100 light:text-stone-900">Da leggere</option>
-          </select>
-          <ChevronDown size={12} className="absolute right-1.5 lg:right-2 pointer-events-none opacity-70 shrink-0" />
-        </div>
-
-        {/* Badge Priorità per i libri da leggere */}
-        {book.status === 'want' && priorityRank !== undefined && (
-          <span
-            className={`h-7 lg:h-8 shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-2 lg:px-2.5 rounded-full border shadow-xs ${priorityRank === 1
-                ? 'bg-amber-500/20 text-amber-300 light:text-amber-800 border-amber-500/40 ring-1 ring-amber-400/40'
-                : 'bg-sky-500/15 text-sky-300 light:text-sky-800 border-sky-500/30'
-              }`}
-            title={
-              priorityRank === 1
-                ? 'Priorità #1: la tua prossima lettura in programma!'
-                : `Priorità #${priorityRank} nella lista da leggere`
-            }
-          >
-            {isDraggable && <GripVertical size={13} className="opacity-70 text-sky-400" />}
-            <span>{priorityRank === 1 ? <>★ #1<span className="hidden lg:inline"> Prossimo</span></> : `#${priorityRank}`}</span>
-          </span>
-        )}
-
-        {/* Badge Data di lettura */}
-        {book.read_at ? (
-          <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 lg:px-3 whitespace-nowrap">
-            <Calendar size={12} className="shrink-0 hidden lg:inline" />
-            <span>
-              {new Date(book.read_at).toLocaleDateString('it-IT', {
-                day: '2-digit',
-                month: 'short',
-                year: '2-digit',
-              })}
+      {/* Riga 1: stato + data */}
+      {(book.status === 'completed' || Boolean(book.read_at)) && (
+        <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 min-w-0 max-w-full">
+          {/* Badge stato Letto per i libri completati */}
+          {book.status === 'completed' && (
+            <span
+              className={`shrink-0 h-7 lg:h-8 inline-flex items-center gap-1 text-xs font-semibold px-2.5 lg:px-3 rounded-full border shadow-xs ${STATUS_COLORS.completed}`}
+            >
+              <CheckCircle2 size={12} className="shrink-0" />
+              <span>Letto</span>
             </span>
-          </span>
-        ) : null}
-      </div>
+          )}
+
+          {/* Badge Data di lettura */}
+          {book.read_at ? (
+            <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 lg:px-3 whitespace-nowrap">
+              <Calendar size={12} className="shrink-0 hidden lg:inline" />
+              <span>
+                {new Date(book.read_at).toLocaleDateString('it-IT', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: '2-digit',
+                })}
+              </span>
+            </span>
+          ) : null}
+        </div>
+      )}
 
       {/* Riga 2: azioni (Scheda + Note), allineate a sinistra sotto la riga 1 */}
       <div className="inline-flex items-center gap-1.5 shrink-0">
@@ -414,7 +387,7 @@ function BookCardComponent({
                 if (e.key === 'Escape') setEditingProgress(false);
               }}
               autoFocus
-              className="w-14 sm:w-16 px-1.5 py-0.5 bg-stone-900 light:bg-white border border-amber-500/50 rounded text-xs text-stone-100 light:text-stone-900 outline-none focus:ring-1 focus:ring-amber-500"
+              className="w-16 px-1.5 py-0.5 bg-stone-900 light:bg-white border border-amber-500/50 rounded text-base sm:text-xs text-stone-100 light:text-stone-900 outline-none focus:ring-1 focus:ring-amber-500"
               placeholder="0"
             />
             {book.pages && book.pages > 0 && (
@@ -663,7 +636,7 @@ function BookCardComponent({
                     {book.title}
                   </h3>
                   <div className="flex items-center gap-1.5 text-stone-400 light:text-stone-600 text-xs sm:text-sm mt-0.5 flex-wrap">
-                    <span className="truncate max-w-[140px] xs:max-w-[190px] sm:max-w-[260px] md:max-w-[160px] lg:max-w-[220px]">{book.author}</span>
+                    <span className="truncate">{book.author}</span>
                     {book.pages && book.pages > 0 && (
                       <span
                         className="inline-flex items-baseline gap-1 px-2 py-[3px] rounded-full bg-stone-750/70 light:bg-stone-100 border border-stone-600/40 light:border-stone-200 shrink-0 leading-none"
@@ -742,6 +715,24 @@ function BookCardComponent({
         {book.status === 'reading' && (
           <div className="mt-3 pt-3 border-t border-amber-500/15 light:border-amber-200/60">
             {renderProgressWidget()}
+          </div>
+        )}
+
+        {/* Se è da leggere: barra inferiore dedicata compatta con tasto rapido per iniziare la lettura */}
+        {book.status === 'want' && (
+          <div className="mt-2.5 pt-2 border-t border-stone-800/70 light:border-stone-200/80 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium truncate">
+              {priorityRank === 1 ? 'Prossimo libro in programma' : 'Vuoi iniziare questo libro?'}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleStatusChange('reading')}
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg btn-amber text-stone-950 font-bold text-[11px] shadow-xs cursor-pointer active:scale-95 transition-all"
+              title="Sposta subito nei libri In lettura"
+            >
+              <Flame size={11} strokeWidth={2.3} className="shrink-0" />
+              <span>In lettura</span>
+            </button>
           </div>
         )}
       </div>
