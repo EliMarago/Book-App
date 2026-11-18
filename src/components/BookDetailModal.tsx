@@ -23,6 +23,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { StarRating } from './StarRating';
 import { BookNotesModal } from './BookNotesModal';
 import { FinishBookDialog } from './FinishBookDialog';
@@ -336,13 +337,7 @@ export function BookDetailModal({
   }, [initialBook]);
 
   // Blocca lo scroll del body quando la Scheda Libro è aperta
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+  useBodyScrollLock();
 
   // Gestione tasto Escape per chiudere la Scheda Libro
   useEffect(() => {
@@ -573,7 +568,7 @@ export function BookDetailModal({
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center p-1.5 text-center bg-stone-850 light:bg-stone-100">
                     <BookMarked size={18} className="text-stone-500 mb-0.5" />
-                    <span className="text-[10px] text-stone-400 leading-tight">
+                    <span className="text-[11px] text-stone-400 leading-tight">
                       Nessuna copertina
                     </span>
                   </div>
@@ -710,7 +705,7 @@ export function BookDetailModal({
                     <Heart size={13} className="text-rose-400 light:text-rose-600 fill-rose-400/35" />
                   </div>
                   <div className="min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-300/90 light:text-rose-700">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-rose-300/90 light:text-rose-700">
                       Protagonisti / Coppia
                     </span>
                     <p className="font-serif font-bold text-sm sm:text-base text-rose-100 light:text-rose-950 leading-snug break-words">
@@ -917,7 +912,7 @@ export function BookDetailModal({
                         <button
                           type="button"
                           onClick={() => setShowFinishDialog(true)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer active:scale-95"
                           title="Ho finito di leggere tutto il libro! Segna come Letto"
                         >
                           <CheckCircle2 size={12} />

@@ -55,10 +55,16 @@ import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
 import { ReadingChallenge } from './ReadingChallenge';
 import { BackupManager } from './BackupManager';
+import {
+  ProfileSettingsModal,
+  READER_AVATARS,
+  getStoredProfileAvatar,
+} from './ProfileSettingsModal';
 import { useReadingGoals } from '@/hooks/useReadingGoals';
 import { useBookPriority } from '@/hooks/useBookPriority';
 import { orderWantBooks } from '@/lib/bookPriority';
 import { useToast } from './Toast';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { LibrarySkeleton } from './Skeletons';
 import { SORT_OPTIONS, sortBooks, getStoredSort, storeSort, type SortKey } from '@/lib/sortBooks';
 import { APP_VERSION_LABEL } from '@/version';
@@ -134,6 +140,18 @@ export function Dashboard() {
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  useBodyScrollLock(showBackupModal || showSignOutConfirm);
+  const [profileAvatar, setProfileAvatar] = useState(() =>
+    getStoredProfileAvatar((user?.user_metadata?.avatar_icon as string | undefined) ?? null)
+  );
+
+  useEffect(() => {
+    setProfileAvatar(
+      getStoredProfileAvatar((user?.user_metadata?.avatar_icon as string | undefined) ?? null)
+    );
+  }, [user?.user_metadata]);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
@@ -689,31 +707,6 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Toggle Modalità Chiara / Scura / Sistema */}
-            <button
-              onClick={toggleTheme}
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-200 light:text-stone-750 hover:text-white light:hover:text-stone-950 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
-              title={
-                themePreference === 'system'
-                  ? `Tema: Automatico di sistema (${isDark ? 'Scura attiva' : 'Chiara attiva'}). Clicca per impostare Chiara.`
-                  : themePreference === 'light'
-                  ? 'Tema: Chiara manuale. Clicca per impostare Scura.'
-                  : 'Tema: Scura manuale. Clicca per impostare Automatica di sistema.'
-              }
-              aria-label="Cambia tema"
-            >
-              {themePreference === 'system' ? (
-                <SunMoon size={15} className="text-amber-400 light:text-amber-600 transition-transform" />
-              ) : isDark ? (
-                <Moon size={15} className="text-amber-400 hover:-rotate-12 transition-transform" />
-              ) : (
-                <Sun size={15} className="text-amber-600 hover:rotate-45 transition-transform" />
-              )}
-              <span className="hidden sm:inline">
-                {themePreference === 'system' ? 'Auto' : isDark ? 'Scuro' : 'Chiaro'}
-              </span>
-            </button>
-
             <button
               onClick={() => loadBooks(false, { force: true })}
               disabled={isSyncing}
@@ -733,12 +726,20 @@ export function Dashboard() {
               </span>
             </button>
 
+            {/* Pulsante Profilo e Impostazioni (unifica Tema, Account, Vista, Backup e Sicurezza) */}
             <button
-              onClick={signOut}
-              className="flex items-center gap-1.5 text-sm text-stone-400 light:text-stone-600 hover:text-stone-100 light:hover:text-stone-950 px-3 py-1.5 rounded-lg hover:bg-stone-800 light:hover:bg-stone-200/60 transition-colors cursor-pointer"
+              type="button"
+              onClick={() => setShowProfileModal(true)}
+              className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-lg bg-gradient-to-br from-amber-400/20 via-amber-500/15 to-orange-500/20 light:from-amber-100 light:to-amber-200/80 hover:from-amber-400/30 hover:to-orange-500/30 light:hover:from-amber-200 light:hover:to-amber-300/80 border border-amber-500/35 light:border-amber-400/70 flex items-center justify-center text-amber-300 light:text-amber-800 font-serif font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+              title="Profilo e Impostazioni"
+              aria-label="Apri Profilo e Impostazioni"
             >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Esci</span>
+              {(() => {
+                const found = READER_AVATARS.find((a) => a.id === profileAvatar);
+                return found && found.emoji
+                  ? found.emoji
+                  : (user?.email?.trim().charAt(0) || 'L').toUpperCase();
+              })()}
             </button>
           </div>
         </div>
@@ -1065,7 +1066,7 @@ export function Dashboard() {
                 <p className="text-sm font-medium text-stone-300 light:text-stone-800">
                   Nessun libro nella lista da leggere
                 </p>
-                <p className="text-xs text-stone-500 light:text-stone-500 mt-1 mb-4">
+                <p className="text-xs text-stone-400 light:text-stone-600 mt-1 mb-4">
                   Aggiungi i libri che desideri leggere prossimamente.
                 </p>
                 <button
@@ -1142,7 +1143,7 @@ export function Dashboard() {
               <div className="flex flex-col items-center justify-center py-20 text-stone-500 light:text-stone-400">
                 <Library size={48} className="mb-4 text-stone-700 light:text-stone-300" />
                 <h3 className="font-serif text-xl text-stone-300 light:text-stone-800 mb-1">Il tuo scaffale è vuoto</h3>
-                <p className="text-sm text-stone-500 light:text-stone-500 mb-4">
+                <p className="text-sm text-stone-400 light:text-stone-600 mb-4">
                   Inizia aggiungendo il primo libro
                 </p>
                 <button
@@ -1386,7 +1387,7 @@ export function Dashboard() {
                     <div className="text-center py-16 text-stone-400">
                       <BookMarked size={40} className="mx-auto mb-3 text-stone-600" />
                       <p className="font-medium text-stone-300">Nessun libro trovato</p>
-                      <p className="text-xs text-stone-500 mt-1">
+                      <p className="text-xs text-stone-400 light:text-stone-600 mt-1">
                         Nessun libro corrisponde a "{search}"
                       </p>
                     </div>
@@ -1397,13 +1398,13 @@ export function Dashboard() {
         )}
 
         {/* Footer elegante con link per la gestione dati e backup */}
-        <div className="mt-14 pt-6 border-t border-stone-800/80 light:border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 light:text-stone-400">
+        <div className="mt-14 pt-6 border-t border-stone-800/80 light:border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-400 light:text-stone-500">
           <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start text-stone-400 light:text-stone-500">
             <span className="font-serif italic font-medium text-stone-300 light:text-stone-700">Bookshelf</span>
             <span className="text-stone-600 light:text-stone-300">·</span>
             <span>{stats.total} {stats.total === 1 ? 'libro registrato' : 'libri registrati'}</span>
             <span className="text-stone-600 light:text-stone-300">·</span>
-            <span className="font-mono text-[11px] text-stone-500 light:text-stone-400 select-none">
+            <span className="font-mono text-[11px] text-stone-400 light:text-stone-500 select-none">
               {APP_VERSION_LABEL}
             </span>
           </div>
@@ -1472,7 +1473,7 @@ export function Dashboard() {
                 >
                   <Icon size={21} strokeWidth={isActive ? 2.3 : 1.9} />
                   {tab.count > 0 && (
-                    <span className="absolute -top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-stone-950 text-[10px] font-bold leading-4 text-center tabular-nums ring-2 ring-stone-900 light:ring-white">
+                    <span className="absolute -top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-stone-950 text-[11px] font-bold leading-4 text-center tabular-nums ring-2 ring-stone-900 light:ring-white">
                       {tab.count > 99 ? '99+' : tab.count}
                     </span>
                   )}
@@ -1529,6 +1530,73 @@ export function Dashboard() {
           }}
           onAdd={handleAddBook}
           onUpdate={handleUpdateBook}
+        />
+      )}
+
+      {/* Conferma uscita dall'account */}
+      {showSignOutConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Conferma uscita"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-up"
+          onClick={() => setShowSignOutConfirm(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowSignOutConfirm(false);
+          }}
+        >
+          <div
+            className="bg-stone-900 light:bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-stone-800 light:border-stone-200 w-full sm:max-w-sm px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] sm:p-6 shadow-2xl text-center modal-sheet"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-stone-700 light:bg-stone-300 mx-auto mb-3 sm:hidden" />
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center mx-auto text-amber-400 light:text-amber-700">
+              <LogOut size={20} />
+            </div>
+            <h2 className="mt-3 font-serif text-lg font-bold text-stone-100 light:text-stone-900">
+              Vuoi uscire?
+            </h2>
+            <p className="mt-1 text-xs sm:text-sm text-stone-400 light:text-stone-600 leading-relaxed">
+              I tuoi libri restano al sicuro nel cloud. Al prossimo accesso dovrai inserire di nuovo la password.
+            </p>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setShowSignOutConfirm(false)}
+                className="flex-1 py-3 sm:py-2.5 rounded-xl bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 text-stone-200 light:text-stone-800 font-semibold text-sm cursor-pointer transition-colors"
+              >
+                Resta
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSignOutConfirm(false);
+                  signOut();
+                }}
+                className="flex-1 py-3 sm:py-2.5 rounded-xl btn-amber text-stone-950 font-bold text-sm cursor-pointer active:scale-95 transition-all"
+              >
+                Esci
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pannello Profilo e Impostazioni */}
+      {showProfileModal && (
+        <ProfileSettingsModal
+          books={books}
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          isSyncing={isSyncing}
+          lastSyncedAt={lastSyncedAt}
+          onSyncNow={() => loadBooks(false, { force: true })}
+          onOpenBackup={() => setShowBackupModal(true)}
+          onProfileUpdated={(avatar) => {
+            setProfileAvatar(avatar);
+          }}
+          onClose={() => setShowProfileModal(false)}
         />
       )}
 

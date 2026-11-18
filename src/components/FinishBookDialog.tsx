@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, X, Loader2 } from 'lucide-react';
 import type { Book } from '@/lib/supabase';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { StarRating } from './StarRating';
 import { CoverImage } from './CoverImage';
 
@@ -32,6 +33,8 @@ const RATING_LABELS: Record<number, string> = {
 export function FinishBookDialog({ book, onConfirm, onCancel }: FinishBookDialogProps) {
   const [rating, setRating] = useState<number>(book.rating > 0 ? book.rating : 0);
   const [saving, setSaving] = useState(false);
+
+  useBodyScrollLock();
 
   useEffect(() => {
     // In cattura e con stopImmediatePropagation: Esc chiude solo questa finestra, non la Scheda Libro sotto

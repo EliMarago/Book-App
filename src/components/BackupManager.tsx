@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
 import type { ReadingGoals } from '@/hooks/useReadingGoals';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import {
   saveBookDate,
   saveBookPages,
@@ -437,6 +438,8 @@ export function BackupManager({ books, goals, onRestoreCompleted }: BackupManage
       setRestoreProgress(null);
     }
   };
+
+  useBodyScrollLock(Boolean(previewBackup));
 
   useEffect(() => {
     if (!previewBackup) return;

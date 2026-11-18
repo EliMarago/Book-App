@@ -63,8 +63,8 @@ export function StarRating({ value, onChange, size = 24, readOnly = false }: Sta
                   ? 'Clicca di nuovo per azzerare il voto'
                   : `${star} ${star === 1 ? 'stella' : 'stelle'}`
             }
-            className={`relative p-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
-              readOnly ? 'cursor-default' : 'cursor-pointer active:scale-90 transition-transform'
+            className={`relative rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+              readOnly ? 'p-0.5 cursor-default' : 'p-1 cursor-pointer active:scale-90 transition-transform'
             }`}
             onMouseMove={(e) => handleMouseEnter(e, star)}
             onClick={(e) => handleClick(e, star)}
@@ -77,8 +77,12 @@ export function StarRating({ value, onChange, size = 24, readOnly = false }: Sta
             />
             {(isFull || isHalf) && (
               <div
-                className="absolute inset-0.5 overflow-hidden pointer-events-none"
-                style={{ width: isHalf ? `calc(50% - 2px)` : `calc(100% - 4px)` }}
+                className={`absolute overflow-hidden pointer-events-none ${readOnly ? 'inset-0.5' : 'inset-1'}`}
+                style={{
+                  width: isHalf
+                    ? `calc(50% - ${readOnly ? 2 : 4}px)`
+                    : `calc(100% - ${readOnly ? 4 : 8}px)`,
+                }}
               >
                 <Star
                   size={size}

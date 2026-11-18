@@ -87,7 +87,7 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
       <button
         type="button"
         onClick={() => onDismiss(item.id)}
-        className="shrink-0 p-1 rounded-md text-stone-500 hover:text-stone-200 light:hover:text-stone-800 transition-colors cursor-pointer"
+        className="shrink-0 p-2 -my-1 rounded-md text-stone-400 hover:text-stone-200 light:text-stone-500 light:hover:text-stone-800 transition-colors cursor-pointer"
         aria-label="Chiudi notifica"
       >
         <X size={14} />

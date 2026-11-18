@@ -13,6 +13,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { supabase, type Book } from '@/lib/supabase';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import {
   syncBookDateToSupabase,
   syncBookPagesToSupabase,
@@ -81,10 +82,8 @@ export function AddBookModal({
   const justSelectedSuggestionRef = useRef(false);
 
   // Blocca lo scroll del body e gestisce il tasto Escape quando la modale è aperta
+  useBodyScrollLock();
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -93,7 +92,6 @@ export function AddBookModal({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose]);
@@ -506,7 +504,7 @@ export function AddBookModal({
               ) : (
                 <div className="flex flex-col items-center justify-center p-2 text-center">
                   <BookMarked size={30} className="text-stone-600 light:text-stone-400 mb-1" />
-                  <span className="text-[11px] text-stone-500 light:text-stone-400 leading-tight">
+                  <span className="text-[11px] text-stone-400 light:text-stone-500 leading-tight">
                     Nessuna copertina
                   </span>
                 </div>
@@ -634,7 +632,7 @@ export function AddBookModal({
               <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 min-w-0">
                 <Link2 size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
                 <span className="truncate">Copertina</span>
-                <span className="text-[11px] text-stone-500 font-normal normal-case shrink-0 hidden xs:inline">(automatica o URL)</span>
+                <span className="text-[11px] text-stone-400 light:text-stone-500 font-normal normal-case shrink-0 hidden xs:inline">(automatica o URL)</span>
               </label>
 
               <button
@@ -722,7 +720,7 @@ export function AddBookModal({
               <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-300 light:text-stone-700 min-w-0">
                 <Layers size={14} className="text-amber-400 light:text-amber-600 shrink-0" />
                 <span className="truncate">Numero di pagine</span>
-                <span className="text-[11px] text-stone-500 font-normal normal-case shrink-0">(opzionale)</span>
+                <span className="text-[11px] text-stone-400 light:text-stone-500 font-normal normal-case shrink-0">(opzionale)</span>
               </label>
 
               <button

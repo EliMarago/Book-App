@@ -7,7 +7,6 @@ import {
   BookOpen,
   Pencil,
   ImageOff,
-  Calendar,
   Flame,
   Sparkles,
   CheckCircle2,
@@ -22,6 +21,7 @@ import {
   removeBookStartedReadingDate,
   formatReadingDuration,
   formatReadingStartDate,
+  markLocalMutation,
 } from '@/lib/bookDates';
 import { fetchBookCover } from '@/lib/bookCoverApi';
 import { StarRating } from './StarRating';
@@ -30,12 +30,6 @@ import { FinishBookDialog } from './FinishBookDialog';
 import { useToast } from './Toast';
 import { BookNotesModal } from './BookNotesModal';
 import { BookmarkRibbon } from './BookmarkRibbon';
-
-const STATUS_COLORS: Record<Book['status'], string> = {
-  reading: 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-800 border-amber-500/30 light:border-amber-300',
-  completed: 'bg-emerald-500/15 light:bg-emerald-50 text-emerald-400 light:text-emerald-800 border-emerald-500/30 light:border-emerald-300',
-  want: 'bg-sky-500/15 light:bg-sky-50 text-sky-400 light:text-sky-800 border-sky-500/30 light:border-sky-300',
-};
 
 function BookCardComponent({
   book,
@@ -165,7 +159,37 @@ function BookCardComponent({
     if (status === 'completed' && book.status !== 'completed') {
       toast({ message: `Hai completato "${book.title}"! 🎉`, type: 'success' });
     } else if (status === 'reading' && book.status !== 'reading') {
-      toast({ message: `Buona lettura con "${book.title}"! 📖`, type: 'success' });
+      const previousStatus = book.status;
+      const previousStartedAt = book.started_at ?? null;
+      toast({
+        message: `Buona lettura con "${book.title}"! 📖`,
+        type: 'success',
+        duration: 6000,
+        actionLabel: 'Annulla',
+        onAction: async () => {
+          // Ripristina lo stato precedente (es. "Da leggere") e toglie la data di inizio lettura
+          markLocalMutation();
+          if (previousStartedAt) {
+            await syncBookStartedReadingToSupabase(book.id, previousStartedAt);
+          } else {
+            removeBookStartedReadingDate(book.id);
+            await syncBookStartedReadingToSupabase(book.id, null);
+          }
+          const { data } = await supabase
+            .from('books')
+            .update({ status: previousStatus, updated_at: new Date().toISOString() })
+            .eq('id', book.id)
+            .select()
+            .single();
+          onUpdate({
+            ...book,
+            ...(data ?? {}),
+            status: previousStatus,
+            started_at: previousStartedAt,
+            notes_count: displayCount,
+          });
+        },
+      });
     }
   };
 
@@ -298,36 +322,7 @@ function BookCardComponent({
 
   const renderBottomBar = () => (
     <>
-      {/* Riga 1: stato + data */}
-      {(book.status === 'completed' || Boolean(book.read_at)) && (
-        <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 min-w-0 max-w-full">
-          {/* Badge stato Letto per i libri completati */}
-          {book.status === 'completed' && (
-            <span
-              className={`shrink-0 h-7 lg:h-8 inline-flex items-center gap-1 text-xs font-semibold px-2.5 lg:px-3 rounded-full border shadow-xs ${STATUS_COLORS.completed}`}
-            >
-              <CheckCircle2 size={12} className="shrink-0" />
-              <span>Letto</span>
-            </span>
-          )}
-
-          {/* Badge Data di lettura */}
-          {book.read_at ? (
-            <span className="shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/30 light:border-emerald-300/60 rounded-full px-2 lg:px-3 whitespace-nowrap">
-              <Calendar size={12} className="shrink-0 hidden lg:inline" />
-              <span>
-                {new Date(book.read_at).toLocaleDateString('it-IT', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: '2-digit',
-                })}
-              </span>
-            </span>
-          ) : null}
-        </div>
-      )}
-
-      {/* Riga 2: azioni (Scheda + Note), allineate a sinistra sotto la riga 1 */}
+      {/* Azioni (Scheda + Note), allineate a sinistra */}
       <div className="inline-flex items-center gap-1.5 shrink-0">
         {/* Pulsante Scheda / Trama (icona: la scheda si apre anche da copertina e titolo) */}
         {onInspect && (
@@ -335,7 +330,7 @@ function BookCardComponent({
             type="button"
             onClick={() => onInspect(book)}
             aria-label="Apri Scheda Libro e trama"
-            className="shrink-0 h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-full border border-stone-600 light:border-stone-300 text-amber-400 light:text-amber-600 hover:border-amber-500/40 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer active:scale-95"
+            className="relative before:absolute before:-inset-2 shrink-0 h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-full border border-stone-600 light:border-stone-300 text-amber-400 light:text-amber-600 hover:border-amber-500/40 hover:bg-stone-700/50 light:hover:bg-stone-100 transition-all cursor-pointer active:scale-95"
             title="Apri Scheda Libro e trama"
           >
             <BookOpen size={13} className="shrink-0" />
@@ -346,7 +341,7 @@ function BookCardComponent({
         <button
           type="button"
           onClick={() => setShowNotesModal(true)}
-          className={`shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${displayCount > 0
+          className={`relative before:absolute before:-inset-y-2 shrink-0 h-7 lg:h-8 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 lg:px-3 rounded-full border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${displayCount > 0
               ? 'border-amber-500/40 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-50 hover:bg-amber-500/20 light:hover:bg-amber-100'
               : 'border-stone-600 light:border-stone-300 text-stone-300 light:text-stone-700 hover:bg-stone-700/50 light:hover:bg-stone-100'
             } ${showNotesModal ? 'ring-1 ring-amber-500/40 light:ring-amber-400' : ''}`}
@@ -422,7 +417,7 @@ function BookCardComponent({
             <button
               type="button"
               onClick={() => setShowFinishDialog(true)}
-              className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 border border-emerald-500/30 light:border-emerald-300 px-2 py-0.5 rounded cursor-pointer transition-colors active:scale-95"
+              className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 border border-emerald-500/30 light:border-emerald-300 px-3 py-1.5 rounded-md cursor-pointer transition-colors active:scale-95"
               title="Ho finito di leggere tutto il libro! Segna come Completato"
             >
               <CheckCircle2 size={11} />
@@ -559,11 +554,11 @@ function BookCardComponent({
             ) : (
               <div className="flex flex-col items-center justify-center p-1.5 text-center">
                 <BookMarked size={28} className="text-stone-600 light:text-stone-400 mb-1" />
-                <span className="text-[10.5px] sm:text-[11px] text-stone-500 light:text-stone-400 leading-tight">
+                <span className="text-[11px] sm:text-[11px] text-stone-500 light:text-stone-400 leading-tight">
                   Nessuna copertina
                 </span>
                 {/* Badge indicatore di ricerca copertina su mobile */}
-                <div className="sm:hidden mt-1.5 flex items-center gap-0.5 text-[10px] font-medium text-amber-400 light:text-amber-700 bg-amber-500/15 light:bg-amber-100 px-1 py-0.5 rounded border border-amber-500/30">
+                <div className="sm:hidden mt-1.5 flex items-center gap-0.5 text-[11px] font-medium text-amber-400 light:text-amber-700 bg-amber-500/15 light:bg-amber-100 px-1 py-0.5 rounded border border-amber-500/30">
                   <Sparkles size={9} />
                   <span>Cerca</span>
                 </div>
@@ -574,7 +569,7 @@ function BookCardComponent({
             {book.status === 'want' && priorityRank !== undefined && (
               <div className="absolute top-1 left-1 z-10 pointer-events-none">
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-black shadow-md ${priorityRank === 1
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-black shadow-md ${priorityRank === 1
                       ? 'bg-amber-400 text-stone-950 ring-1 ring-amber-200'
                       : 'bg-stone-900/90 text-sky-300 border border-sky-400/50'
                     }`}
@@ -601,7 +596,7 @@ function BookCardComponent({
                 ) : (
                   <Sparkles size={16} className="text-amber-400 light:text-amber-600 mb-1" />
                 )}
-                <span className="text-[10.5px] sm:text-[11px] text-amber-300 light:text-amber-800 font-medium leading-tight">
+                <span className="text-[11px] sm:text-[11px] text-amber-300 light:text-amber-800 font-medium leading-tight">
                   {autoFetchingCover ? 'Cerco...' : 'Cerca copertina'}
                 </span>
               </button>
@@ -613,7 +608,7 @@ function BookCardComponent({
           <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
             <div>
               {(highlight || book.status === 'reading') && (
-                <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1 flex-wrap">
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-[11px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 light:bg-amber-500 animate-pulse inline-block shrink-0" />
                     <span>In lettura</span>
@@ -645,15 +640,11 @@ function BookCardComponent({
                     <span className="truncate">{book.author}</span>
                     {book.pages && book.pages > 0 && (
                       <span
-                        className="inline-flex items-baseline gap-1 px-2.5 py-[3px] rounded-full bg-stone-800/80 light:bg-stone-100 border border-stone-600/60 light:border-stone-200 shrink-0 leading-none"
+                        className="inline-flex items-baseline gap-1 text-xs text-stone-400 light:text-stone-500 shrink-0 tabular-nums"
                         title={`${book.pages} pagine`}
                       >
-                        <span className="text-xs font-semibold text-stone-200 light:text-stone-800 tabular-nums">
-                          {book.pages}
-                        </span>
-                        <span className="text-[10.5px] font-medium text-stone-400 light:text-stone-500">
-                          pag.
-                        </span>
+                        <span className="opacity-50">·</span>
+                        <span>{book.pages} pag.</span>
                       </span>
                     )}
                   </div>
@@ -665,13 +656,13 @@ function BookCardComponent({
                       {book.tags.slice(0, 3).map((t) => (
                         <span
                           key={t}
-                          className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-stone-800/80 light:bg-stone-100 text-stone-200 light:text-stone-700 border border-stone-600/60 light:border-stone-200 leading-tight"
+                          className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200/90 leading-tight"
                         >
                           {t}
                         </span>
                       ))}
                       {book.tags.length > 3 && (
-                        <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-600 border border-stone-700 light:border-stone-200 leading-tight tabular-nums">
+                        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-600 border border-stone-700 light:border-stone-200 leading-tight tabular-nums">
                           +{book.tags.length - 3}
                         </span>
                       )}
@@ -684,7 +675,7 @@ function BookCardComponent({
                   <button
                     type="button"
                     onClick={() => onEdit(book)}
-                    className="opacity-80 lg:opacity-60 lg:group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-amber-400 light:hover:text-amber-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
+                    className="opacity-80 lg:opacity-60 lg:group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-amber-400 light:hover:text-amber-600 p-2 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
                     title="Modifica libro"
                     aria-label="Modifica libro"
                   >
@@ -693,7 +684,7 @@ function BookCardComponent({
                   <button
                     type="button"
                     onClick={() => onDelete(book.id)}
-                    className="opacity-80 lg:opacity-60 lg:group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-red-400 light:hover:text-red-600 p-1.5 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
+                    className="opacity-80 lg:opacity-60 lg:group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 transition-opacity text-stone-400 light:text-stone-500 hover:text-red-400 light:hover:text-red-600 p-2 rounded-md hover:bg-stone-700/40 light:hover:bg-stone-100 active:scale-90 cursor-pointer"
                     title="Elimina libro"
                     aria-label="Elimina libro"
                   >
@@ -739,6 +730,29 @@ function BookCardComponent({
               <Flame size={11} strokeWidth={2.3} className="shrink-0" />
               <span>In lettura</span>
             </button>
+          </div>
+        )}
+
+        {/* Se è completato: barra inferiore dedicata con stato Letto e data di completamento */}
+        {book.status === 'completed' && (
+          <div className="mt-2.5 pt-2 border-t border-emerald-500/15 light:border-emerald-200/70 flex items-center gap-1.5">
+            <CheckCircle2 size={13} className="text-emerald-400 light:text-emerald-600 shrink-0" />
+            <span className="text-[11px] text-emerald-400 light:text-emerald-700 font-semibold truncate">
+              {book.read_at ? (
+                <>
+                  <span className="mr-1">Letto il</span>
+                  <span>
+                    {new Date(book.read_at).toLocaleDateString('it-IT', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: '2-digit',
+                    })}
+                  </span>
+                </>
+              ) : (
+                'Letto'
+              )}
+            </span>
           </div>
         )}
       </div>

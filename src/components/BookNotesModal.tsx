@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { supabase, type Book, type Note } from '@/lib/supabase';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { useToast } from './Toast';
 
 export type NoteTag = 'Citazione' | 'Riflessione' | 'Riassunto' | 'Spunto';
@@ -201,13 +202,7 @@ export function BookNotesModal({
   }, [initialNotes, loadNotes]);
 
   // Blocca lo scroll del body quando la modale è aperta per una navigazione mobile fluida
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+  useBodyScrollLock();
 
   // Gestione tasto Escape per chiudere la modale
   useEffect(() => {
@@ -519,7 +514,7 @@ export function BookNotesModal({
                   className="w-20 px-2.5 py-1 text-base sm:text-xs bg-stone-900 light:bg-white border border-stone-700 light:border-stone-300 rounded-lg text-stone-100 light:text-stone-900 focus:outline-none focus:border-amber-500/50"
                 />
                 {book.pages && book.pages > 0 && (
-                  <span className="text-xs text-stone-500">/ {book.pages}</span>
+                  <span className="text-xs text-stone-400 light:text-stone-500">/ {book.pages}</span>
                 )}
               </div>
             </div>
@@ -550,14 +545,14 @@ export function BookNotesModal({
 
             {/* Barra azioni inferiore dell'editor */}
             <div className="flex items-center justify-between gap-2.5 mt-3 pt-2.5 border-t border-stone-800/80 light:border-stone-200/80 text-xs shrink-0">
-              <div className="flex items-center gap-2 text-stone-500 light:text-stone-400">
+              <div className="flex items-center gap-2 text-stone-400 light:text-stone-500">
                 <span>
                   {wordCount} {wordCount === 1 ? 'parola' : 'parole'}
                 </span>
                 <span>·</span>
                 <span>{charCount} car.</span>
                 <span className="hidden sm:inline-block">·</span>
-                <span className="hidden sm:inline-block text-[11px] text-stone-500 light:text-stone-400">
+                <span className="hidden sm:inline-block text-[11px] text-stone-400 light:text-stone-500">
                   Premi <kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[11px]">⌘</kbd>+<kbd className="px-1.5 py-0.5 rounded bg-stone-800 light:bg-stone-200 text-stone-300 light:text-stone-700 font-mono text-[11px]">Invio</kbd> per salvare
                 </span>
               </div>
@@ -601,7 +596,7 @@ export function BookNotesModal({
                 <span className="font-serif font-bold text-sm text-stone-200 light:text-stone-900">
                   Tutte le note
                 </span>
-                <span className="text-xs text-stone-500 light:text-stone-500">
+                <span className="text-xs text-stone-400 light:text-stone-500">
                   ({filteredNotes.length}{notes && filteredNotes.length !== notes.length ? ` di ${notes.length}` : ''})
                 </span>
               </div>
@@ -648,7 +643,7 @@ export function BookNotesModal({
                 </p>
               </div>
             ) : filteredNotes.length === 0 ? (
-              <div className="text-center py-8 text-stone-500 light:text-stone-400 text-xs">
+              <div className="text-center py-8 text-stone-400 light:text-stone-500 text-xs">
                 Nessuna nota corrisponde a "{searchQuery}"
               </div>
             ) : (
@@ -768,7 +763,7 @@ export function BookNotesModal({
                               )}
 
                               {!tagMeta && !parsed.page && (
-                                <span className="text-[11px] text-stone-500 light:text-stone-400 flex items-center gap-1">
+                                <span className="text-[11px] text-stone-400 light:text-stone-500 flex items-center gap-1">
                                   <Calendar size={11} />
                                   <span>
                                     {new Date(note.created_at).toLocaleDateString('it-IT', {
@@ -857,7 +852,7 @@ export function BookNotesModal({
                           </div>
 
                           {(tagMeta || parsed.page) && (
-                            <div className="flex items-center gap-1 text-[11px] text-stone-500 light:text-stone-400 pt-1">
+                            <div className="flex items-center gap-1 text-[11px] text-stone-400 light:text-stone-500 pt-1">
                               <Calendar size={10} />
                               <span>
                                 {new Date(note.created_at).toLocaleDateString('it-IT', {

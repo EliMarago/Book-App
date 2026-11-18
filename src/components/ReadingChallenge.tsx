@@ -286,7 +286,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
               className="transition-[stroke-dashoffset] duration-700 ease-out [filter:drop-shadow(0_0_4px_rgba(249,115,22,0.45))]"
             />
           </svg>
-          <span className="absolute font-sans text-[10.5px] font-bold tabular-nums text-stone-100 light:text-stone-900">
+          <span className="absolute font-sans text-[11px] font-bold tabular-nums text-stone-100 light:text-stone-900">
             {goal > 0 ? `${percent}%` : <Target size={15} className="text-orange-400 light:text-orange-600" />}
           </span>
         </div>
@@ -436,7 +436,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                       <button
                         id="challenge-goal-edit"
                         onClick={startEditing}
-                        className="p-0.5 rounded text-stone-500 hover:text-orange-400 light:hover:text-orange-600 transition-colors cursor-pointer self-center"
+                        className="relative before:absolute before:-inset-2.5 p-0.5 rounded text-stone-400 hover:text-orange-400 light:hover:text-orange-600 transition-colors cursor-pointer self-center"
                         aria-label="Modifica obiettivo"
                         title="Modifica traguardo libri"
                       >
@@ -523,7 +523,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                   <span className="text-xs font-bold font-serif text-stone-100 light:text-stone-900 tabular-nums">
                     {daysLeft}
                   </span>
-                  <span className="text-[10px] text-stone-400 light:text-stone-500 font-medium truncate">
+                  <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium truncate">
                     {daysLeft === 1 ? 'g.' : 'giorni'}
                   </span>
                 </MetricCard>
@@ -534,7 +534,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                   <span className="text-xs font-bold font-serif text-stone-100 light:text-stone-900 tabular-nums">
                     {mediaPerMonth}
                   </span>
-                  <span className="text-[10px] text-stone-400 light:text-stone-500 font-medium truncate">
+                  <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium truncate">
                     <span className="sm:hidden">/mese</span>
                     <span className="hidden sm:inline">libri/mese</span>
                   </span>

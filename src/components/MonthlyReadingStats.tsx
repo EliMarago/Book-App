@@ -259,7 +259,7 @@ export function MonthlyReadingStats({
                     {m.books.length}
                   </span>
                   {hasBooks && m.pages > 0 && (
-                    <span className={`text-[10px] ${isSelected ? 'text-stone-900' : 'text-stone-400 light:text-stone-500'}`}>
+                    <span className={`text-[11px] ${isSelected ? 'text-stone-900' : 'text-stone-400 light:text-stone-500'}`}>
                       {m.pages}p
                     </span>
                   )}

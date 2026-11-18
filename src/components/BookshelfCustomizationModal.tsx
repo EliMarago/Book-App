@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { X, RotateCcw, Check, Palette, Sparkles, Eye, SunMedium } from 'lucide-react';
 import {
   type BookshelfHoliday,
@@ -106,6 +107,7 @@ export function BookshelfCustomizationModal({
   onChange,
   onClose,
 }: BookshelfCustomizationModalProps) {
+  useBodyScrollLock();
   // Chiudi con il tasto ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -183,7 +185,7 @@ export function BookshelfCustomizationModal({
           {/* 1. ANTEPRIMA DAL VIVO (Live Preview) */}
           <div className="rounded-2xl p-3 border border-stone-800 light:border-stone-200 bg-stone-950/60 light:bg-stone-50">
             <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wider text-stone-400 light:text-stone-500 font-sans flex items-center gap-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 light:text-stone-500 font-sans flex items-center gap-1">
                 <Eye size={12} className="text-amber-400" />
                 Anteprima
               </span>
@@ -259,7 +261,7 @@ export function BookshelfCustomizationModal({
               <div className={`floating-wood-shelf w-full wood-${customization.wood} relative z-10`}>
                 <div className="floating-wood-shelf-top w-full rounded-t-xs" />
                 <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 relative">
-                  <span className="font-serif text-[10px] font-semibold tracking-wider uppercase truncate">
+                  <span className="font-serif text-[11px] font-semibold tracking-wider uppercase truncate">
                     {customization.showShelfLabels ? 'La tua Libreria' : ''}
                   </span>
                   <span className="text-[9.5px] opacity-70">
@@ -303,7 +305,7 @@ export function BookshelfCustomizationModal({
                       <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
                         {w.label}
                       </div>
-                      <div className="text-[10px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="text-[11px] text-stone-400 light:text-stone-500 truncate">
                         {w.desc}
                       </div>
                     </div>
@@ -341,7 +343,7 @@ export function BookshelfCustomizationModal({
                       <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
                         {bg.label}
                       </div>
-                      <div className="text-[10px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="text-[11px] text-stone-400 light:text-stone-500 truncate">
                         {bg.desc}
                       </div>
                     </div>
@@ -375,7 +377,7 @@ export function BookshelfCustomizationModal({
                       <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
                         {h.label}
                       </div>
-                      <div className="hidden sm:block text-[10px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="hidden sm:block text-[11px] text-stone-400 light:text-stone-500 truncate">
                         {h.desc}
                       </div>
                     </div>
@@ -402,7 +404,7 @@ export function BookshelfCustomizationModal({
                     <div className="text-xs font-bold text-stone-200 light:text-stone-900">
                       Oggetti Decorativi
                     </div>
-                    <div className="text-[10px] text-stone-400 light:text-stone-500">
+                    <div className="text-[11px] text-stone-400 light:text-stone-500">
                       Piantine, zucche, alberelli e addobbi a fine mensola (vista dorsi)
                     </div>
                   </div>
@@ -434,7 +436,7 @@ export function BookshelfCustomizationModal({
                     <div className="text-xs font-bold text-stone-200 light:text-stone-900">
                       Incisione sul Legno
                     </div>
-                    <div className="text-[10px] text-stone-400 light:text-stone-500">
+                    <div className="text-[11px] text-stone-400 light:text-stone-500">
                       Mostra titolo sezione e conteggio volumi sul bordo frontale
                     </div>
                   </div>
@@ -467,7 +469,7 @@ export function BookshelfCustomizationModal({
                       <div className="text-xs font-bold text-stone-200 light:text-stone-900">
                         Lucine LED Natalizie
                       </div>
-                      <div className="text-[10px] text-stone-400 light:text-stone-500">
+                      <div className="text-[11px] text-stone-400 light:text-stone-500">
                         Ghirlanda di micro-led sopra i libri
                       </div>
                     </div>

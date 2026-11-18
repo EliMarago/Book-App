@@ -1041,7 +1041,7 @@ export function BookshelfView({
                         </div>
                         <div className="flex flex-wrap sm:flex-nowrap items-baseline sm:items-center gap-1.5 sm:gap-2 min-w-0">
                           <span
-                            className={`text-[10px] sm:text-[10.5px] font-sans font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${accentBadge}`}
+                            className={`text-[11px] sm:text-[11px] font-sans font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${accentBadge}`}
                           >
                             {section.shelfLabel}
                           </span>
@@ -1347,18 +1347,18 @@ export function BookshelfView({
                                     <div
                                       className={`w-full h-full bg-gradient-to-br ${spine.bg} p-3 flex flex-col justify-between border ${spine.border} relative overflow-hidden`}
                                     >
-                                      <div className="text-[10px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
+                                      <div className="text-[11px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
                                         Bookshelf
                                       </div>
                                       <div className="my-auto text-center px-1">
-                                        <h4 className="font-serif font-bold text-[10.5px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
+                                        <h4 className="font-serif font-bold text-[11px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
                                           {book.title}
                                         </h4>
-                                        <p className="text-[10.5px] text-amber-200/80 mt-1 font-sans truncate">
+                                        <p className="text-[11px] text-amber-200/80 mt-1 font-sans truncate">
                                           {book.author}
                                         </p>
                                       </div>
-                                      <div className="flex items-center justify-between text-[10px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
+                                      <div className="flex items-center justify-between text-[11px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
                                         <BookMarked size={12} />
                                         {book.pages && <span>{book.pages}p</span>}
                                       </div>
@@ -1438,10 +1438,10 @@ export function BookshelfView({
                         <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 sm:px-5 relative">
                           {customization.showShelfLabels ? (
                             <>
-                              <span className="font-serif text-[10.5px] sm:text-xs font-semibold tracking-wider uppercase text-amber-200/80 light:text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
+                              <span className="font-serif text-[11px] sm:text-xs font-semibold tracking-wider uppercase text-amber-200/80 light:text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
                                 {section.title}
                               </span>
-                              <span className="text-[10px] sm:text-[11px] font-sans font-medium text-amber-300/60 light:text-amber-200/70">
+                              <span className="text-[11px] sm:text-[11px] font-sans font-medium text-amber-300/60 light:text-amber-200/70">
                                 {section.books.length} {section.books.length === 1 ? 'volume' : 'volumi'}
                               </span>
                             </>
@@ -2145,10 +2145,10 @@ export function BookshelfView({
                                 <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 sm:px-5 relative">
                                   {customization.showShelfLabels && rIdx === 0 ? (
                                     <>
-                                      <span className="font-serif text-[10.5px] sm:text-xs font-semibold tracking-wider uppercase text-amber-200/80 light:text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
+                                      <span className="font-serif text-[11px] sm:text-xs font-semibold tracking-wider uppercase text-amber-200/80 light:text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
                                         {section.title}
                                       </span>
-                                      <span className="text-[10px] sm:text-[11px] font-sans font-medium text-amber-300/60 light:text-amber-200/70">
+                                      <span className="text-[11px] sm:text-[11px] font-sans font-medium text-amber-300/60 light:text-amber-200/70">
                                         {section.books.length}{' '}
                                         {section.books.length === 1 ? 'volume' : 'volumi'}
                                       </span>
