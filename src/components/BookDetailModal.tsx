@@ -881,11 +881,11 @@ export function BookDetailModal({
                           setProgressInput(book.read_pages ? String(book.read_pages) : '');
                           setEditingProgress(true);
                         }}
-                        className="w-full bg-stone-800/90 light:bg-stone-200/90 h-2 rounded-full overflow-hidden cursor-pointer group"
+                        className="w-full bg-stone-950/70 light:bg-stone-200/90 h-2 rounded-full cursor-pointer group"
                         title="Clicca per modificare la pagina"
                       >
                         <div
-                          className="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-300 group-hover:brightness-110"
+                          className={`bg-gradient-to-r from-amber-300 via-amber-500 to-orange-600 h-full rounded-full transition-all duration-300 group-hover:brightness-110 ${readingPercent && readingPercent > 0 ? 'shadow-[0_0_10px_1px_rgba(249,115,22,0.55)]' : ''}`}
                           style={{
                             width: `${readingPercent !== null ? readingPercent : 0}%`,
                           }}

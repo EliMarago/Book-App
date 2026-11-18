@@ -29,6 +29,7 @@ import { CoverImage } from './CoverImage';
 import { FinishBookDialog } from './FinishBookDialog';
 import { useToast } from './Toast';
 import { BookNotesModal } from './BookNotesModal';
+import { BookmarkRibbon } from './BookmarkRibbon';
 
 const STATUS_COLORS: Record<Book['status'], string> = {
   reading: 'bg-amber-500/15 light:bg-amber-50 text-amber-400 light:text-amber-800 border-amber-500/30 light:border-amber-300',
@@ -369,7 +370,7 @@ function BookCardComponent({
   );
 
   const renderProgressWidget = () => (
-    <div className="p-2 sm:p-2.5 bg-amber-500/10 light:bg-amber-50/70 border border-amber-500/20 light:border-amber-200/80 rounded-lg transition-all">
+    <div className="p-3 sm:p-3.5 bg-amber-950/25 light:bg-amber-50/80 border border-amber-500/25 light:border-amber-200/90 rounded-xl transition-all">
       {editingProgress ? (
         <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
@@ -439,9 +440,9 @@ function BookCardComponent({
             className="cursor-pointer group/progress"
             title="Clicca per aggiornare la pagina letta"
           >
-            <div className="flex items-center justify-between text-[11px] mb-1 gap-1">
-              <span className="text-amber-300 light:text-amber-800 font-medium flex items-center gap-1 truncate">
-                <Flame size={12} className="text-amber-400 light:text-amber-600 shrink-0" />
+            <div className="flex items-center justify-between text-xs mb-1.5 gap-1">
+              <span className="text-amber-300 light:text-amber-800 font-medium flex items-center gap-1.5 truncate">
+                <Flame size={13} className="text-amber-400 light:text-amber-600 shrink-0" />
                 <span className="truncate">
                   {book.read_pages && book.read_pages > 0
                     ? `Pag. ${book.read_pages}${book.pages ? ` di ${book.pages}` : ''}`
@@ -450,19 +451,19 @@ function BookCardComponent({
                       : 'Imposta pagina letta'}
                 </span>
               </span>
-              <span className="text-stone-400 light:text-stone-500 text-[11px] group-hover/progress:text-amber-300 light:group-hover/progress:text-amber-700 transition-colors font-semibold shrink-0 inline-flex items-center gap-1">
+              <span className="text-stone-300 light:text-stone-600 text-xs group-hover/progress:text-amber-300 light:group-hover/progress:text-amber-700 transition-colors font-semibold shrink-0 inline-flex items-center gap-1 tabular-nums">
                 <span>
                   {book.pages && book.pages > 0
                     ? `${Math.min(100, Math.round(((book.read_pages || 0) / book.pages) * 100))}%`
                     : 'Modifica'}
                 </span>
-                <Pencil size={10} className="opacity-70 group-hover/progress:opacity-100" />
+                <Pencil size={11} className="opacity-70 group-hover/progress:opacity-100" />
               </span>
             </div>
             {book.pages && book.pages > 0 && (
-              <div className="w-full bg-stone-800/80 light:bg-stone-200 h-1.5 rounded-full overflow-hidden mb-1.5">
+              <div className="w-full bg-stone-950/70 light:bg-stone-200 h-2 rounded-full mb-2.5">
                 <div
-                  className="bg-amber-400 light:bg-amber-500 h-full rounded-full transition-all duration-300"
+                  className={`bg-gradient-to-r from-amber-300 via-amber-500 to-orange-600 h-full rounded-full transition-all duration-300 ${(book.read_pages || 0) > 0 ? 'shadow-[0_0_10px_1px_rgba(249,115,22,0.55)]' : ''}`}
                   style={{
                     width: `${Math.min(100, Math.max(0, ((book.read_pages || 0) / book.pages) * 100))}%`,
                   }}
@@ -472,7 +473,7 @@ function BookCardComponent({
           </div>
 
           {/* Avanzamento rapido: +10 / +25 / +50 pagine */}
-          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
             {[10, 25, 50].map((n) => (
               <button
                 key={n}
@@ -485,7 +486,7 @@ function BookCardComponent({
                   savingProgress ||
                   Boolean(book.pages && book.pages > 0 && (book.read_pages || 0) >= book.pages)
                 }
-                className="text-xs font-semibold px-2.5 py-1 rounded-md border border-amber-500/30 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/10 light:bg-amber-100/70 hover:bg-amber-500/20 light:hover:bg-amber-200/70 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-500/35 light:border-amber-300 text-amber-300 light:text-amber-800 bg-amber-500/15 light:bg-amber-100/70 hover:bg-amber-500/25 light:hover:bg-amber-200/70 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95"
                 title={`Aggiungi ${n} pagine lette`}
               >
                 +{n} pag.
@@ -495,7 +496,7 @@ function BookCardComponent({
           </div>
 
           {/* Pulsante "Finito" responsive e dinamico */}
-          <div className="flex items-center justify-between pt-1.5 border-t border-amber-500/15 light:border-amber-200/60 mt-1 gap-2">
+          <div className="flex items-center justify-between pt-2.5 border-t border-amber-500/15 light:border-amber-200/60 mt-2.5 gap-2">
             <span className="text-xs text-stone-400 light:text-stone-500 truncate">
               Hai finito il libro?
             </span>
@@ -505,7 +506,7 @@ function BookCardComponent({
                 e.stopPropagation();
                 setShowFinishDialog(true);
               }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 light:hover:bg-emerald-200 border border-emerald-500/30 light:border-emerald-300 px-3 py-1 rounded-md transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/15 light:bg-emerald-100 hover:bg-emerald-500/25 light:hover:bg-emerald-200 border border-emerald-500/35 light:border-emerald-300 px-3.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
               title="Ho finito di leggere tutto il libro! Segna come Completato"
             >
               <CheckCircle2 size={13} className="text-emerald-400 light:text-emerald-600 shrink-0" />
@@ -527,18 +528,22 @@ function BookCardComponent({
       <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
         {/* Sezione superiore: Copertina e dettagli del libro */}
         <div className="flex items-start gap-3 sm:gap-4 flex-1">
-          {/* Copertina a proporzioni fisse con effetto dorso libro */}
-          <div
-            onClick={() => {
-              if (book.cover_url && onInspect) {
-                onInspect(book);
-              } else if (!book.cover_url) {
-                handleAutoFetchCover();
-              }
-            }}
-            className="relative shrink-0 w-20 lg:w-24 aspect-[2/3] rounded-lg overflow-hidden self-start bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover cursor-pointer"
-            title={book.cover_url ? 'Clicca per aprire la Scheda Libro e la trama' : 'Clicca per cercare la copertina in automatico'}
-          >
+          {/* Copertina a proporzioni fisse con effetto dorso libro e segnalibro per libri in lettura */}
+          <div className="relative shrink-0 self-start">
+            {book.status === 'reading' && (
+              <BookmarkRibbon className="right-[12%]" width={10} up={7} down={24} />
+            )}
+            <div
+              onClick={() => {
+                if (book.cover_url && onInspect) {
+                  onInspect(book);
+                } else if (!book.cover_url) {
+                  handleAutoFetchCover();
+                }
+              }}
+              className="relative w-20 lg:w-24 aspect-[2/3] rounded-lg overflow-hidden bg-stone-900 light:bg-stone-100 flex items-center justify-center shadow-md border border-stone-800/80 light:border-stone-200 book-spine-effect group/cover cursor-pointer"
+              title={book.cover_url ? 'Clicca per aprire la Scheda Libro e la trama' : 'Clicca per cercare la copertina in automatico'}
+            >
             {book.cover_url ? (
               <CoverImage
                 src={book.cover_url}
@@ -601,6 +606,7 @@ function BookCardComponent({
                 </span>
               </button>
             )}
+            </div>
           </div>
 
           {/* Colonna dettagli del libro */}
@@ -639,13 +645,13 @@ function BookCardComponent({
                     <span className="truncate">{book.author}</span>
                     {book.pages && book.pages > 0 && (
                       <span
-                        className="inline-flex items-baseline gap-1 px-2 py-[3px] rounded-full bg-stone-750/70 light:bg-stone-100 border border-stone-600/40 light:border-stone-200 shrink-0 leading-none"
+                        className="inline-flex items-baseline gap-1 px-2.5 py-[3px] rounded-full bg-stone-800/80 light:bg-stone-100 border border-stone-600/60 light:border-stone-200 shrink-0 leading-none"
                         title={`${book.pages} pagine`}
                       >
-                        <span className="text-xs font-bold text-stone-100 light:text-stone-800 tabular-nums">
+                        <span className="text-xs font-semibold text-stone-200 light:text-stone-800 tabular-nums">
                           {book.pages}
                         </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 light:text-stone-500">
+                        <span className="text-[10.5px] font-medium text-stone-400 light:text-stone-500">
                           pag.
                         </span>
                       </span>
@@ -654,12 +660,12 @@ function BookCardComponent({
                   {book.tags && book.tags.length > 0 && (
                     <div
                       onClick={() => onInspect?.(book)}
-                      className="flex items-center gap-1 mt-1.5 flex-wrap cursor-pointer"
+                      className="flex items-center gap-1.5 mt-1.5 flex-wrap cursor-pointer"
                     >
                       {book.tags.slice(0, 3).map((t) => (
                         <span
                           key={t}
-                          className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200/90 leading-tight"
+                          className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-stone-800/80 light:bg-stone-100 text-stone-200 light:text-stone-700 border border-stone-600/60 light:border-stone-200 leading-tight"
                         >
                           {t}
                         </span>
@@ -711,9 +717,9 @@ function BookCardComponent({
           </div>
         </div>
 
-        {/* Se è in lettura: widget progresso a tutta larghezza in fondo alla card, separato con eleganza */}
+        {/* Se è in lettura: widget progresso a tutta larghezza in fondo alla card */}
         {book.status === 'reading' && (
-          <div className="mt-3 pt-3 border-t border-amber-500/15 light:border-amber-200/60">
+          <div className="mt-3">
             {renderProgressWidget()}
           </div>
         )}
