@@ -124,6 +124,7 @@ export function Dashboard() {
     reorderOnDrop,
     bestBooksOrder,
     setBestBooksOrder,
+    refreshPriority,
   } = useBookPriority();
   const [isReorderingWantCards, setIsReorderingWantCards] = useState(false);
   const [draggedCardBookId, setDraggedCardBookId] = useState<string | null>(null);
@@ -292,6 +293,11 @@ export function Dashboard() {
         if (showFullLoader || force) {
           checkForAppUpdate().catch(() => {});
         }
+        if (force) {
+          window.dispatchEvent(new CustomEvent('bookapp:sync-now'));
+          void refreshPriority(true);
+          void refreshGoals(true);
+        }
 
         const fetchBooksQuery = () =>
           supabase
@@ -415,7 +421,7 @@ export function Dashboard() {
         }
       }
     },
-    [authReady, userId]
+    [authReady, userId, refreshPriority, refreshGoals]
   );
 
   // Sincronizza la cache locale ogni volta che i libri vengono modificati/aggiunti/rimossi localmente

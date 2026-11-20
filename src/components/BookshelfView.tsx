@@ -183,14 +183,14 @@ const SPINE_PALETTES: SpinePaletteItem[] = [
 
 // Proporzioni realistiche variate per creare lo skyline organico dello screenshot senza mai sovrapporre titolo e autore
 const SPINE_DIMENSIONS = [
-  { width: 'w-[35px] xs:w-[38px] sm:w-[45px]', height: 'h-[200px] xs:h-[212px] sm:h-[240px]', maxChars: 16, basePx: 35, xsPx: 38, smPx: 45 },
-  { width: 'w-[32px] xs:w-[35px] sm:w-[41px]', height: 'h-[176px] xs:h-[186px] sm:h-[210px]', maxChars: 12, basePx: 32, xsPx: 35, smPx: 41 },
-  { width: 'w-[33px] xs:w-[36px] sm:w-[42px]', height: 'h-[186px] xs:h-[196px] sm:h-[222px]', maxChars: 14, basePx: 33, xsPx: 36, smPx: 42 },
-  { width: 'w-[32px] xs:w-[35px] sm:w-[41px]', height: 'h-[180px] xs:h-[190px] sm:h-[214px]', maxChars: 13, basePx: 32, xsPx: 35, smPx: 41 },
-  { width: 'w-[35px] xs:w-[38px] sm:w-[45px]', height: 'h-[194px] xs:h-[204px] sm:h-[230px]', maxChars: 15, basePx: 35, xsPx: 38, smPx: 45 },
-  { width: 'w-[32px] xs:w-[35px] sm:w-[40px]', height: 'h-[176px] xs:h-[186px] sm:h-[210px]', maxChars: 12, basePx: 32, xsPx: 35, smPx: 40 },
-  { width: 'w-[36px] xs:w-[39px] sm:w-[46px]', height: 'h-[208px] xs:h-[220px] sm:h-[248px]', maxChars: 16, basePx: 36, xsPx: 39, smPx: 46 },
-  { width: 'w-[35px] xs:w-[38px] sm:w-[44px]', height: 'h-[192px] xs:h-[202px] sm:h-[228px]', maxChars: 14, basePx: 35, xsPx: 38, smPx: 44 },
+  { width: 'w-[41px] xs:w-[43px] sm:w-[45px]', height: 'h-[224px] xs:h-[230px] sm:h-[240px]', maxChars: 16, basePx: 41, xsPx: 43, smPx: 45 },
+  { width: 'w-[38px] xs:w-[40px] sm:w-[41px]', height: 'h-[198px] xs:h-[206px] sm:h-[210px]', maxChars: 12, basePx: 38, xsPx: 40, smPx: 41 },
+  { width: 'w-[39px] xs:w-[41px] sm:w-[42px]', height: 'h-[210px] xs:h-[216px] sm:h-[222px]', maxChars: 14, basePx: 39, xsPx: 41, smPx: 42 },
+  { width: 'w-[38px] xs:w-[40px] sm:w-[41px]', height: 'h-[202px] xs:h-[210px] sm:h-[214px]', maxChars: 13, basePx: 38, xsPx: 40, smPx: 41 },
+  { width: 'w-[41px] xs:w-[43px] sm:w-[45px]', height: 'h-[218px] xs:h-[224px] sm:h-[230px]', maxChars: 15, basePx: 41, xsPx: 43, smPx: 45 },
+  { width: 'w-[38px] xs:w-[40px] sm:w-[40px]', height: 'h-[198px] xs:h-[206px] sm:h-[210px]', maxChars: 12, basePx: 38, xsPx: 40, smPx: 40 },
+  { width: 'w-[42px] xs:w-[44px] sm:w-[46px]', height: 'h-[232px] xs:h-[238px] sm:h-[248px]', maxChars: 16, basePx: 42, xsPx: 44, smPx: 46 },
+  { width: 'w-[41px] xs:w-[43px] sm:w-[44px]', height: 'h-[214px] xs:h-[222px] sm:h-[228px]', maxChars: 14, basePx: 41, xsPx: 43, smPx: 44 },
 ];
 
 function getBookHash(id: string, title: string): number {
@@ -286,13 +286,13 @@ function getEditorialSpineTypography(
     ? isSm
       ? 14
       : isXs
-        ? 12.5
-        : 11.8
+        ? 13.6
+        : 13.2
     : isSm
       ? 13
       : isXs
-        ? 11.8
-        : 11;
+        ? 12.8
+        : 12.4;
 
   if (cleanFullTitle.length <= 9 && !hasRankBadge) {
     fontPx += 1.2;
@@ -370,11 +370,13 @@ export function BookshelfView({
   const {
     shelfStyle,
     customization,
-    faceOutOverrides,
+    faceOutSections,
+    syncStatus,
     setShelfStyle: handleShelfStyleChange,
     setCustomization: handleUpdateCustomization,
     toggleFaceOut: handleToggleFaceOut,
     resetFaceOutOverrides: handleResetFaceOutOverrides,
+    flushSync,
   } = useBookshelfSettings();
 
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -389,7 +391,7 @@ export function BookshelfView({
   const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
   const [isSelectingFaceOut, setIsSelectingFaceOut] = useState(false);
 
-  const hasCustomFaceOut = Object.keys(faceOutOverrides).length > 0;
+  const hasCustomFaceOut = Object.keys(faceOutSections).length > 0;
 
   // Colori reali dei dorsi estratti dinamicamente dalle immagini di copertina (con cache in localStorage)
   const [coverSpinePalettes, setCoverSpinePalettes] = useState<Record<string, ExtractedSpinePalette>>(() => {
@@ -948,11 +950,11 @@ export function BookshelfView({
         ref={bookcaseRef}
         className={
           customization.background === 'brick'
-            ? 'bookshelf-brick-wall rounded-3xl p-3 sm:p-5 shadow-2xl transition-all duration-300 overflow-hidden'
+            ? 'bookshelf-brick-wall rounded-3xl p-2 sm:p-5 shadow-2xl transition-all duration-300 overflow-hidden'
             : customization.background === 'boiserie'
-              ? 'bookshelf-wall-boiserie rounded-3xl p-3 sm:p-5 shadow-2xl transition-all duration-300 overflow-hidden'
+              ? 'bookshelf-wall-boiserie rounded-3xl p-2 sm:p-5 shadow-2xl transition-all duration-300 overflow-hidden'
               : customization.background === 'plaster'
-                ? 'bookshelf-wall-plaster rounded-3xl p-3 sm:p-5 shadow-2xl transition-all duration-300 overflow-hidden'
+                ? 'bookshelf-wall-plaster rounded-3xl p-2 sm:p-5 shadow-2xl transition-all duration-300 overflow-hidden'
                 : 'relative'
         }
       >
@@ -1008,8 +1010,23 @@ export function BookshelfView({
                   : 'bg-black/25 border-amber-200/10 text-amber-100/75 light:bg-white/75 light:border-stone-300/80 light:text-stone-600'
                   }`}
               >
-                <span className="truncate">
-                  Esposizione sui ripiani
+                <span className="truncate flex items-center gap-2">
+                  <span>Esposizione sui ripiani</span>
+                  {syncStatus === 'saving' && (
+                    <span className="text-[10px] font-medium text-amber-300 light:text-amber-700 animate-pulse">
+                      Salvataggio…
+                    </span>
+                  )}
+                  {syncStatus === 'saved' && (
+                    <span className="text-[10px] font-medium text-emerald-400 light:text-emerald-700">
+                      Sincronizzato
+                    </span>
+                  )}
+                  {syncStatus === 'error' && (
+                    <span className="text-[10px] font-medium text-rose-400 light:text-rose-700">
+                      In attesa di rete
+                    </span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -1040,6 +1057,21 @@ export function BookshelfView({
                   </span>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+                  {syncStatus === 'saving' && (
+                    <span className="text-[10.5px] font-medium text-amber-300 animate-pulse mr-auto sm:mr-0">
+                      Salvo sul cloud…
+                    </span>
+                  )}
+                  {syncStatus === 'saved' && (
+                    <span className="text-[10.5px] font-medium text-emerald-400 mr-auto sm:mr-0">
+                      Salvato su tutti i dispositivi
+                    </span>
+                  )}
+                  {syncStatus === 'error' && (
+                    <span className="text-[10.5px] font-medium text-rose-400 mr-auto sm:mr-0">
+                      Salvataggio in attesa di rete
+                    </span>
+                  )}
                   {hasCustomFaceOut && (
                     <button
                       type="button"
@@ -1053,7 +1085,10 @@ export function BookshelfView({
                   )}
                   <button
                     type="button"
-                    onClick={() => setIsSelectingFaceOut(false)}
+                    onClick={() => {
+                      flushSync();
+                      setIsSelectingFaceOut(false);
+                    }}
                     className="px-3 py-1.5 rounded-lg btn-amber text-stone-950 font-semibold text-[11px] cursor-pointer"
                   >
                     Fatto
@@ -1278,7 +1313,7 @@ export function BookshelfView({
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
                     <>
                       <div className="rounded-2xl pt-4 pb-2 px-1 sm:px-3 mb-0.5 relative">
-                        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-5 sm:gap-5 items-end px-1 sm:px-2 pt-3.5 sm:pt-4 pb-1 min-h-[200px]">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-x-3.5 gap-y-5 sm:gap-5 items-end px-1 sm:px-2 pt-3.5 sm:pt-4 pb-1 min-h-[200px]">
                           {section.books.map((book, bookIdx) => {
                             const spine = getBookSpineStyle(
                               book.id,
@@ -1359,7 +1394,7 @@ export function BookshelfView({
                                     setInspectingBook(book);
                                   }
                                 }}
-                                className={`group relative flex flex-col items-center cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[140px] xs:max-w-[150px] mx-auto ${isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                                className={`group relative flex flex-col items-center cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[164px] sm:max-w-[155px] mx-auto ${isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
                                   } ${isDragOver
                                     ? isBestSection
                                       ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.7)] -translate-y-2 scale-105'
@@ -1523,12 +1558,12 @@ export function BookshelfView({
                       const isWeb = bookcaseWidth >= 640;
 
                       const horizontalPaddingPx =
-                        (customization.background === 'clean' ? 0 : isSm ? 40 : 24) +
+                        (customization.background === 'clean' ? 0 : isSm ? 40 : 16) +
                         (isSm ? 32 : 12);
                       const availShelfPx = Math.max(250, bookcaseWidth - horizontalPaddingPx);
 
                       const gapPx = isSm ? 6 : isXs ? 3 : 2;
-                      const faceOutWidthPx = isSm ? 158 : isXs ? 118 : 108;
+                      const faceOutWidthPx = isSm ? 158 : isXs ? 132 : 124;
                       const propWidthPx = isSm ? 96 : isXs ? 76 : 68;
 
                       const getSpinePx = (b: Book): number => {
@@ -1536,11 +1571,13 @@ export function BookshelfView({
                         return isSm ? dim.smPx : isXs ? dim.xsPx : dim.basePx;
                       };
 
+                      const sectionCustomFaceOutIds = faceOutSections[section.id];
+                      const isSectionCustomized = sectionCustomFaceOutIds !== undefined;
+
                       const isDefaultFaceOut = (b: Book, idxInRow: number): boolean => {
                         if (shelfStyle !== 'mixed' || !b.cover_url) return false;
-                        const sectionBookKey = `${section.id}::${b.id}`;
-                        if (faceOutOverrides[sectionBookKey] !== undefined) {
-                          return faceOutOverrides[sectionBookKey];
+                        if (isSectionCustomized) {
+                          return sectionCustomFaceOutIds.includes(b.id);
                         }
                         return idxInRow === 0 || (isWeb && (idxInRow === 4 || idxInRow === 8));
                       };
@@ -1643,19 +1680,17 @@ export function BookshelfView({
                           cursor += 1;
                         }
 
-                        // Se su mobile un ripiano in modalità 'mixed' ha ancora spazio libero (es. 2, 3 o 4 libri),
+                        // Se su mobile un ripiano NON personalizzato manualmente ha ancora spazio libero,
                         // espone automaticamente un secondo libro con la copertina frontale su basetta per riempire con armonia la mensola
-                        if (!isWeb && shelfStyle === 'mixed' && items.length >= 2) {
+                        if (!isWeb && !isSectionCustomized && shelfStyle === 'mixed' && items.length >= 2) {
                           const widthWithProp =
                             usedPx + (customization.showDecorations ? propWidthPx : 0);
                           if (widthWithProp < availShelfPx * 0.82) {
                             for (let j = items.length - 1; j >= 1; j--) {
                               const candidate = items[j];
-                              const key = `${section.id}::${candidate.book.id}`;
                               if (
                                 !candidate.isFaceOut &&
-                                Boolean(candidate.book.cover_url) &&
-                                faceOutOverrides[key] === undefined
+                                Boolean(candidate.book.cover_url)
                               ) {
                                 const extraPx = faceOutWidthPx - getSpinePx(candidate.book);
                                 if (usedPx + extraPx <= availShelfPx) {
@@ -1690,7 +1725,7 @@ export function BookshelfView({
                             <div key={`${section.id}-row-${rIdx}`} className="relative">
                               {/* Area libri appoggiati fisicamente sopra il piano 3D della mensola */}
                               <div className="pt-2 sm:pt-3 px-0.5 sm:px-2 relative z-20">
-                                <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 pt-3 sm:pt-4 pb-[5px] overflow-x-auto overflow-y-hidden no-scrollbar min-h-[212px] xs:min-h-[226px] sm:min-h-[252px] touch-manipulation">
+                                <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 pt-3 sm:pt-4 pb-[5px] overflow-x-auto overflow-y-hidden no-scrollbar min-h-[234px] xs:min-h-[244px] sm:min-h-[252px] touch-manipulation">
                                   {/* Sequenza di libri (dorsi cilindrici 3D + eventuali copertine frontali su basetta) */}
                                   <div className="shelf-row-wall-shadow flex items-end gap-[2px] xs:gap-[3px] sm:gap-1.5 shrink-0">
                                     {row.items.map(({ book, globalIdx, isFaceOut }) => {
@@ -1721,7 +1756,7 @@ export function BookshelfView({
                                         (isWantSection && priorityRank !== null);
 
                                       // Calcolo tipografia editoriale adattiva (font variati + scala in base a lunghezza e altezza dorso)
-                                      const approxSpineHeightPx = isSm ? 225 : isXs ? 200 : 190;
+                                      const approxSpineHeightPx = isSm ? 225 : isXs ? 220 : 212;
                                       const spineTypo = getEditorialSpineTypography(
                                         book,
                                         showSpineRankBadge,
@@ -1830,7 +1865,7 @@ export function BookshelfView({
                                             {/* Copertina frontale verticale */}
                                             <div className="relative">
                                             <div
-                                              className={`relative w-[96px] xs:w-[106px] sm:w-[136px] h-[152px] xs:h-[168px] sm:h-[210px] rounded-t-[3px] overflow-hidden shadow-[-4px_4px_12px_rgba(0,0,0,0.65),4px_4px_12px_rgba(0,0,0,0.55)] border ${isSelectingFaceOut
+                                              className={`relative w-[112px] xs:w-[120px] sm:w-[136px] h-[176px] xs:h-[188px] sm:h-[210px] rounded-t-[3px] overflow-hidden shadow-[-4px_4px_12px_rgba(0,0,0,0.65),4px_4px_12px_rgba(0,0,0,0.55)] border ${isSelectingFaceOut
                                                 ? 'border-amber-400 ring-2 ring-amber-400/70'
                                                 : 'border-white/15'
                                                 }`}
@@ -1921,7 +1956,7 @@ export function BookshelfView({
                                             </div>
 
                                             {/* Basetta / supporto in legno su cui poggia la copertina (come nello screenshot) */}
-                                            <div className="w-[104px] xs:w-[114px] sm:w-[146px] book-stand-ledge z-20" />
+                                            <div className="w-[120px] xs:w-[128px] sm:w-[146px] book-stand-ledge z-20" />
                                           </div>
                                         );
                                       }
@@ -2151,7 +2186,7 @@ export function BookshelfView({
                                                         ? '0 1px 1px rgba(255,255,255,0.45)'
                                                         : '0 1px 2px rgba(0,0,0,0.65)',
                                                   }}
-                                                  className="writing-vertical-topdown editorial-font-serif italic font-medium text-[9px] sm:text-[10px] tracking-[0.04em] leading-none select-none whitespace-nowrap max-h-[54px] sm:max-h-[62px] overflow-hidden"
+                                                  className="writing-vertical-topdown editorial-font-serif italic font-medium text-[10px] tracking-[0.04em] leading-none select-none whitespace-nowrap max-h-[58px] sm:max-h-[62px] overflow-hidden"
                                                 >
                                                   {authorSurname}
                                                 </span>
@@ -2190,7 +2225,7 @@ export function BookshelfView({
 
                               {/* MENSOLA 3D IN LEGNO MASSELLO CON FILO E LUCINE APPESE LUNGO IL BORDO INFERIORE */}
                               <div
-                                className={`floating-wood-shelf w-full wood-${customization.wood} -mt-[16px] sm:-mt-[18px] relative z-10 mb-3`}
+                                className={`floating-wood-shelf w-full wood-${customization.wood} -mt-[13px] sm:-mt-[18px] relative z-10 mb-3`}
                               >
                                 <div className="floating-wood-shelf-top w-full rounded-t-xs" />
                                 <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 sm:px-5 relative">

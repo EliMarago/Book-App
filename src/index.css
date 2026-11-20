@@ -217,8 +217,8 @@
 .floating-wood-shelf-top {
   position: relative;
   overflow: hidden;
-  height: 22px;
-  clip-path: polygon(9px 0%, calc(100% - 9px) 0%, 100% 100%, 0% 100%);
+  height: 18px;
+  clip-path: polygon(8px 0%, calc(100% - 8px) 0%, 100% 100%, 0% 100%);
   background: linear-gradient(
     180deg,
     #25130a 0%,
@@ -310,7 +310,7 @@
 /* Spessore frontale della tavola in legno massello con smusso, venature profonde e satinatura */
 .floating-wood-shelf-front {
   position: relative;
-  min-height: 26px;
+  min-height: 22px;
   background: linear-gradient(
     180deg,
     #844e30 0%,
