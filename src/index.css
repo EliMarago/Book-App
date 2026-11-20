@@ -172,206 +172,346 @@
     0 15px 35px -8px rgba(90, 50, 25, 0.2);
 }
 
-/* Mensola Sospesa in Legno Massiccio (Floating Wood Shelf) */
+/* =========================================================================
+   MENSOLA SOSPESA 3D IN LEGNO MASSELLO (Realistic 3D Solid Wood Shelf)
+   ========================================================================= */
 .floating-wood-shelf {
   position: relative;
   width: 100%;
+  /* Venatura legno massello multi-livello (fasce tonali + fibre ondulate + nodi + micropori) */
+  --shelf-wood-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='28' viewBox='0 0 420 28'%3E%3Cg fill='none'%3E%3Cpath d='M0 0h420v7C340 4 250 10 160 6S55 9 0 7z' fill='%23000000' fill-opacity='0.14'/%3E%3Cpath d='M0 12C95 9 195 16 295 11S375 14 420 12v8C335 17 245 22 145 18S50 21 0 19z' fill='%23ffe6c2' fill-opacity='0.09'/%3E%3Cpath d='M0 22C110 20 220 25 330 21S390 23 420 22v6H0z' fill='%23000000' fill-opacity='0.18'/%3E%3Cpath d='M0 2.5C75 1 155 4.8 235 2S355 4.2 420 2.5' stroke='%23120702' stroke-opacity='0.34' stroke-width='1.1'/%3E%3Cpath d='M0 5.5C90 7.2 175 3.4 265 6S365 4.5 420 5.5' stroke='%23fff2dc' stroke-opacity='0.18' stroke-width='0.8'/%3E%3Cpath d='M0 9C68 7 142 12 225 8.5S345 11 420 9' stroke='%23120702' stroke-opacity='0.42' stroke-width='1.5'/%3E%3Cpath d='M0 12.8C82 14.8 168 10.2 252 13.5S358 11.8 420 12.8' stroke='%23120702' stroke-opacity='0.28' stroke-width='0.95'/%3E%3Cpath d='M0 16.5C72 14.5 152 19 240 15.8S352 18.2 420 16.5' stroke='%23120702' stroke-opacity='0.38' stroke-width='1.35'/%3E%3Cpath d='M0 20.2C88 22 176 18 268 20.8S368 19.2 420 20.2' stroke='%23fff2dc' stroke-opacity='0.15' stroke-width='0.85'/%3E%3Cpath d='M0 24.5C78 22.8 162 26.2 248 23.8S356 25.5 420 24.5' stroke='%23120702' stroke-opacity='0.36' stroke-width='1.2'/%3E%3Cellipse cx='116' cy='14' rx='26' ry='3.6' stroke='%23120702' stroke-opacity='0.26' stroke-width='1.1'/%3E%3Cellipse cx='116' cy='14' rx='14' ry='1.9' fill='%23120702' fill-opacity='0.14' stroke='%23120702' stroke-opacity='0.34' stroke-width='0.9'/%3E%3Cellipse cx='116' cy='14' rx='5.5' ry='0.8' fill='%23120702' fill-opacity='0.32'/%3E%3Cellipse cx='322' cy='11.5' rx='20' ry='2.7' stroke='%23120702' stroke-opacity='0.22' stroke-width='1'/%3E%3Cellipse cx='322' cy='11.5' rx='9' ry='1.2' fill='%23120702' fill-opacity='0.16' stroke='%23120702' stroke-opacity='0.28' stroke-width='0.8'/%3E%3Cpath d='M18 7h14M66 19h19M154 6h12M202 18h22M276 8h16M358 19h18M394 11h11' stroke='%23120702' stroke-opacity='0.28' stroke-width='0.75' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-/* Piano d'appoggio superiore della mensola */
-.floating-wood-shelf-top {
-  height: 14px;
+/* Ombra realistica stratificata proiettata dalla mensola sporgente sulla parete sottostante */
+.floating-wood-shelf::after {
+  content: '';
+  position: absolute;
+  left: 0.5%;
+  right: 0.5%;
+  bottom: -22px;
+  height: 24px;
   background: linear-gradient(
-    to bottom,
-    #2a160c 0%,
-    #3d2113 40%,
-    #4a2918 85%,
-    #59321e 100%
+    180deg,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.32) 32%,
+    rgba(0, 0, 0, 0.1) 68%,
+    transparent 100%
   );
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  filter: blur(6px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.light .floating-wood-shelf::after,
+[data-theme='light'] .floating-wood-shelf::after {
+  background: linear-gradient(
+    180deg,
+    rgba(52, 30, 14, 0.36) 0%,
+    rgba(52, 30, 14, 0.18) 38%,
+    rgba(52, 30, 14, 0.06) 72%,
+    transparent 100%
+  );
+}
+
+/* Piano d'appoggio superiore 3D trapezoidale in prospettiva (i libri poggiano fisicamente sopra la tavola) */
+.floating-wood-shelf-top {
+  position: relative;
+  overflow: hidden;
+  height: 22px;
+  clip-path: polygon(9px 0%, calc(100% - 9px) 0%, 100% 100%, 0% 100%);
+  background: linear-gradient(
+    180deg,
+    #25130a 0%,
+    #3b2012 36%,
+    #522e1b 78%,
+    #663b24 100%
+  );
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1.5px 2px rgba(255, 232, 200, 0.35);
+}
+
+@media (min-width: 640px) {
+  .floating-wood-shelf-top {
+    height: 26px;
+    clip-path: polygon(14px 0%, calc(100% - 14px) 0%, 100% 100%, 0% 100%);
+  }
+}
+
+/* Venatura naturale della tavola superiore in prospettiva */
+.floating-wood-shelf-top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--shelf-wood-grain);
+  background-size: 420px 26px;
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+/* Giunzione d'ombra tra la parete e il bordo posteriore della mensola + riflesso lungo lo spigolo anteriore */
+.floating-wood-shelf-top::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.62) 0%,
+      rgba(0, 0, 0, 0.24) 28%,
+      transparent 62%,
+      rgba(255, 240, 218, 0.22) 94%,
+      rgba(255, 242, 224, 0.42) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.24) 0%,
+      transparent 7%,
+      transparent 93%,
+      rgba(0, 0, 0, 0.24) 100%
+    );
+  pointer-events: none;
+}
+
+.light .floating-wood-shelf-top::after,
+[data-theme='light'] .floating-wood-shelf-top::after {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(44, 24, 10, 0.42) 0%,
+      rgba(44, 24, 10, 0.16) 30%,
+      transparent 64%,
+      rgba(255, 244, 226, 0.26) 94%,
+      rgba(255, 246, 232, 0.48) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(44, 24, 10, 0.16) 0%,
+      transparent 7%,
+      transparent 93%,
+      rgba(44, 24, 10, 0.16) 100%
+    );
 }
 
 .light .floating-wood-shelf-top,
 [data-theme='light'] .floating-wood-shelf-top {
   background: linear-gradient(
-    to bottom,
-    #301a0e 0%,
-    #422414 40%,
-    #522d1a 85%,
-    #613720 100%
+    180deg,
+    #341c10 0%,
+    #4c2a18 38%,
+    #633821 80%,
+    #78462a 100%
   );
-  border-top: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.35),
+    inset 0 -1.5px 2px rgba(255, 238, 214, 0.42);
 }
 
-/* Bordo frontale sagomato e arrotondato della mensola con luce e ombra */
+/* Spessore frontale della tavola in legno massello con smusso, venature profonde e satinatura */
 .floating-wood-shelf-front {
   position: relative;
-  min-height: 24px;
+  min-height: 26px;
   background: linear-gradient(
-    to bottom,
-    #7a4529 0%,
-    #633720 18%,
-    #482716 48%,
-    #2c140a 78%,
-    #180a04 100%
+    180deg,
+    #844e30 0%,
+    #6d3e24 14%,
+    #522c18 50%,
+    #371b0d 84%,
+    #1f0e06 100%
   );
-  border-radius: 0 0 4px 4px;
-  border-bottom: 2px solid #0f0602;
+  border-radius: 0 0 3px 3px;
+  border-top: 1.5px solid rgba(255, 235, 208, 0.46);
+  border-bottom: 2.5px solid #0e0602;
   box-shadow:
-    inset 0 2px 3px rgba(255, 215, 175, 0.4),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.65),
-    0 16px 24px -4px rgba(0, 0, 0, 0.6),
-    0 4px 8px rgba(0, 0, 0, 0.4);
+    inset 0 2px 3px rgba(255, 226, 192, 0.38),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.65),
+    0 5px 10px rgba(0, 0, 0, 0.55),
+    0 14px 24px -4px rgba(0, 0, 0, 0.62);
+}
+
+@media (min-width: 640px) {
+  .floating-wood-shelf-front {
+    min-height: 28px;
+  }
+}
+
+.floating-wood-shelf-front::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--shelf-wood-grain);
+  background-size: 420px 28px;
+  opacity: 0.96;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Satinatura calda e ombreggiatura laterale 3D lungo il bordo frontale della tavola */
+.floating-wood-shelf-front::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      rgba(255, 238, 212, 0.08) 18%,
+      rgba(255, 242, 222, 0.14) 48%,
+      rgba(255, 238, 212, 0.05) 78%,
+      rgba(0, 0, 0, 0.3) 100%
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floating-wood-shelf-front > span {
+  position: relative;
+  z-index: 2;
+}
+
+.wood-white .floating-wood-shelf-top::before,
+.wood-white .floating-wood-shelf-front::before {
+  opacity: 0.38;
+}
+
+.wood-ebony .floating-wood-shelf-top::before,
+.wood-ebony .floating-wood-shelf-front::before {
+  opacity: 0.55;
 }
 
 .light .floating-wood-shelf-front,
 [data-theme='light'] .floating-wood-shelf-front {
   background: linear-gradient(
-    to bottom,
-    #7c4629 0%,
-    #63361e 18%,
-    #462514 48%,
-    #2a1308 78%,
-    #150803 100%
+    180deg,
+    #885132 0%,
+    #6e3f25 14%,
+    #522c18 50%,
+    #361a0c 84%,
+    #1d0d05 100%
   );
-  border-radius: 0 0 4px 4px;
-  border-bottom: 2px solid #0b0402;
+  border-radius: 0 0 3px 3px;
+  border-top: 1.5px solid rgba(255, 238, 214, 0.52);
+  border-bottom: 2.5px solid #160903;
   box-shadow:
-    inset 0 2px 3px rgba(255, 225, 190, 0.5),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.55),
-    0 16px 22px -4px rgba(70, 35, 15, 0.35),
-    0 4px 8px rgba(70, 35, 15, 0.25);
+    inset 0 2px 3px rgba(255, 232, 202, 0.48),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.45),
+    0 4px 8px rgba(62, 36, 18, 0.26),
+    0 14px 22px -4px rgba(62, 36, 18, 0.34);
 }
 
 /* =========================================================================
    FINITURE DEL LEGNO DELLE MENSOLE (Shelf Wood Finishes)
    ========================================================================= */
 
-/* 1. NOCE SCURO (Walnut - Predefinito, fedele allo stile libreria BookTok con alto contrasto sulla parete) */
+/* 1. NOCE SCURO (Walnut - Predefinito, legno massello caldo e naturale) */
 .wood-walnut .floating-wood-shelf-top {
-  height: 9px;
-  background: linear-gradient(to bottom, #967459 0%, #785a43 55%, #59402e 100%);
-  border-top: 1.5px solid rgba(255, 240, 222, 0.52);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, #4b3525 0%, #6d503a 36%, #8e6c52 76%, #a68265 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.52),
+    inset 0 -1.5px 2px rgba(255, 238, 214, 0.38);
 }
 .light .wood-walnut .floating-wood-shelf-top,
 [data-theme='light'] .wood-walnut .floating-wood-shelf-top {
-  height: 9px;
-  background: linear-gradient(to bottom, #967459 0%, #785a43 55%, #59402e 100%);
-  border-top: 1.5px solid rgba(255, 240, 222, 0.55);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, #563e2c 0%, #785942 36%, #99765a 76%, #b28e70 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(42, 24, 10, 0.35),
+    inset 0 -1.5px 2px rgba(255, 242, 222, 0.46);
 }
 .wood-walnut .floating-wood-shelf-front {
-  min-height: 20px;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.045) 0px,
-      rgba(255, 255, 255, 0.045) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    linear-gradient(
-      to bottom,
-      #84644b 0%,
-      #6b4f3a 28%,
-      #523b2a 66%,
-      #362519 100%
-    );
+  background: linear-gradient(
+    180deg,
+    #8c6b51 0%,
+    #755740 16%,
+    #5c422f 54%,
+    #412d1f 86%,
+    #2a1c12 100%
+  );
   color: #fef3c7;
-  border-top: 1px solid rgba(255, 232, 205, 0.42);
-  border-bottom: 2px solid #1a1009;
+  border-top: 1.5px solid rgba(255, 236, 212, 0.48);
+  border-bottom: 2.5px solid #180f08;
   box-shadow:
-    inset 0 1px 2px rgba(255, 235, 210, 0.38),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.6),
-    0 14px 24px -2px rgba(0, 0, 0, 0.82),
-    0 5px 10px rgba(0, 0, 0, 0.6);
+    inset 0 2px 3px rgba(255, 236, 214, 0.36),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.62),
+    0 5px 10px rgba(0, 0, 0, 0.55),
+    0 16px 26px -4px rgba(0, 0, 0, 0.75);
 }
 .light .wood-walnut .floating-wood-shelf-front,
 [data-theme='light'] .wood-walnut .floating-wood-shelf-front {
-  min-height: 20px;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.045) 0px,
-      rgba(255, 255, 255, 0.045) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    linear-gradient(
-      to bottom,
-      #84644b 0%,
-      #6b4f3a 28%,
-      #523b2a 66%,
-      #362519 100%
-    );
+  background: linear-gradient(
+    180deg,
+    #927055 0%,
+    #7a5b43 16%,
+    #604532 54%,
+    #453021 86%,
+    #2d1e14 100%
+  );
   color: #fffbeb;
-  border-top: 1px solid rgba(255, 232, 205, 0.42);
-  border-bottom: 2px solid #1a1009;
+  border-top: 1.5px solid rgba(255, 238, 216, 0.54);
+  border-bottom: 2.5px solid #23150c;
   box-shadow:
-    inset 0 1px 2px rgba(255, 235, 210, 0.38),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.6),
-    0 14px 24px -2px rgba(0, 0, 0, 0.78),
-    0 5px 10px rgba(0, 0, 0, 0.55);
+    inset 0 2px 3px rgba(255, 238, 216, 0.42),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.44),
+    0 4px 8px rgba(62, 38, 20, 0.24),
+    0 14px 22px -4px rgba(62, 38, 20, 0.34);
 }
 
 /* 2. ROVERE CHIARO (Light Natural Oak) */
 .wood-oak .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #8a5a2e 0%, #a6723b 40%, #c48b4b 85%, #d59f5e 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, #7e5229 0%, #a5713c 38%, #c99152 78%, #dfaa6c 100%);
 }
 .light .wood-oak .floating-wood-shelf-top,
 [data-theme='light'] .wood-oak .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #9d6735 0%, #b87f45 40%, #d49a56 85%, #e2ab69 100%);
+  background: linear-gradient(180deg, #916032 0%, #b78046 38%, #d79e5d 78%, #e9b678 100%);
 }
 .wood-oak .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #deb078 0%, #ca965a 18%, #af7c40 48%, #875926 78%, #5a3812 100%);
+  background: linear-gradient(180deg, #e2b57e 0%, #cc985c 18%, #b17d42 52%, #895b27 84%, #5e3b14 100%);
   color: #291807;
-  border-bottom: 2px solid #3d2208;
-  box-shadow: inset 0 2px 3px rgba(255, 240, 220, 0.6), inset 0 -2px 3px rgba(0, 0, 0, 0.4), 0 16px 22px -4px rgba(70, 45, 20, 0.3);
+  border-top: 1.5px solid rgba(255, 246, 230, 0.65);
+  border-bottom: 2.5px solid #3d2208;
+  box-shadow: inset 0 2px 3px rgba(255, 244, 226, 0.55), inset 0 -2px 3px rgba(0, 0, 0, 0.4), 0 14px 22px -4px rgba(70, 45, 20, 0.34);
 }
 .light .wood-oak .floating-wood-shelf-front,
 [data-theme='light'] .wood-oak .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #e8be89 0%, #d2a167 18%, #b88349 48%, #8e5f2c 78%, #5e3b14 100%);
+  background: linear-gradient(180deg, #ecc38e 0%, #d4a369 18%, #ba864b 52%, #90612d 84%, #633e16 100%);
   color: #221204;
 }
 
 /* 3. CILIEGIO / MOGANO CALDO (Warm Cherry) */
 .wood-cherry .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #3b1111 0%, #4e1919 40%, #682323 85%, #7a2b2b 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, #350f0f 0%, #521a1a 38%, #732727 78%, #8e3333 100%);
 }
 .wood-cherry .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #a33b3b 0%, #872b2b 18%, #661e1e 48%, #451212 78%, #240808 100%);
+  background: linear-gradient(180deg, #a83e3e 0%, #8b2d2d 18%, #681f1f 52%, #471313 84%, #260909 100%);
   color: #fee2e2;
-  border-bottom: 2px solid #1a0505;
-  box-shadow: inset 0 2px 3px rgba(255, 210, 210, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.6), 0 16px 22px -4px rgba(60, 15, 15, 0.4);
+  border-top: 1.5px solid rgba(255, 218, 210, 0.45);
+  border-bottom: 2.5px solid #1a0505;
+  box-shadow: inset 0 2px 3px rgba(255, 215, 210, 0.45), inset 0 -2px 3px rgba(0, 0, 0, 0.6), 0 14px 22px -4px rgba(60, 15, 15, 0.42);
 }
 
 /* 4. BIANCO MODERNO / FRASSINO SBIANCATO (Nordic White Ash) */
 .wood-white .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #cbd5e1 0%, #e2e8f0 40%, #f1f5f9 85%, #f8fafc 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(180deg, #cbd5e1 0%, #e2e8f0 38%, #f1f5f9 78%, #ffffff 100%);
 }
 .wood-white .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #ffffff 0%, #f1f5f9 20%, #e2e8f0 55%, #cbd5e1 80%, #94a3b8 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 20%, #e2e8f0 56%, #cbd5e1 84%, #94a3b8 100%);
   color: #1e293b;
-  border-bottom: 2px solid #64748b;
-  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.8), inset 0 -2px 3px rgba(0, 0, 0, 0.15), 0 14px 20px -4px rgba(0, 0, 0, 0.22);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.95);
+  border-bottom: 2.5px solid #64748b;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.85), inset 0 -2px 3px rgba(0, 0, 0, 0.14), 0 12px 20px -4px rgba(0, 0, 0, 0.2);
 }
 
 /* 5. EBANO / NERO INDUSTRIALE (Ebony Black) */
 .wood-ebony .floating-wood-shelf-top {
-  background: linear-gradient(to bottom, #09090b 0%, #18181b 40%, #27272a 85%, #3f3f46 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, #09090b 0%, #1c1c20 38%, #2e2e33 78%, #45454d 100%);
 }
 .wood-ebony .floating-wood-shelf-front {
-  background: linear-gradient(to bottom, #52525b 0%, #3f3f46 18%, #27272a 48%, #18181b 78%, #09090b 100%);
+  background: linear-gradient(180deg, #52525b 0%, #3f3f46 18%, #27272a 52%, #18181b 84%, #09090b 100%);
   color: #f4f4f5;
-  border-bottom: 2px solid #000000;
-  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.3), inset 0 -2px 3px rgba(0, 0, 0, 0.8), 0 16px 24px -4px rgba(0, 0, 0, 0.7);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-bottom: 2.5px solid #000000;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.28), inset 0 -2px 3px rgba(0, 0, 0, 0.8), 0 16px 24px -4px rgba(0, 0, 0, 0.72);
 }
 
 /* =========================================================================
@@ -479,14 +619,101 @@
   transform: rotate(180deg);
 }
 
-/* Ombreggiatura cilindrica morbida 3D per i dorsi stile BookTok */
+/* Orientamento editoriale dall'alto verso il basso per i dorsi */
+.writing-vertical-topdown {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.editorial-font-condensed {
+  font-family: 'Oswald', ui-sans-serif, system-ui, sans-serif;
+}
+.editorial-font-display {
+  font-family: 'Playfair Display', 'Lora', Georgia, serif;
+}
+.editorial-font-serif {
+  font-family: 'Lora', Georgia, serif;
+}
+
+/* Ombreggiatura cilindrica morbida 3D + ombra di appoggio sul piano in legno della mensola */
 .book-spine-cylinder {
   position: relative;
   box-shadow:
-    -2px 0 5px rgba(0, 0, 0, 0.38),
-    2px 0 6px rgba(0, 0, 0, 0.45),
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.35),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.28);
+    -2px 0 5px rgba(0, 0, 0, 0.42),
+    4px 1px 9px rgba(0, 0, 0, 0.58),
+    0 4px 4px -1px rgba(0, 0, 0, 0.72),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.38),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.38);
+}
+
+.light .book-spine-cylinder,
+[data-theme='light'] .book-spine-cylinder {
+  box-shadow:
+    -1.5px 0 4px rgba(55, 34, 18, 0.2),
+    4px 1px 9px rgba(55, 34, 18, 0.34),
+    0 3px 4px -1px rgba(42, 24, 10, 0.56),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.42),
+    inset 0 -3px 4px rgba(45, 26, 12, 0.28);
+}
+
+/* Ombra morbida proiettata dalla fila di libri sulla parete dietro la mensola + occlusione alla base */
+.shelf-row-wall-shadow {
+  position: relative;
+  isolation: isolate;
+}
+.shelf-row-wall-shadow::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: -12px;
+  top: 12px;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.24) 6%,
+    rgba(0, 0, 0, 0.34) 90%,
+    rgba(0, 0, 0, 0.42) 96%,
+    transparent 100%
+  );
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: -1;
+}
+.shelf-row-wall-shadow::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  right: -6px;
+  bottom: 0;
+  height: 6px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.52) 100%
+  );
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: -1;
+}
+.light .shelf-row-wall-shadow::before,
+[data-theme='light'] .shelf-row-wall-shadow::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(68, 42, 22, 0.12) 6%,
+    rgba(68, 42, 22, 0.18) 90%,
+    rgba(68, 42, 22, 0.24) 96%,
+    transparent 100%
+  );
+}
+.light .shelf-row-wall-shadow::after,
+[data-theme='light'] .shelf-row-wall-shadow::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(52, 30, 14, 0.32) 100%
+  );
 }
 
 .book-spine-cylinder::before {

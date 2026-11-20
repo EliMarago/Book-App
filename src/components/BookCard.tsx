@@ -648,26 +648,6 @@ function BookCardComponent({
                       </span>
                     )}
                   </div>
-                  {book.tags && book.tags.length > 0 && (
-                    <div
-                      onClick={() => onInspect?.(book)}
-                      className="flex items-center gap-1.5 mt-1.5 flex-wrap cursor-pointer"
-                    >
-                      {book.tags.slice(0, 3).map((t) => (
-                        <span
-                          key={t}
-                          className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200/90 leading-tight"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                      {book.tags.length > 3 && (
-                        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-600 border border-stone-700 light:border-stone-200 leading-tight tabular-nums">
-                          +{book.tags.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* Pulsanti azioni rapidi (sempre visibili su mobile e tablet touch) */}
@@ -692,6 +672,28 @@ function BookCardComponent({
                   </button>
                 </div>
               </div>
+
+              {book.tags && book.tags.length > 0 && (
+                <div
+                  onClick={() => onInspect?.(book)}
+                  className="flex items-center gap-1 mt-1.5 min-w-0 overflow-hidden cursor-pointer"
+                  title={book.tags.join(' · ')}
+                >
+                  {book.tags.slice(0, 2).map((t) => (
+                    <span
+                      key={t}
+                      className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 light:bg-amber-50 text-amber-300 light:text-amber-800 border border-amber-500/25 light:border-amber-200/90 leading-tight truncate min-w-0"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                  {book.tags.length > 2 && (
+                    <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full bg-stone-800 light:bg-stone-100 text-stone-300 light:text-stone-600 border border-stone-700 light:border-stone-200 leading-tight tabular-nums shrink-0">
+                      +{book.tags.length - 2}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Valutazione visibile solo per i libri già letti e bloccata sulla card (non cambia passando il mouse) */}

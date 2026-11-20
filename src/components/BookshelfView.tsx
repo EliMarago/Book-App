@@ -239,22 +239,77 @@ function getBookSpineDimension(book: Book) {
   return SPINE_DIMENSIONS[hash % SPINE_DIMENSIONS.length];
 }
 
-/** Estrae il cognome dell'autore per la parte alta del dorso (es. "Lauren Asher" -> "Asher") */
+/** Estrae il cognome dell'autore per il dorso (es. "Lauren Asher" -> "Asher") */
 function getAuthorSurname(author?: string): string {
   if (!author) return '';
   const primary = author.split(/[,&/]/)[0].trim();
   if (!primary) return '';
   const parts = primary.split(/\s+/);
   const surname = parts[parts.length - 1];
-  if (surname.length <= 9) return surname;
-  return surname.slice(0, 8) + '...';
+  if (surname.length <= 13) return surname;
+  return surname.slice(0, 12) + '.';
 }
 
-/** Tronca elegantemente il titolo sul dorso come nello screenshot ("Terms and condi...") */
+/** Tronca elegantemente il titolo sul dorso */
 function truncateSpineTitle(title: string, maxChars: number): string {
-  const clean = title.split(/\s*[:(–—-]\s*/)[0].trim() || title.trim();
+  const clean = title.split(/\s*[:(–—]\s*/)[0].trim() || title.trim();
   if (clean.length <= maxChars) return clean;
-  return clean.slice(0, Math.max(7, maxChars - 2)).trimEnd() + '...';
+  return clean.slice(0, Math.max(8, maxChars - 1)).trimEnd() + '…';
+}
+
+const SPINE_FONT_STYLES = [
+  { fontClass: 'editorial-font-serif font-bold tracking-[-0.01em]', isCondensed: false },
+  { fontClass: 'editorial-font-condensed font-semibold uppercase tracking-[0.04em]', isCondensed: true },
+  { fontClass: 'editorial-font-display font-semibold tracking-[0.01em]', isCondensed: false },
+  { fontClass: 'editorial-font-condensed font-semibold uppercase tracking-[0.04em]', isCondensed: true },
+  { fontClass: 'editorial-font-display italic font-semibold tracking-[0.01em]', isCondensed: false },
+] as const;
+
+/** Calcola stile tipografico editoriale e dimensione adattiva del titolo sul dorso */
+function getEditorialSpineTypography(
+  book: Book,
+  hasRankBadge: boolean,
+  hasAuthor: boolean,
+  isSm: boolean,
+  isXs: boolean,
+  spineHeightPx: number
+) {
+  const hash = getBookHash(book.id, `${book.title}::arch`);
+  const style = SPINE_FONT_STYLES[hash % SPINE_FONT_STYLES.length];
+  const cleanFullTitle = book.title.split(/\s*[:(–—]\s*/)[0].trim() || book.title.trim();
+
+  const topReservedPx = hasRankBadge ? 52 : 24;
+  const bottomReservedPx = hasAuthor ? 78 : 26;
+  const availableTitleHeightPx = Math.max(66, spineHeightPx - topReservedPx - bottomReservedPx);
+
+  let fontPx = style.isCondensed
+    ? isSm
+      ? 14
+      : isXs
+        ? 12.5
+        : 11.8
+    : isSm
+      ? 13
+      : isXs
+        ? 11.8
+        : 11;
+
+  if (cleanFullTitle.length <= 9 && !hasRankBadge) {
+    fontPx += 1.2;
+  } else if (cleanFullTitle.length > 20) {
+    fontPx = Math.max(9.6, fontPx - 2);
+  } else if (cleanFullTitle.length > 14) {
+    fontPx = Math.max(10.2, fontPx - 1.1);
+  }
+
+  const avgCharStepPx = fontPx * (style.isCondensed ? 0.56 : 0.61);
+  const dynamicMaxChars = Math.max(10, Math.floor(availableTitleHeightPx / avgCharStepPx));
+
+  return {
+    fontClass: style.fontClass,
+    fontPx,
+    title: truncateSpineTitle(cleanFullTitle, dynamicMaxChars),
+  };
 }
 
 // Fiocchi di neve / particelle luminose soffuse sullo sfondo della libreria
@@ -1328,9 +1383,8 @@ export function BookshelfView({
                                   <div className="absolute top-0 left-2.5 bottom-0 w-[1px] bg-black/40 z-20 pointer-events-none" />
                                   <div className="absolute top-0 left-[11px] bottom-0 w-[1px] bg-white/20 z-20 pointer-events-none" />
 
-                                  {/* Taglio delle pagine di carta a destra e in alto */}
+                                  {/* Taglio delle pagine di carta a destra */}
                                   <div className="absolute top-0 right-0 bottom-0 w-1.5 book-pages-right z-20 pointer-events-none shadow-xs" />
-                                  <div className="absolute top-0 left-3 right-1.5 h-[2px] bg-[#f5ecdd] border-b border-stone-400/40 z-20 pointer-events-none" />
 
                                   {/* Riflesso plastificato diagonale realistico */}
                                   <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.07] to-transparent pointer-events-none z-10" />
@@ -1634,11 +1688,11 @@ export function BookshelfView({
                         <div className="space-y-6 sm:space-y-7">
                           {rows.map((row, rIdx) => (
                             <div key={`${section.id}-row-${rIdx}`} className="relative">
-                              {/* Area libri sopra la mensola (no-scrollbar evita la barra grigia sopra la mensola in legno) */}
-                              <div className="pt-2 sm:pt-3 px-0.5 sm:px-2">
-                                <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 pt-3 sm:pt-4 overflow-x-auto overflow-y-hidden no-scrollbar min-h-[212px] xs:min-h-[226px] sm:min-h-[252px] touch-manipulation">
+                              {/* Area libri appoggiati fisicamente sopra il piano 3D della mensola */}
+                              <div className="pt-2 sm:pt-3 px-0.5 sm:px-2 relative z-20">
+                                <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 pt-3 sm:pt-4 pb-[5px] overflow-x-auto overflow-y-hidden no-scrollbar min-h-[212px] xs:min-h-[226px] sm:min-h-[252px] touch-manipulation">
                                   {/* Sequenza di libri (dorsi cilindrici 3D + eventuali copertine frontali su basetta) */}
-                                  <div className="flex items-end gap-[2px] xs:gap-[3px] sm:gap-1.5 shrink-0">
+                                  <div className="shelf-row-wall-shadow flex items-end gap-[2px] xs:gap-[3px] sm:gap-1.5 shrink-0">
                                     {row.items.map(({ book, globalIdx, isFaceOut }) => {
                                       const extractedCoverPalette = book.cover_url
                                         ? coverSpinePalettes[book.cover_url] ??
@@ -1666,11 +1720,16 @@ export function BookshelfView({
                                         (isBestSection && bestRank !== null) ||
                                         (isWantSection && priorityRank !== null);
 
-                                      // Riduce leggermente i caratteri massimi del titolo quando c'è il badge in testa per non toccare mai il cognome dell'autore
-                                      const effectiveMaxChars = showSpineRankBadge
-                                        ? Math.max(9, dim.maxChars - 3)
-                                        : dim.maxChars;
-                                      const spineTitle = truncateSpineTitle(book.title, effectiveMaxChars);
+                                      // Calcolo tipografia editoriale adattiva (font variati + scala in base a lunghezza e altezza dorso)
+                                      const approxSpineHeightPx = isSm ? 225 : isXs ? 200 : 190;
+                                      const spineTypo = getEditorialSpineTypography(
+                                        book,
+                                        showSpineRankBadge,
+                                        Boolean(authorSurname),
+                                        isSm,
+                                        isXs,
+                                        approxSpineHeightPx
+                                      );
 
                                       const isBeingDragged =
                                         (isWantSection && draggedBookId === book.id) ||
@@ -1776,10 +1835,9 @@ export function BookshelfView({
                                                 : 'border-white/15'
                                                 }`}
                                             >
-                                              {/* Riflesso rilegatura sui bordi e taglio superiore pagine */}
+                                              {/* Riflesso rilegatura sui bordi */}
                                               <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/35 via-white/20 to-transparent z-20 pointer-events-none" />
                                               <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-l from-black/45 to-transparent z-20 pointer-events-none" />
-                                              <div className="absolute top-0 left-2 right-1.5 h-[2px] bg-[#f5ecdd]/90 border-b border-stone-400/40 z-20 pointer-events-none" />
                                               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none z-10" />
 
                                               <CoverImage
@@ -2054,58 +2112,51 @@ export function BookshelfView({
                                             </div>
                                           )}
 
-                                          {/* CORPO CENTRALE DEL DORSO: Rombo ◇ + Cognome Autore in alto (corsivo) + Titolo in basso (grassetto) */}
-                                          <div className="flex-1 flex flex-col items-center justify-between py-1.5 sm:py-2 px-0.5 overflow-hidden z-10 min-h-0 gap-2">
-                                            {/* Parte superiore: eventuale piccolo rombo ornamentale ◇ + Cognome autore in Serif Italic */}
-                                            <div className="flex flex-col items-center gap-1 shrink-0">
-                                              {spine.diamond && !showSpineRankBadge && (
-                                                <svg
-                                                  width="10"
-                                                  height="10"
-                                                  viewBox="0 0 12 12"
-                                                  fill="none"
-                                                  className="shrink-0 opacity-90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
-                                                >
-                                                  <path
-                                                    d="M6 1 L11 6 L6 11 L1 6 Z"
-                                                    stroke={book.cover_url ? '#f5efe6' : spine.authorColor}
-                                                    strokeWidth="1.2"
-                                                  />
-                                                </svg>
-                                              )}
-                                              {authorSurname && (
-                                                <span
-                                                  style={{
-                                                    color: book.cover_url ? '#f5efe6' : spine.authorColor,
-                                                    textShadow: book.cover_url
-                                                      ? '0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.85)'
-                                                      : spine.isLight
-                                                        ? '0 1px 1px rgba(255,255,255,0.45)'
-                                                        : '0 1px 2px rgba(0,0,0,0.65)',
-                                                  }}
-                                                  className="writing-vertical-rl font-serif italic text-[9.5px] xs:text-[10px] sm:text-[11.5px] tracking-wide leading-none select-none whitespace-nowrap"
-                                                >
-                                                  {authorSurname}
-                                                </span>
-                                              )}
-                                            </div>
-
-                                            {/* Parte inferiore: Titolo del libro in Serif Bold orientato dal basso verso l'alto */}
-                                            <div className="mt-auto flex items-center justify-start overflow-hidden pt-1">
+                                          {/* CORPO CENTRALE DEL DORSO: Titolo editoriale verticale dall'alto al basso + Cognome autore in verticale in basso */}
+                                          <div className="flex-1 flex flex-col items-center justify-between py-1.5 sm:py-2 px-0.5 overflow-hidden z-10 min-h-0 gap-1.5">
+                                            {/* Zona centrale: Titolo verticale dall'alto verso il basso con tipografia editoriale adattiva */}
+                                            <div className="flex-1 w-full flex items-center justify-center overflow-hidden min-h-0">
                                               <span
                                                 style={{
                                                   color: book.cover_url ? '#ffffff' : spine.textColor,
+                                                  fontSize: `${spineTypo.fontPx}px`,
                                                   textShadow: book.cover_url
-                                                    ? '0 1px 3px rgba(0,0,0,0.98), 0 0 7px rgba(0,0,0,0.9)'
+                                                    ? '0 1px 2px rgba(0,0,0,0.96), 0 0 5px rgba(0,0,0,0.78), 0 0 10px rgba(0,0,0,0.48)'
                                                     : spine.isLight
                                                       ? '0 1px 1px rgba(255,255,255,0.5)'
                                                       : '0 1px 2px rgba(0,0,0,0.75)',
                                                 }}
-                                                className="writing-vertical-rl font-serif font-bold text-[10.5px] xs:text-[11px] sm:text-[13px] tracking-tight leading-none select-none whitespace-nowrap"
+                                                className={`writing-vertical-topdown ${spineTypo.fontClass} leading-none select-none whitespace-nowrap max-h-full overflow-hidden`}
                                               >
-                                                {spineTitle}
+                                                {spineTypo.title}
                                               </span>
                                             </div>
+
+                                            {/* Parte inferiore: sottile divisorio + Cognome autore sempre in verticale (corsivo) */}
+                                            {authorSurname && (
+                                              <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                                                <span
+                                                  aria-hidden="true"
+                                                  className="w-[12px] h-[1px] rounded-full opacity-60"
+                                                  style={{
+                                                    backgroundColor: book.cover_url ? '#f5efe6' : spine.authorColor,
+                                                  }}
+                                                />
+                                                <span
+                                                  style={{
+                                                    color: book.cover_url ? '#faf6ee' : spine.authorColor,
+                                                    textShadow: book.cover_url
+                                                      ? '0 1px 2px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.75)'
+                                                      : spine.isLight
+                                                        ? '0 1px 1px rgba(255,255,255,0.45)'
+                                                        : '0 1px 2px rgba(0,0,0,0.65)',
+                                                  }}
+                                                  className="writing-vertical-topdown editorial-font-serif italic font-medium text-[9px] sm:text-[10px] tracking-[0.04em] leading-none select-none whitespace-nowrap max-h-[54px] sm:max-h-[62px] overflow-hidden"
+                                                >
+                                                  {authorSurname}
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
 
                                           {/* PIEDE DEL DORSO: Doppia nervatura orizzontale incisa simmetrica */}
@@ -2125,7 +2176,7 @@ export function BookshelfView({
                                   {/* Decorazione / Gattino che dorme sul lato destro della mensola */}
                                   {row.showPropOnRight && (
                                     <div
-                                      className="shrink-0 self-end ml-auto pl-0.5 xs:pl-1 sm:pl-3 pr-0.5 pb-0.5 scale-[0.88] xs:scale-95 sm:scale-100 origin-bottom-right pointer-events-none"
+                                      className="shrink-0 self-end ml-auto pl-0.5 xs:pl-1 sm:pl-3 pr-0.5 pb-0.5 scale-[0.88] xs:scale-95 sm:scale-100 origin-bottom-right pointer-events-none drop-shadow-[0_3px_4px_rgba(0,0,0,0.45)]"
                                       title="Decorazione sul ripiano"
                                     >
                                       <BookshelfDecoration
@@ -2137,9 +2188,9 @@ export function BookshelfView({
                                 </div>
                               </div>
 
-                              {/* MENSOLA IN LEGNO MASSICCIO CON FILO E LUCINE APPESE LUNGO IL BORDO INFERIORE */}
+                              {/* MENSOLA 3D IN LEGNO MASSELLO CON FILO E LUCINE APPESE LUNGO IL BORDO INFERIORE */}
                               <div
-                                className={`floating-wood-shelf w-full wood-${customization.wood} relative z-20 mb-3`}
+                                className={`floating-wood-shelf w-full wood-${customization.wood} -mt-[16px] sm:-mt-[18px] relative z-10 mb-3`}
                               >
                                 <div className="floating-wood-shelf-top w-full rounded-t-xs" />
                                 <div className="floating-wood-shelf-front w-full flex items-center justify-between px-3 sm:px-5 relative">
