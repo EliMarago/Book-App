@@ -14,7 +14,8 @@ import {
   shiftBookPosition,
 } from '@/lib/bookPriority';
 
-const PRIORITY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
+const PRIORITY_SYNC_COOLDOWN_MS = 30 * 1000;
+const PUSH_DEBOUNCE_MS = 600;
 
 export function useBookPriority() {
   const { user, authReady } = useAuth();
@@ -25,7 +26,79 @@ export function useBookPriority() {
   const bestBooksRef = useRef<string[]>(bestBooksOrder);
   const lastRefreshRef = useRef<number>(0);
 
-  // Sincronizza con i metadati remoti su Supabase
+  // Stato coda per debounce e protezione da snap-back durante riordini rapidi
+  const wantTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wantPendingRef = useRef<boolean>(false);
+  const bestPendingRef = useRef<boolean>(false);
+  const wantInFlightRef = useRef<boolean>(false);
+  const bestInFlightRef = useRef<boolean>(false);
+
+  const flushWantPush = useCallback(async () => {
+    if (wantTimerRef.current) {
+      clearTimeout(wantTimerRef.current);
+      wantTimerRef.current = null;
+    }
+    if (!wantPendingRef.current || wantInFlightRef.current) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
+    wantInFlightRef.current = true;
+    wantPendingRef.current = false;
+    try {
+      await syncWantPriorityToSupabase(priorityRef.current);
+    } finally {
+      wantInFlightRef.current = false;
+      if (wantPendingRef.current && (typeof navigator === 'undefined' || navigator.onLine)) {
+        wantTimerRef.current = setTimeout(() => {
+          wantTimerRef.current = null;
+          void flushWantPush();
+        }, 400);
+      }
+    }
+  }, []);
+
+  const flushBestPush = useCallback(async () => {
+    if (bestTimerRef.current) {
+      clearTimeout(bestTimerRef.current);
+      bestTimerRef.current = null;
+    }
+    if (!bestPendingRef.current || bestInFlightRef.current) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
+    bestInFlightRef.current = true;
+    bestPendingRef.current = false;
+    try {
+      await syncBestBooksOrderToSupabase(bestBooksRef.current);
+    } finally {
+      bestInFlightRef.current = false;
+      if (bestPendingRef.current && (typeof navigator === 'undefined' || navigator.onLine)) {
+        bestTimerRef.current = setTimeout(() => {
+          bestTimerRef.current = null;
+          void flushBestPush();
+        }, 400);
+      }
+    }
+  }, []);
+
+  const scheduleWantPush = useCallback(() => {
+    wantPendingRef.current = true;
+    if (wantTimerRef.current) clearTimeout(wantTimerRef.current);
+    wantTimerRef.current = setTimeout(() => {
+      wantTimerRef.current = null;
+      void flushWantPush();
+    }, PUSH_DEBOUNCE_MS);
+  }, [flushWantPush]);
+
+  const scheduleBestPush = useCallback(() => {
+    bestPendingRef.current = true;
+    if (bestTimerRef.current) clearTimeout(bestTimerRef.current);
+    bestTimerRef.current = setTimeout(() => {
+      bestTimerRef.current = null;
+      void flushBestPush();
+    }, PUSH_DEBOUNCE_MS);
+  }, [flushBestPush]);
+
+  // Sincronizza con i metadati remoti su Supabase (senza sovrascrivere riordini locali in corso)
   const refreshPriority = useCallback(async (force = false) => {
     if (!force && Date.now() - lastRefreshRef.current < PRIORITY_SYNC_COOLDOWN_MS) {
       return;
@@ -35,13 +108,23 @@ export function useBookPriority() {
       if (error || !data.user) return;
       lastRefreshRef.current = Date.now();
       const remoteWant = data.user.user_metadata?.want_priority;
-      if (Array.isArray(remoteWant) && remoteWant.length > 0) {
+      if (
+        !wantPendingRef.current &&
+        !wantInFlightRef.current &&
+        Array.isArray(remoteWant) &&
+        remoteWant.length > 0
+      ) {
         priorityRef.current = remoteWant;
         saveStoredWantPriority(remoteWant);
         setPriorityOrder(remoteWant);
       }
       const remoteBest = data.user.user_metadata?.best_books_order;
-      if (Array.isArray(remoteBest) && remoteBest.length > 0) {
+      if (
+        !bestPendingRef.current &&
+        !bestInFlightRef.current &&
+        Array.isArray(remoteBest) &&
+        remoteBest.length > 0
+      ) {
         bestBooksRef.current = remoteBest;
         saveStoredBestBooksOrder(remoteBest);
         setBestBooksOrderState(remoteBest);
@@ -51,52 +134,94 @@ export function useBookPriority() {
     }
   }, []);
 
-  // Identa subito dai metadati presenti nella sessione utente corrente (es. appena effettuato il login)
+  // Idrata dai metadati della sessione SOLO se non c'è un riordino locale in sospeso
   useEffect(() => {
     const meta = user?.user_metadata;
     if (!meta) return;
-    if (Array.isArray(meta.want_priority) && meta.want_priority.length > 0) {
+    if (
+      !wantPendingRef.current &&
+      !wantInFlightRef.current &&
+      Array.isArray(meta.want_priority) &&
+      meta.want_priority.length > 0
+    ) {
       priorityRef.current = meta.want_priority;
       saveStoredWantPriority(meta.want_priority);
       setPriorityOrder(meta.want_priority);
     }
-    if (Array.isArray(meta.best_books_order) && meta.best_books_order.length > 0) {
+    if (
+      !bestPendingRef.current &&
+      !bestInFlightRef.current &&
+      Array.isArray(meta.best_books_order) &&
+      meta.best_books_order.length > 0
+    ) {
       bestBooksRef.current = meta.best_books_order;
       saveStoredBestBooksOrder(meta.best_books_order);
       setBestBooksOrderState(meta.best_books_order);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!authReady || !user) return;
     if (navigator.onLine) {
-      refreshPriority(true);
+      void refreshPriority(true);
     }
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) refreshPriority(false);
+      if (document.visibilityState === 'hidden') {
+        void flushWantPush();
+        void flushBestPush();
+      } else if (document.visibilityState === 'visible' && navigator.onLine) {
+        void refreshPriority(false);
+      }
+    };
+    const onPageHide = () => {
+      void flushWantPush();
+      void flushBestPush();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
     };
-  }, [authReady, user?.id, refreshPriority]);
+  }, [authReady, user?.id, refreshPriority, flushWantPush, flushBestPush]);
 
-  // Aggiorna l'ordine locale dei libri da leggere e lo sincronizza in background
-  const setPriority = useCallback(async (newOrder: string[]) => {
-    priorityRef.current = newOrder;
-    saveStoredWantPriority(newOrder);
-    setPriorityOrder(newOrder);
-    await syncWantPriorityToSupabase(newOrder);
-  }, []);
+  useEffect(() => {
+    return () => {
+      if (wantTimerRef.current) {
+        clearTimeout(wantTimerRef.current);
+        wantTimerRef.current = null;
+        if (wantPendingRef.current) void flushWantPush();
+      }
+      if (bestTimerRef.current) {
+        clearTimeout(bestTimerRef.current);
+        bestTimerRef.current = null;
+        if (bestPendingRef.current) void flushBestPush();
+      }
+    };
+  }, [flushWantPush, flushBestPush]);
 
-  // Aggiorna l'ordine della classifica dei migliori libri letti e sincronizza su Supabase
-  const setBestBooksOrder = useCallback(async (newOrder: string[]) => {
-    bestBooksRef.current = newOrder;
-    saveStoredBestBooksOrder(newOrder);
-    setBestBooksOrderState(newOrder);
-    await syncBestBooksOrderToSupabase(newOrder);
-  }, []);
+  // Aggiorna l'ordine locale istantaneamente (0ms) e sincronizza su Supabase con debounce
+  const setPriority = useCallback(
+    (newOrder: string[]) => {
+      priorityRef.current = newOrder;
+      saveStoredWantPriority(newOrder);
+      setPriorityOrder(newOrder);
+      scheduleWantPush();
+    },
+    [scheduleWantPush]
+  );
+
+  // Aggiorna la classifica locale istantaneamente (0ms) e sincronizza su Supabase con debounce
+  const setBestBooksOrder = useCallback(
+    (newOrder: string[]) => {
+      bestBooksRef.current = newOrder;
+      saveStoredBestBooksOrder(newOrder);
+      setBestBooksOrderState(newOrder);
+      scheduleBestPush();
+    },
+    [scheduleBestPush]
+  );
 
   // Sposta i migliori libri tramite drag & drop
   const reorderBestOnDrop = useCallback(
@@ -157,4 +282,3 @@ export function useBookPriority() {
     refreshPriority,
   };
 }
-

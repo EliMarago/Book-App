@@ -16,6 +16,9 @@ import {
   SlidersHorizontal,
   Eye,
   RotateCcw,
+  Check,
+  ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { type Book } from '@/lib/supabase';
 import { matchesBookSearch } from '@/lib/bookSearch';
@@ -389,7 +392,15 @@ export function BookshelfView({
 
   // Libro attualmente selezionato per ispezione dettagliata
   const [inspectingBook, setInspectingBook] = useState<Book | null>(null);
-  const [isSelectingFaceOut, setIsSelectingFaceOut] = useState(false);
+
+  // Unica modalità di modifica mutualmente esclusiva (evita conflitti tra copertine, classifica e ordine)
+  const [editMode, setEditMode] = useState<'none' | 'faceout' | 'reorder-best' | 'reorder-want'>('none');
+  const [isEditMenuOpen, setIsEditMenuOpen] = useState(false);
+  const editMenuRef = useRef<HTMLDivElement>(null);
+
+  const isSelectingFaceOut = editMode === 'faceout';
+  const isReorderingBest = editMode === 'reorder-best';
+  const isReorderingWant = editMode === 'reorder-want';
 
   const hasCustomFaceOut = Object.keys(faceOutSections).length > 0;
 
@@ -496,15 +507,39 @@ export function BookshelfView({
     };
   }, []);
 
-  // Stato per la modalità di riordino manuale e drag & drop libri da leggere
-  const [isReorderingWant, setIsReorderingWant] = useState(false);
-  const [draggedBookId, setDraggedBookId] = useState<string | null>(null);
-  const [dragOverBookId, setDragOverBookId] = useState<string | null>(null);
+  // Stato unificato per riordino fluido (Pointer Drag su touch+mouse + spostamento rapido in 2 tocchi)
+  const [pickedReorderBook, setPickedReorderBook] = useState<{
+    bookId: string;
+    sectionId: 'want' | 'best-completed';
+  } | null>(null);
+  const [justMovedBookId, setJustMovedBookId] = useState<string | null>(null);
+  const justMovedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stato per la modalità di riordino manuale e drag & drop classifica migliori libri letti
-  const [isReorderingBest, setIsReorderingBest] = useState(false);
-  const [draggedBestBookId, setDraggedBestBookId] = useState<string | null>(null);
-  const [dragOverBestBookId, setDragOverBestBookId] = useState<string | null>(null);
+  const [activePointerDrag, setActivePointerDrag] = useState<{
+    book: Book;
+    sectionId: 'want' | 'best-completed';
+    rank: number | null;
+    spineColor: string;
+    initialX: number;
+    initialY: number;
+  } | null>(null);
+  const [dragTargetBookId, setDragTargetBookId] = useState<string | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement | null>(null);
+  const suppressClickUntilRef = useRef<number>(0);
+
+  const triggerJustMoved = (bookId: string) => {
+    setJustMovedBookId(bookId);
+    if (justMovedTimerRef.current) clearTimeout(justMovedTimerRef.current);
+    justMovedTimerRef.current = setTimeout(() => {
+      setJustMovedBookId((cur) => (cur === bookId ? null : cur));
+    }, 450);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (justMovedTimerRef.current) clearTimeout(justMovedTimerRef.current);
+    };
+  }, []);
 
   // Anno solare corrente (es. 2026)
   const currentYear = useMemo(() => new Date().getFullYear().toString(), []);
@@ -558,6 +593,7 @@ export function BookshelfView({
     if (!sourceId || !targetId || sourceId === targetId) return;
     const nextOrder = reorderBookIds(orderedWantBooks, sourceId, targetId);
     onUpdatePriorityOrder?.(nextOrder);
+    triggerJustMoved(sourceId);
   };
 
   // Gestione deterministica drag & drop per la classifica dei migliori libri letti
@@ -567,16 +603,19 @@ export function BookshelfView({
       const reorderedSection = reorderBookIds(currentSectionBooks, sourceId, targetId);
       const merged = mergeBestSectionOrder(reorderedSection);
       onUpdateBestBooksOrder?.(merged);
+      triggerJustMoved(sourceId);
       return;
     }
     const nextOrder = reorderBookIds(orderedBestBooks, sourceId, targetId);
     onUpdateBestBooksOrder?.(nextOrder);
+    triggerJustMoved(sourceId);
   };
 
   // Gestione spostamento rapido (frecce ‹ e ›) per Da Leggere
   const handleShift = (bookId: string, direction: 'left' | 'right' | 'first' | 'last') => {
     const nextOrder = shiftBookPosition(orderedWantBooks, bookId, direction);
     onUpdatePriorityOrder?.(nextOrder);
+    triggerJustMoved(bookId);
   };
 
   // Gestione spostamento rapido (frecce ‹ e ›) per la Classifica dei Migliori Libri
@@ -590,6 +629,222 @@ export function BookshelfView({
     const reorderedSection = shiftBookPosition(baseList, bookId, direction);
     const merged = mergeBestSectionOrder(reorderedSection);
     onUpdateBestBooksOrder?.(merged);
+    triggerJustMoved(bookId);
+  };
+
+  // Spostamento rapido in 2 tocchi (ideale su mobile tra più ripiani): tocca libro -> tocca posizione finale
+  const handleReorderTap = (
+    sectionId: 'want' | 'best-completed',
+    bookId: string,
+    sectionBooks: Book[]
+  ) => {
+    if (!pickedReorderBook || pickedReorderBook.sectionId !== sectionId) {
+      setPickedReorderBook({ bookId, sectionId });
+      return;
+    }
+    if (pickedReorderBook.bookId === bookId) {
+      setPickedReorderBook(null);
+      return;
+    }
+    const sourceId = pickedReorderBook.bookId;
+    setPickedReorderBook(null);
+    if (sectionId === 'best-completed') {
+      handleBestDropReorder(sourceId, bookId, sectionBooks);
+    } else {
+      handleDropReorder(sourceId, bookId);
+    }
+  };
+
+  // Trascinamento fluido unificato (Pointer Events: funziona sia su touch iOS/Android sia su mouse)
+  const startPointerReorder = (
+    e: React.PointerEvent<HTMLElement>,
+    params: {
+      book: Book;
+      sectionId: 'want' | 'best-completed';
+      sectionBooks: Book[];
+      rank: number | null;
+      spineColor: string;
+    }
+  ) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if ((e.target as HTMLElement | null)?.closest('button')) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const pointerId = e.pointerId;
+    const isTouch = e.pointerType !== 'mouse';
+
+    let engaged = false;
+    let cancelled = false;
+    let lastX = startX;
+    let lastY = startY;
+    let currentTargetId: string | null = null;
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let scrollRaf: number | null = null;
+    let hitTestPending = false;
+
+    const updateGhostPosition = (x: number, y: number) => {
+      const ghost = dragGhostRef.current;
+      if (ghost) {
+        ghost.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -62%) rotate(-2deg)`;
+      }
+    };
+
+    const runHitTest = () => {
+      hitTestPending = false;
+      if (!engaged || cancelled) return;
+      const el = document.elementFromPoint(lastX, lastY) as HTMLElement | null;
+      const targetEl = el?.closest<HTMLElement>('[data-reorder-book-id]');
+      const matchedId =
+        targetEl && targetEl.dataset.reorderSection === params.sectionId
+          ? targetEl.dataset.reorderBookId || null
+          : null;
+      if (matchedId !== currentTargetId) {
+        currentTargetId = matchedId;
+        setDragTargetBookId(matchedId);
+      }
+    };
+
+    const autoScrollLoop = () => {
+      if (!engaged || cancelled) {
+        scrollRaf = null;
+        return;
+      }
+      const edgePx = 82;
+      const vh = window.innerHeight;
+      let delta = 0;
+      if (lastY < edgePx) {
+        delta = -Math.ceil(((edgePx - lastY) / edgePx) * 14);
+      } else if (lastY > vh - edgePx) {
+        delta = Math.ceil(((lastY - (vh - edgePx)) / edgePx) * 14);
+      }
+      if (delta !== 0) {
+        window.scrollBy(0, delta);
+        runHitTest();
+      }
+      scrollRaf = requestAnimationFrame(autoScrollLoop);
+    };
+
+    const engageDrag = () => {
+      if (engaged || cancelled) return;
+      engaged = true;
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      if (isTouch && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(10);
+        } catch {
+          // ignore
+        }
+      }
+      setPickedReorderBook(null);
+      setActivePointerDrag({
+        book: params.book,
+        sectionId: params.sectionId,
+        rank: params.rank,
+        spineColor: params.spineColor,
+        initialX: lastX,
+        initialY: lastY,
+      });
+      requestAnimationFrame(() => updateGhostPosition(lastX, lastY));
+      scrollRaf = requestAnimationFrame(autoScrollLoop);
+    };
+
+    const cleanup = () => {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      if (scrollRaf !== null) {
+        cancelAnimationFrame(scrollRaf);
+        scrollRaf = null;
+      }
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerCancel);
+      window.removeEventListener('touchmove', onTouchMove);
+    };
+
+    const onTouchMove = (te: TouchEvent) => {
+      if (engaged) {
+        te.preventDefault();
+      }
+    };
+
+    const onPointerMove = (me: PointerEvent) => {
+      if (me.pointerId !== pointerId || cancelled) return;
+      lastX = me.clientX;
+      lastY = me.clientY;
+      const dx = lastX - startX;
+      const dy = lastY - startY;
+
+      if (!engaged) {
+        if (isTouch) {
+          // Scorrimento verticale rapido: lascia scorrere liberamente la pagina tra i ripiani
+          if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx) * 1.15) {
+            cancelled = true;
+            cleanup();
+            return;
+          }
+          // Movimento orizzontale deciso: aggancia subito il libro
+          if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+            engageDrag();
+          }
+        } else if (Math.hypot(dx, dy) > 6) {
+          engageDrag();
+        }
+      }
+
+      if (engaged) {
+        updateGhostPosition(lastX, lastY);
+        if (!hitTestPending) {
+          hitTestPending = true;
+          requestAnimationFrame(runHitTest);
+        }
+      }
+    };
+
+    const finishDrag = (applyDrop: boolean) => {
+      const wasEngaged = engaged;
+      const dropTarget = currentTargetId;
+      cancelled = true;
+      cleanup();
+
+      if (wasEngaged) {
+        suppressClickUntilRef.current = Date.now() + 260;
+        setActivePointerDrag(null);
+        setDragTargetBookId(null);
+        if (applyDrop && dropTarget && dropTarget !== params.book.id) {
+          if (params.sectionId === 'best-completed') {
+            handleBestDropReorder(params.book.id, dropTarget, params.sectionBooks);
+          } else {
+            handleDropReorder(params.book.id, dropTarget);
+          }
+        }
+      }
+    };
+
+    const onPointerEnd = (ue: PointerEvent) => {
+      if (ue.pointerId !== pointerId) return;
+      finishDrag(true);
+    };
+
+    const onPointerCancel = (ce: PointerEvent) => {
+      if (ce.pointerId !== pointerId) return;
+      finishDrag(false);
+    };
+
+    if (isTouch) {
+      // Breve pressione di 160ms: aggancia subito il libro su touch per trascinarlo anche verticalmente tra ripiani
+      holdTimer = setTimeout(engageDrag, 160);
+    }
+
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('pointerup', onPointerEnd);
+    window.addEventListener('pointercancel', onPointerCancel);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
   };
 
   // Posizione di priorità del libro attualmente ispezionato
@@ -826,38 +1081,259 @@ export function BookshelfView({
     selectedYear,
   ]);
 
+  // Azioni disponibili nel menu unico "Modifica" in base alla vista corrente
+  const canEditFaceOut = shelfStyle !== 'covers' && books.length > 0;
+  const canReorderBest = shelfSections.some((s) => s.id === 'best-completed' && s.books.length > 1);
+  const canReorderWant = shelfSections.some((s) => s.id === 'want' && s.books.length > 1);
+  const availableEditModes: Array<'faceout' | 'reorder-best' | 'reorder-want'> = [
+    ...(canEditFaceOut ? (['faceout'] as const) : []),
+    ...(canReorderBest ? (['reorder-best'] as const) : []),
+    ...(canReorderWant ? (['reorder-want'] as const) : []),
+  ];
+
+  const exitEditMode = () => {
+    if (editMode === 'faceout') {
+      flushSync();
+    }
+    setPickedReorderBook(null);
+    setEditMode('none');
+    setIsEditMenuOpen(false);
+  };
+
+  const enterEditMode = (nextMode: 'faceout' | 'reorder-best' | 'reorder-want') => {
+    if (editMode === 'faceout' && nextMode !== 'faceout') {
+      flushSync();
+    }
+    setPickedReorderBook(null);
+    setEditMode(nextMode);
+    setIsEditMenuOpen(false);
+
+    if (nextMode === 'reorder-best' || nextMode === 'reorder-want') {
+      const sectionId = nextMode === 'reorder-best' ? 'best-completed' : 'want';
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`shelf-section-${sectionId}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+  };
+
+  // Disattiva automaticamente una modalità se non è più valida nella vista/tab corrente
+  useEffect(() => {
+    if (editMode === 'faceout' && !canEditFaceOut) {
+      flushSync();
+      setEditMode('none');
+    } else if (editMode === 'reorder-best' && !canReorderBest) {
+      setEditMode('none');
+    } else if (editMode === 'reorder-want' && !canReorderWant) {
+      setEditMode('none');
+    }
+  }, [editMode, canEditFaceOut, canReorderBest, canReorderWant, flushSync]);
+
+  // Chiude il menu "Modifica" cliccando fuori o premendo Escape
+  useEffect(() => {
+    if (!isEditMenuOpen) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (editMenuRef.current && !editMenuRef.current.contains(e.target as Node)) {
+        setIsEditMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsEditMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [isEditMenuOpen]);
+
+  const editMenuItems = (
+    <>
+      <div className="px-2.5 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 light:text-stone-500">
+        Cosa vuoi modificare?
+      </div>
+      <div className="space-y-0.5">
+        {canEditFaceOut && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => enterEditMode('faceout')}
+            className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-stone-800/90 light:hover:bg-stone-100 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0 mt-0.5">
+              <Eye size={14} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-stone-100 light:text-stone-900">
+                Scegli copertine in mostra
+              </div>
+              <div className="text-[11px] text-stone-400 light:text-stone-500 leading-snug">
+                Tocca i libri per girarli di fronte o di dorso
+              </div>
+            </div>
+          </button>
+        )}
+        {canReorderBest && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => enterEditMode('reorder-best')}
+            className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-stone-800/90 light:hover:bg-stone-100 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0 mt-0.5">
+              <Crown size={14} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-stone-100 light:text-stone-900">
+                Riordina classifica
+              </div>
+              <div className="text-[11px] text-stone-400 light:text-stone-500 leading-snug">
+                Sposta i tuoi migliori libri sul podio
+              </div>
+            </div>
+          </button>
+        )}
+        {canReorderWant && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => enterEditMode('reorder-want')}
+            className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-stone-800/90 light:hover:bg-stone-100 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <div className="w-7 h-7 rounded-lg bg-sky-500/15 light:bg-sky-100 border border-sky-500/30 light:border-sky-300 flex items-center justify-center text-sky-400 light:text-sky-700 shrink-0 mt-0.5">
+              <ArrowUpDown size={14} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-stone-100 light:text-stone-900">
+                Riordina Da Leggere
+              </div>
+              <div className="text-[11px] text-stone-400 light:text-stone-500 leading-snug">
+                Imposta la priorità delle prossime letture
+              </div>
+            </div>
+          </button>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className="space-y-6">
       {/* BARRA CONTROLLI DELLO SCAFFALE */}
-      <div className="flex flex-col gap-2.5 bg-stone-850/80 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-sm">
-        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 min-w-0 order-1">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
-              <Library size={15} />
+      <div
+        ref={editMenuRef}
+        className="relative z-30 flex flex-col gap-2.5 bg-stone-850/80 light:bg-white border border-stone-800 light:border-stone-200/90 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-sm"
+      >
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 order-1">
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-amber-500/15 light:bg-amber-100 border border-amber-500/30 light:border-amber-300 flex items-center justify-center text-amber-400 light:text-amber-700 shrink-0">
+              <Library size={14} className="sm:w-[15px] sm:h-[15px]" />
             </div>
-            <div className="flex items-baseline gap-1.5 min-w-0">
+            <div className="flex items-baseline gap-1 sm:gap-1.5 min-w-0">
               <span className="font-serif font-bold text-xs xs:text-sm sm:text-base text-stone-100 light:text-stone-900 truncate">
-                Scaffale Virtuale
+                <span className="hidden xs:inline">Scaffale Virtuale</span>
+                <span className="xs:hidden">Scaffale</span>
               </span>
               <span className="text-stone-500 light:text-stone-400 text-[11px] sm:text-xs shrink-0">
-                · {books.length} {books.length === 1 ? 'libro' : 'libri'}
+                · {books.length}
+                <span className="hidden sm:inline"> {books.length === 1 ? 'libro' : 'libri'}</span>
               </span>
             </div>
           </div>
 
-          {/* Pulsante Personalizzazione Libreria (Legno, Parete, Tema, Luci, Dettagli) */}
-          <button
-            type="button"
-            onClick={() => setIsCustomizing(true)}
-            className="order-2 sm:ml-auto flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-300 light:text-stone-700 hover:text-white light:hover:text-stone-950 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
-            title="Personalizza l'aspetto della libreria (legno, sfondo, decorazioni)"
-          >
-            <SlidersHorizontal size={13} className="text-amber-400 light:text-amber-600" />
-            <span>Personalizza</span>
-          </button>
+          {/* Azioni compatte in alto: Modifica (menu unico Copertine / Classifica / Ordine) + Personalizza */}
+          <div className="order-2 sm:ml-auto flex items-center gap-1.5 shrink-0">
+            {availableEditModes.length > 0 && (
+              <div className="relative">
+                {editMode !== 'none' ? (
+                  <button
+                    type="button"
+                    onClick={exitEditMode}
+                    className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11.5px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                      editMode === 'reorder-want'
+                        ? 'bg-sky-500 hover:bg-sky-400 text-stone-950'
+                        : 'btn-amber text-stone-950'
+                    }`}
+                    title="Esci dalla modalità modifica"
+                  >
+                    <Check size={13} />
+                    <span>Fine</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (availableEditModes.length === 1) {
+                        enterEditMode(availableEditModes[0]);
+                      } else {
+                        setIsEditMenuOpen((v) => !v);
+                      }
+                    }}
+                    aria-expanded={isEditMenuOpen}
+                    aria-haspopup={availableEditModes.length > 1 ? 'menu' : undefined}
+                    className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-[11.5px] sm:text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                      isEditMenuOpen
+                        ? 'border-amber-400/70 bg-amber-500/15 light:bg-amber-50 text-amber-200 light:text-amber-900'
+                        : 'border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-200 light:text-stone-800 hover:text-white light:hover:text-stone-950'
+                    }`}
+                    title="Scegli copertine in mostra, modifica classifica o ordine"
+                  >
+                    <Pencil size={12} className="text-amber-400 light:text-amber-600" />
+                    <span>Modifica</span>
+                    {availableEditModes.length > 1 && (
+                      <ChevronDown
+                        size={12}
+                        className={`text-stone-400 light:text-stone-500 transition-transform duration-150 ${
+                          isEditMenuOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    )}
+                  </button>
+                )}
+
+                {/* Popover desktop ancorato a destra sotto il tasto Modifica */}
+                {isEditMenuOpen && availableEditModes.length > 1 && (
+                  <div
+                    role="menu"
+                    className="hidden sm:block absolute right-0 mt-2 w-72 rounded-2xl bg-stone-900 light:bg-white border border-stone-700/80 light:border-stone-200 shadow-2xl p-1.5 z-50"
+                  >
+                    {editMenuItems}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pulsante Personalizzazione Libreria (Legno, Parete, Tema, Luci, Dettagli) */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditMenuOpen(false);
+                setIsCustomizing(true);
+              }}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-stone-800 light:border-stone-200 bg-stone-900/90 light:bg-stone-100 hover:border-amber-400/50 text-stone-300 light:text-stone-700 hover:text-white light:hover:text-stone-950 text-[11.5px] sm:text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+              title="Personalizza l'aspetto della libreria (legno, sfondo, decorazioni)"
+            >
+              <SlidersHorizontal size={12} className="sm:w-[13px] sm:h-[13px] text-amber-400 light:text-amber-600" />
+              <span>Personalizza</span>
+            </button>
+          </div>
+
+          {/* Pannello mobile a tutta larghezza subito sotto i tasti (mai tagliato ai bordi) */}
+          {isEditMenuOpen && availableEditModes.length > 1 && (
+            <div
+              role="menu"
+              className="order-3 w-full sm:hidden rounded-xl bg-stone-900/95 light:bg-stone-50 border border-amber-500/35 light:border-amber-300/90 p-1.5 shadow-lg"
+            >
+              {editMenuItems}
+            </div>
+          )}
 
           {/* Toggle Stile Scaffale: Misto BookTok vs Solo Dorsi vs Griglia Copertine */}
-          <div className="order-3 w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1 bg-stone-900/90 light:bg-stone-100 p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
+          <div className="order-4 sm:order-3 w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1 bg-stone-900/90 light:bg-stone-100 p-1 rounded-xl border border-stone-800 light:border-stone-200 text-xs shrink-0">
             <button
               type="button"
               onClick={() => handleShelfStyleChange('mixed')}
@@ -1002,48 +1478,7 @@ export function BookshelfView({
           </div>
         ) : (
           <div className="space-y-8 sm:space-y-9 relative z-10">
-            {/* Micro-barra Vetrina dentro la libreria (quando non è attiva la selezione) */}
-            {shelfStyle !== 'covers' && books.length > 0 && !isSelectingFaceOut && (
-              <div
-                className={`-mb-4 sm:-mb-5 flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-[11px] sm:text-xs backdrop-blur-xs ${customization.background === 'boiserie'
-                  ? 'bg-black/25 border-amber-200/10 text-amber-100/75'
-                  : 'bg-black/25 border-amber-200/10 text-amber-100/75 light:bg-white/75 light:border-stone-300/80 light:text-stone-600'
-                  }`}
-              >
-                <span className="truncate flex items-center gap-2">
-                  <span>Esposizione sui ripiani</span>
-                  {syncStatus === 'saving' && (
-                    <span className="text-[10px] font-medium text-amber-300 light:text-amber-700 animate-pulse">
-                      Salvataggio…
-                    </span>
-                  )}
-                  {syncStatus === 'saved' && (
-                    <span className="text-[10px] font-medium text-emerald-400 light:text-emerald-700">
-                      Sincronizzato
-                    </span>
-                  )}
-                  {syncStatus === 'error' && (
-                    <span className="text-[10px] font-medium text-rose-400 light:text-rose-700">
-                      In attesa di rete
-                    </span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsSelectingFaceOut(true)}
-                  className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shrink-0 active:scale-95 ${customization.background === 'boiserie'
-                    ? 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60'
-                    : 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60 light:bg-white light:text-amber-950 light:border-amber-300 hover:light:bg-amber-50'
-                    }`}
-                  title="Scegli quali libri mostrare di fronte con la copertina sullo scaffale"
-                >
-                  <Eye size={11} />
-                  <span>Scegli copertine</span>
-                </button>
-              </div>
-            )}
-
-            {/* Banner guida interattivo quando si scelgono le copertine da mettere in mostra */}
+            {/* Banner guida interattivo (visibile solo mentre si scelgono le copertine da mettere in mostra) */}
             {isSelectingFaceOut && shelfStyle !== 'covers' && (
               <div className="p-3 sm:px-4 sm:py-3 rounded-2xl bg-stone-950/85 border border-amber-400/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-amber-100 shadow-xl backdrop-blur-md">
                 <div className="flex items-start sm:items-center gap-2.5 min-w-0">
@@ -1085,10 +1520,7 @@ export function BookshelfView({
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      flushSync();
-                      setIsSelectingFaceOut(false);
-                    }}
+                    onClick={exitEditMode}
                     className="px-3 py-1.5 rounded-lg btn-amber text-stone-950 font-semibold text-[11px] cursor-pointer"
                   >
                     Fatto
@@ -1114,7 +1546,7 @@ export function BookshelfView({
                       : 'bg-amber-500/20 text-amber-300 border-amber-400/40 light:bg-amber-100 light:text-amber-950 light:border-amber-300';
 
               return (
-                <div key={section.id} className="relative">
+                <div key={section.id} id={`shelf-section-${section.id}`} className="relative scroll-mt-4">
                   {/* Intestazione del ripiano pulita e ad alto contrasto sia in dark che light mode */}
                   <div
                     className={`mb-3 sm:mb-4 px-1 sm:px-2 pb-2.5 border-b ${isAlwaysDarkWall
@@ -1146,144 +1578,123 @@ export function BookshelfView({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        {section.id === 'want' && section.books.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setIsReorderingWant((v) => !v)}
-                            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${isReorderingWant
-                              ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
-                              : isAlwaysDarkWall
-                                ? 'bg-black/35 text-sky-300 border border-sky-400/30 hover:border-sky-300/60'
-                                : 'bg-black/35 text-sky-300 border border-sky-400/30 hover:border-sky-300/60 light:bg-white light:text-sky-900 light:border-sky-300 hover:light:bg-sky-50'
-                              }`}
-                            title="Modifica priorità di lettura con Drag and Drop"
-                          >
-                            <Pencil size={11} />
-                            <span>{isReorderingWant ? 'Fine' : 'Modifica ordine'}</span>
-                          </button>
-                        )}
-                        {section.id === 'best-completed' && section.books.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setIsReorderingBest((v) => !v)}
-                            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${isReorderingBest
-                              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
-                              : isAlwaysDarkWall
-                                ? 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60'
-                                : 'bg-black/35 text-amber-300 border border-amber-400/30 hover:border-amber-300/60 light:bg-white light:text-amber-950 light:border-amber-300 hover:light:bg-amber-50'
-                              }`}
-                            title="Modifica classifica dei migliori libri con Drag and Drop"
-                          >
-                            <Crown size={11} />
-                            <span>{isReorderingBest ? 'Fine' : 'Modifica classifica'}</span>
-                          </button>
-                        )}
-                        <span
-                          className={`text-[11px] sm:text-xs font-sans font-medium px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${isAlwaysDarkWall
-                            ? 'bg-black/30 text-amber-100/80 border-amber-200/15'
-                            : 'bg-black/30 text-amber-100/80 border-amber-200/15 light:bg-white/95 light:text-stone-900 light:border-stone-300/90 light:shadow-xs'
-                            }`}
-                        >
-                          {section.books.length} <span className="hidden xs:inline">{section.books.length === 1 ? 'volume' : 'volumi'}</span><span className="xs:hidden">vol.</span>
-                        </span>
-                      </div>
+                      <span
+                        className={`text-[11px] sm:text-xs font-sans font-medium px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${isAlwaysDarkWall
+                          ? 'bg-black/30 text-amber-100/80 border-amber-200/15'
+                          : 'bg-black/30 text-amber-100/80 border-amber-200/15 light:bg-white/95 light:text-stone-900 light:border-stone-300/90 light:shadow-xs'
+                          }`}
+                      >
+                        {section.books.length} <span className="hidden xs:inline">{section.books.length === 1 ? 'volume' : 'volumi'}</span><span className="xs:hidden">vol.</span>
+                      </span>
                     </div>
-
-                    {/* Su mobile: pulsante di riordino su riga dedicata per evitare qualsiasi sovrapposizione o troncamento del titolo */}
-                    {section.id === 'want' && section.books.length > 1 && (
-                      <div
-                        className={`sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t ${isAlwaysDarkWall ? 'border-amber-200/10' : 'border-amber-200/10 light:border-stone-300/60'
-                          }`}
-                      >
-                        <span
-                          className={`text-[11px] font-medium flex items-center gap-1 truncate ${isAlwaysDarkWall ? 'text-sky-300/90' : 'text-sky-300/90 light:text-sky-950'
-                            }`}
-                        >
-                          <Bookmark size={11} className="shrink-0" />
-                          Priorità di lettura
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsReorderingWant((v) => !v)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${isReorderingWant
-                            ? 'bg-sky-500 text-stone-950 font-bold shadow-xs ring-1 ring-sky-300'
-                            : isAlwaysDarkWall
-                              ? 'bg-black/35 text-sky-300 border border-sky-400/30'
-                              : 'bg-black/35 text-sky-300 border border-sky-400/30 light:bg-white light:text-sky-900 light:border-sky-300'
-                            }`}
-                        >
-                          <Pencil size={10} />
-                          <span>{isReorderingWant ? 'Fine' : 'Modifica ordine'}</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {section.id === 'best-completed' && section.books.length > 1 && (
-                      <div
-                        className={`sm:hidden flex items-center justify-between gap-2 mt-2 pt-2 border-t ${isAlwaysDarkWall ? 'border-amber-200/10' : 'border-amber-200/10 light:border-stone-300/60'
-                          }`}
-                      >
-                        <span
-                          className={`text-[11px] font-medium flex items-center gap-1 truncate ${isAlwaysDarkWall ? 'text-amber-300/90' : 'text-amber-300/90 light:text-amber-950'
-                            }`}
-                        >
-                          <Crown size={11} className="shrink-0" />
-                          Classifica personale
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsReorderingBest((v) => !v)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${isReorderingBest
-                            ? 'bg-amber-500 text-stone-950 font-bold shadow-xs ring-1 ring-amber-300'
-                            : isAlwaysDarkWall
-                              ? 'bg-black/35 text-amber-300 border border-amber-400/30'
-                              : 'bg-black/35 text-amber-300 border border-amber-400/30 light:bg-white light:text-amber-950 light:border-amber-300'
-                            }`}
-                        >
-                          <Crown size={10} />
-                          <span>{isReorderingBest ? 'Fine' : 'Modifica classifica'}</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Messaggio guida quando la modalità riordino è attiva */}
-                  {section.id === 'want' && isReorderingWant && (
-                    <div className="mx-1 sm:mx-2 mb-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-sky-950/60 light:bg-sky-50 border border-sky-500/30 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 text-xs text-sky-200 light:text-sky-900 shadow-inner">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <Bookmark size={14} className="shrink-0 text-sky-400 mt-0.5 xs:mt-0" />
-                        <span className="text-[11px] sm:text-xs leading-snug">
-                          <strong>Ordine di lettura:</strong> trascina i libri per posizionarli (★ <strong>1°</strong> è il prossimo).
-                        </span>
+                  {/* Messaggio guida interattivo quando la modalità riordino è attiva (supporta trascinamento diretto + 2 tocchi) */}
+                  {section.id === 'want' && isReorderingWant && (() => {
+                    const pickedBook =
+                      pickedReorderBook?.sectionId === 'want'
+                        ? section.books.find((b) => b.id === pickedReorderBook.bookId) ?? null
+                        : null;
+                    return (
+                      <div className="mx-1 sm:mx-2 mb-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-sky-950/80 light:bg-sky-50 border border-sky-500/40 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 text-xs text-sky-100 light:text-sky-900 shadow-md">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Bookmark size={14} className="shrink-0 text-sky-400 mt-0.5 xs:mt-0" />
+                          {pickedBook ? (
+                            <span className="text-[11px] sm:text-xs leading-snug">
+                              <strong className="text-sky-300 light:text-sky-800">“{pickedBook.title}”</strong> selezionato: tocca il libro nella posizione dove spostarlo.
+                            </span>
+                          ) : (
+                            <span className="text-[11px] sm:text-xs leading-snug">
+                              <strong>Ordine di lettura:</strong> trascina un libro oppure <strong>toccalo</strong> e poi tocca dove spostarlo.
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 w-full xs:w-auto justify-end shrink-0">
+                          {pickedBook && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleShift(pickedBook.id, 'first');
+                                  setPickedReorderBook(null);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-sky-500/20 light:bg-sky-200/80 text-sky-200 light:text-sky-900 border border-sky-400/40 font-semibold text-[11px] cursor-pointer"
+                              >
+                                1° posto
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPickedReorderBook(null)}
+                                className="px-2 py-1 rounded-lg bg-stone-800 light:bg-white text-stone-300 light:text-stone-700 border border-stone-600 light:border-stone-300 font-medium text-[11px] cursor-pointer"
+                              >
+                                Annulla
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={exitEditMode}
+                            className="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs text-center"
+                          >
+                            Fatto
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsReorderingWant(false)}
-                        className="w-full xs:w-auto px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer shadow-xs text-center"
-                      >
-                        Salva ordine
-                      </button>
-                    </div>
-                  )}
+                    );
+                  })()}
 
-                  {section.id === 'best-completed' && isReorderingBest && (
-                    <div className="mx-1 sm:mx-2 mb-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-amber-950/60 light:bg-amber-50 border border-amber-500/30 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 text-xs text-amber-200 light:text-amber-950 shadow-inner">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <Crown size={14} className="shrink-0 text-amber-400 mt-0.5 xs:mt-0" />
-                        <span className="text-[11px] sm:text-xs leading-snug">
-                          <strong>Classifica Top:</strong> trascina i libri per decidere il podio (👑 <strong>1°</strong> è il preferito).
-                        </span>
+                  {section.id === 'best-completed' && isReorderingBest && (() => {
+                    const pickedBook =
+                      pickedReorderBook?.sectionId === 'best-completed'
+                        ? section.books.find((b) => b.id === pickedReorderBook.bookId) ?? null
+                        : null;
+                    return (
+                      <div className="mx-1 sm:mx-2 mb-3 p-2.5 sm:px-3 sm:py-2 rounded-xl bg-amber-950/80 light:bg-amber-50 border border-amber-500/40 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 text-xs text-amber-100 light:text-amber-950 shadow-md">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Crown size={14} className="shrink-0 text-amber-400 mt-0.5 xs:mt-0" />
+                          {pickedBook ? (
+                            <span className="text-[11px] sm:text-xs leading-snug">
+                              <strong className="text-amber-300 light:text-amber-800">“{pickedBook.title}”</strong> selezionato: tocca la posizione sul podio dove spostarlo.
+                            </span>
+                          ) : (
+                            <span className="text-[11px] sm:text-xs leading-snug">
+                              <strong>Classifica Top:</strong> trascina un libro oppure <strong>toccalo</strong> e poi tocca dove spostarlo.
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 w-full xs:w-auto justify-end shrink-0">
+                          {pickedBook && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleShiftBest(pickedBook.id, 'first', section.books);
+                                  setPickedReorderBook(null);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-amber-500/20 light:bg-amber-200/80 text-amber-200 light:text-amber-950 border border-amber-400/40 font-semibold text-[11px] cursor-pointer"
+                              >
+                                1° posto
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPickedReorderBook(null)}
+                                className="px-2 py-1 rounded-lg bg-stone-800 light:bg-white text-stone-300 light:text-stone-700 border border-stone-600 light:border-stone-300 font-medium text-[11px] cursor-pointer"
+                              >
+                                Annulla
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={exitEditMode}
+                            className="px-2.5 py-1 rounded-lg btn-amber text-stone-950 font-semibold text-[11px] shrink-0 cursor-pointer shadow-xs text-center"
+                          >
+                            Fatto
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsReorderingBest(false)}
-                        className="w-full xs:w-auto px-2.5 py-1 rounded-lg btn-amber text-stone-950 font-semibold text-[11px] shrink-0 cursor-pointer text-center"
-                      >
-                        Salva classifica
-                      </button>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* LIBRI APPOGGIATI SUL RIPIANO */}
                   {section.id === 'reading' && section.books.length === 0 ? (
@@ -1313,7 +1724,7 @@ export function BookshelfView({
                     /* 1. VISTA COPERTINE FRONTALI CON PROFONDITÀ */
                     <>
                       <div className="rounded-2xl pt-4 pb-2 px-1 sm:px-3 mb-0.5 relative">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-x-3.5 gap-y-5 sm:gap-5 items-end px-1 sm:px-2 pt-3.5 sm:pt-4 pb-1 min-h-[200px]">
+                        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-4 sm:gap-5 items-end px-1 sm:px-2 pt-3.5 sm:pt-4 pb-1 min-h-[190px]">
                           {section.books.map((book, bookIdx) => {
                             const spine = getBookSpineStyle(
                               book.id,
@@ -1330,77 +1741,70 @@ export function BookshelfView({
                             const priorityRank = isWantSection ? bookIdx + 1 : null;
                             const bestRank = isBestSection ? bookIdx + 1 : null;
 
+                            const reorderSectionId: 'want' | 'best-completed' | null = isBestSection
+                              ? 'best-completed'
+                              : isWantSection
+                                ? 'want'
+                                : null;
                             const isBeingDragged =
-                              (isWantSection && draggedBookId === book.id) ||
-                              (isBestSection && draggedBestBookId === book.id);
+                              activePointerDrag?.sectionId === reorderSectionId &&
+                              activePointerDrag?.book.id === book.id;
                             const isDragOver =
-                              (isWantSection && dragOverBookId === book.id) ||
-                              (isBestSection && dragOverBestBookId === book.id);
+                              activePointerDrag?.sectionId === reorderSectionId &&
+                              dragTargetBookId === book.id &&
+                              activePointerDrag?.book.id !== book.id;
+                            const isPicked =
+                              pickedReorderBook?.sectionId === reorderSectionId &&
+                              pickedReorderBook?.bookId === book.id;
+                            const isJustMoved = justMovedBookId === book.id;
+
+                            const handleCoverClick = () => {
+                              if (Date.now() < suppressClickUntilRef.current) return;
+                              if (isDraggable && reorderSectionId) {
+                                handleReorderTap(reorderSectionId, book.id, section.books);
+                                return;
+                              }
+                              setInspectingBook(book);
+                            };
 
                             return (
                               <div
                                 key={book.id}
                                 role="button"
                                 tabIndex={0}
-                                draggable={isDraggable}
-                                onDragStart={(e) => {
-                                  if (!isDraggable) return;
-                                  e.dataTransfer.setData('text/plain', book.id);
-                                  e.dataTransfer.effectAllowed = 'move';
-                                  if (isBestSection) setDraggedBestBookId(book.id);
-                                  else if (isWantSection) setDraggedBookId(book.id);
+                                data-reorder-section={isDraggable && reorderSectionId ? reorderSectionId : undefined}
+                                data-reorder-book-id={isDraggable ? book.id : undefined}
+                                onPointerDown={(e) => {
+                                  if (!isDraggable || !reorderSectionId) return;
+                                  startPointerReorder(e, {
+                                    book,
+                                    sectionId: reorderSectionId,
+                                    sectionBooks: section.books,
+                                    rank: bestRank ?? priorityRank,
+                                    spineColor: spine.baseColor,
+                                  });
                                 }}
-                                onDragOver={(e) => {
-                                  if (!isDraggable) return;
-                                  e.preventDefault();
-                                  e.dataTransfer.dropEffect = 'move';
-                                  if (isBestSection) {
-                                    if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
-                                  } else if (isWantSection) {
-                                    if (dragOverBookId !== book.id) setDragOverBookId(book.id);
-                                  }
-                                }}
-                                onDragLeave={(e) => {
-                                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                                  if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
-                                  else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
-                                }}
-                                onDrop={(e) => {
-                                  if (!isDraggable) return;
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const sourceId =
-                                    e.dataTransfer.getData('text/plain') ||
-                                    (isBestSection ? draggedBestBookId : draggedBookId);
-                                  if (sourceId && sourceId !== book.id) {
-                                    if (isBestSection) handleBestDropReorder(sourceId, book.id, section.books);
-                                    else if (isWantSection) handleDropReorder(sourceId, book.id);
-                                  }
-                                  setDraggedBookId(null);
-                                  setDragOverBookId(null);
-                                  setDraggedBestBookId(null);
-                                  setDragOverBestBookId(null);
-                                }}
-                                onDragEnd={() => {
-                                  setDraggedBookId(null);
-                                  setDragOverBookId(null);
-                                  setDraggedBestBookId(null);
-                                  setDragOverBestBookId(null);
-                                }}
-                                onClick={() => setInspectingBook(book)}
+                                onClick={handleCoverClick}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault();
-                                    setInspectingBook(book);
+                                    handleCoverClick();
                                   }
                                 }}
-                                className={`group relative flex flex-col items-center cursor-pointer transition-[transform,box-shadow] duration-300 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[164px] sm:max-w-[155px] mx-auto ${isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                                className={`group relative flex flex-col items-center transition-[transform,opacity,box-shadow] duration-200 sm:hover:-translate-y-3 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-xl w-full max-w-[128px] xs:max-w-[124px] sm:max-w-[150px] mx-auto ${
+                                  isDraggable ? 'cursor-grab active:cursor-grabbing touch-pan-y' : 'cursor-pointer'
+                                } ${isBeingDragged ? 'opacity-25 scale-95 ring-2 ring-amber-400/70' : ''
+                                  } ${isPicked
+                                    ? isBestSection
+                                      ? 'ring-2 ring-amber-400 shadow-[0_0_18px_rgba(245,158,11,0.75)] -translate-y-2.5 scale-[1.03]'
+                                      : 'ring-2 ring-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.75)] -translate-y-2.5 scale-[1.03]'
+                                    : ''
                                   } ${isDragOver
                                     ? isBestSection
                                       ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.7)] -translate-y-2 scale-105'
                                       : 'ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.7)] -translate-y-2 scale-105'
                                     : ''
-                                  }`}
+                                  } ${isJustMoved ? 'book-just-moved' : ''}`}
                                 title={`${isBestSection
                                   ? `[👑 #${bestRank} Top Libro] `
                                   : isWantSection
@@ -1412,95 +1816,94 @@ export function BookshelfView({
                               >
                                 {/* Libro appoggiato sullo scaffale con struttura tridimensionale */}
                                 <div className="relative w-full transition-transform duration-300 group-hover:scale-105">
-                                <div className="relative w-full aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden book-3d-cover transition-shadow group-hover:shadow-[0_20px_28px_-4px_rgba(245,158,11,0.3)]">
-                                  {/* Scanalatura e cerniera rilegatura copertina a sinistra */}
-                                  <div className="absolute top-0 left-0 bottom-0 w-3 bg-gradient-to-r from-white/20 via-black/15 to-black/45 z-20 pointer-events-none" />
-                                  <div className="absolute top-0 left-2.5 bottom-0 w-[1px] bg-black/40 z-20 pointer-events-none" />
-                                  <div className="absolute top-0 left-[11px] bottom-0 w-[1px] bg-white/20 z-20 pointer-events-none" />
+                                  <div className="relative w-full aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden book-3d-cover transition-shadow group-hover:shadow-[0_20px_28px_-4px_rgba(245,158,11,0.3)]">
+                                    {/* Scanalatura e cerniera rilegatura copertina a sinistra */}
+                                    <div className="absolute top-0 left-0 bottom-0 w-3 bg-gradient-to-r from-white/20 via-black/15 to-black/45 z-20 pointer-events-none" />
+                                    <div className="absolute top-0 left-2.5 bottom-0 w-[1px] bg-black/40 z-20 pointer-events-none" />
+                                    <div className="absolute top-0 left-[11px] bottom-0 w-[1px] bg-white/20 z-20 pointer-events-none" />
 
-                                  {/* Taglio delle pagine di carta a destra */}
-                                  <div className="absolute top-0 right-0 bottom-0 w-1.5 book-pages-right z-20 pointer-events-none shadow-xs" />
+                                    {/* Taglio delle pagine di carta a destra */}
+                                    <div className="absolute top-0 right-0 bottom-0 w-1.5 book-pages-right z-20 pointer-events-none shadow-xs" />
 
-                                  {/* Riflesso plastificato diagonale realistico */}
-                                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.07] to-transparent pointer-events-none z-10" />
+                                    {/* Riflesso plastificato diagonale realistico */}
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.07] to-transparent pointer-events-none z-10" />
 
-                                  {book.cover_url ? (
-                                    <CoverImage
-                                      src={book.cover_url}
-                                      alt={book.title}
-                                      className="w-full h-full object-cover"
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    /* Copertina telata classica per libri senza immagine */
-                                    <div
-                                      className={`w-full h-full bg-gradient-to-br ${spine.bg} p-3 flex flex-col justify-between border ${spine.border} relative overflow-hidden`}
-                                    >
-                                      <div className="text-[11px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
-                                        Bookshelf
-                                      </div>
-                                      <div className="my-auto text-center px-1">
-                                        <h4 className="font-serif font-bold text-[11px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
-                                          {book.title}
-                                        </h4>
-                                        <p className="text-[11px] text-amber-200/80 mt-1 font-sans truncate">
-                                          {book.author}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center justify-between text-[11px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
-                                        <BookMarked size={12} />
-                                        {book.pages && <span>{book.pages}p</span>}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Sigillo di completamento per i letti (se non nel ripiano classifica d'onore) */}
-                                  {book.status === 'completed' && !isBestSection && (
-                                    <div className="absolute top-1.5 left-2 z-30 pointer-events-none w-5 h-5 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-md">
-                                      <Trophy size={11} />
-                                    </div>
-                                  )}
-
-                                  {/* Badge classifica ripiano d'onore dei migliori libri letti */}
-                                  {isBestSection && bestRank !== null && (
-                                    <div className="absolute top-1.5 left-4 sm:top-2 sm:left-4 z-30 pointer-events-none">
-                                      <RankSeal rank={bestRank} kind="best" size="md" />
-                                    </div>
-                                  )}
-
-                                  {/* Badge priorità sulla copertina se ripiano da leggere */}
-                                  {isWantSection && priorityRank !== null && (
-                                    <div className="absolute top-1.5 left-4 sm:top-2 sm:left-4 z-30 pointer-events-none">
-                                      <RankSeal rank={priorityRank} kind="want" size="md" />
-                                    </div>
-                                  )}
-
-                                  {/* Barra avanzamento pagine in basso se in lettura */}
-                                  {book.status === 'reading' && book.pages && book.pages > 0 && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
-                                      <div
-                                        className="h-full bg-amber-400"
-                                        style={{
-                                          width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
-                                        }}
+                                    {book.cover_url ? (
+                                      <CoverImage
+                                        src={book.cover_url}
+                                        alt={book.title}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
                                       />
-                                    </div>
-                                  )}
+                                    ) : (
+                                      /* Copertina telata classica per libri senza immagine */
+                                      <div
+                                        className={`w-full h-full bg-gradient-to-br ${spine.bg} p-3 flex flex-col justify-between border ${spine.border} relative overflow-hidden`}
+                                      >
+                                        <div className="text-[11px] uppercase tracking-widest text-amber-200/60 font-sans font-semibold">
+                                          Bookshelf
+                                        </div>
+                                        <div className="my-auto text-center px-1">
+                                          <h4 className="font-serif font-bold text-[11px] xs:text-[11px] sm:text-xs md:text-sm text-amber-100 leading-snug line-clamp-3 break-words">
+                                            {book.title}
+                                          </h4>
+                                          <p className="text-[11px] text-amber-200/80 mt-1 font-sans truncate">
+                                            {book.author}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[11px] font-sans text-amber-300/70 border-t border-amber-500/20 pt-1">
+                                          <BookMarked size={12} />
+                                          {book.pages && <span>{book.pages}p</span>}
+                                        </div>
+                                      </div>
+                                    )}
 
-                                  {/* Badge note se presenti */}
-                                  {book.notes_count && book.notes_count > 0 ? (
-                                    <div
-                                      className={`absolute right-1.5 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[11px] font-bold flex items-center gap-0.5 shadow-md ${
-                                        book.status === 'reading' && book.pages && book.pages > 0
+                                    {/* Sigillo di completamento per i letti (se non nel ripiano classifica d'onore) */}
+                                    {book.status === 'completed' && !isBestSection && (
+                                      <div className="absolute top-1.5 left-2 z-30 pointer-events-none w-5 h-5 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-md">
+                                        <Trophy size={11} />
+                                      </div>
+                                    )}
+
+                                    {/* Badge classifica ripiano d'onore dei migliori libri letti */}
+                                    {isBestSection && bestRank !== null && (
+                                      <div className="absolute top-1.5 left-4 sm:top-2 sm:left-4 z-30 pointer-events-none">
+                                        <RankSeal rank={bestRank} kind="best" size="md" />
+                                      </div>
+                                    )}
+
+                                    {/* Badge priorità sulla copertina se ripiano da leggere */}
+                                    {isWantSection && priorityRank !== null && (
+                                      <div className="absolute top-1.5 left-4 sm:top-2 sm:left-4 z-30 pointer-events-none">
+                                        <RankSeal rank={priorityRank} kind="want" size="md" />
+                                      </div>
+                                    )}
+
+                                    {/* Barra avanzamento pagine in basso se in lettura */}
+                                    {book.status === 'reading' && book.pages && book.pages > 0 && (
+                                      <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
+                                        <div
+                                          className="h-full bg-amber-400"
+                                          style={{
+                                            width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {/* Badge note se presenti */}
+                                    {book.notes_count && book.notes_count > 0 ? (
+                                      <div
+                                        className={`absolute right-1.5 sm:right-2 z-30 pointer-events-none bg-stone-900/90 text-amber-300 border border-amber-500/40 rounded-full px-1.5 py-0.5 text-[11px] font-bold flex items-center gap-0.5 shadow-md ${book.status === 'reading' && book.pages && book.pages > 0
                                           ? 'bottom-2.5 sm:bottom-3'
                                           : 'bottom-1.5 sm:bottom-2'
-                                      }`}
-                                    >
-                                      <StickyNote size={8} />
-                                      <span>{book.notes_count}</span>
-                                    </div>
-                                  ) : null}
-                                </div>
+                                          }`}
+                                      >
+                                        <StickyNote size={8} />
+                                        <span>{book.notes_count}</span>
+                                      </div>
+                                    ) : null}
+                                  </div>
                                 </div>
 
                                 {/* Ombra di contatto realistica sul ripiano in legno */}
@@ -1727,7 +2130,7 @@ export function BookshelfView({
                               <div className="pt-2 sm:pt-3 px-0.5 sm:px-2 relative z-20">
                                 <div className="flex items-end justify-between gap-1.5 sm:gap-2 px-1 sm:px-2 pt-3 sm:pt-4 pb-[5px] overflow-x-auto overflow-y-hidden no-scrollbar min-h-[234px] xs:min-h-[244px] sm:min-h-[252px] touch-manipulation">
                                   {/* Sequenza di libri (dorsi cilindrici 3D + eventuali copertine frontali su basetta) */}
-                                  <div className="shelf-row-wall-shadow flex items-end gap-[2px] xs:gap-[3px] sm:gap-1.5 shrink-0">
+                                  <div className="flex items-end gap-[2px] xs:gap-[3px] sm:gap-1.5 shrink-0">
                                     {row.items.map(({ book, globalIdx, isFaceOut }) => {
                                       const extractedCoverPalette = book.cover_url
                                         ? coverSpinePalettes[book.cover_url] ??
@@ -1766,14 +2169,29 @@ export function BookshelfView({
                                         approxSpineHeightPx
                                       );
 
+                                      const reorderSectionId: 'want' | 'best-completed' | null = isBestSection
+                                        ? 'best-completed'
+                                        : isWantSection
+                                          ? 'want'
+                                          : null;
                                       const isBeingDragged =
-                                        (isWantSection && draggedBookId === book.id) ||
-                                        (isBestSection && draggedBestBookId === book.id);
+                                        activePointerDrag?.sectionId === reorderSectionId &&
+                                        activePointerDrag?.book.id === book.id;
                                       const isDragOver =
-                                        (isWantSection && dragOverBookId === book.id) ||
-                                        (isBestSection && dragOverBestBookId === book.id);
+                                        activePointerDrag?.sectionId === reorderSectionId &&
+                                        dragTargetBookId === book.id &&
+                                        activePointerDrag?.book.id !== book.id;
+                                      const isPicked =
+                                        pickedReorderBook?.sectionId === reorderSectionId &&
+                                        pickedReorderBook?.bookId === book.id;
+                                      const isJustMoved = justMovedBookId === book.id;
 
                                       const handleBookClick = () => {
+                                        if (Date.now() < suppressClickUntilRef.current) return;
+                                        if (isDraggable && reorderSectionId) {
+                                          handleReorderTap(reorderSectionId, book.id, section.books);
+                                          return;
+                                        }
                                         if (isSelectingFaceOut && book.cover_url) {
                                           handleToggleFaceOut(
                                             section.id,
@@ -1793,51 +2211,17 @@ export function BookshelfView({
                                             key={book.id}
                                             role="button"
                                             tabIndex={0}
-                                            draggable={isDraggable}
-                                            onDragStart={(e) => {
-                                              if (!isDraggable) return;
-                                              e.dataTransfer.setData('text/plain', book.id);
-                                              e.dataTransfer.effectAllowed = 'move';
-                                              if (isBestSection) setDraggedBestBookId(book.id);
-                                              else if (isWantSection) setDraggedBookId(book.id);
-                                            }}
-                                            onDragOver={(e) => {
-                                              if (!isDraggable) return;
-                                              e.preventDefault();
-                                              e.dataTransfer.dropEffect = 'move';
-                                              if (isBestSection) {
-                                                if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
-                                              } else if (isWantSection) {
-                                                if (dragOverBookId !== book.id) setDragOverBookId(book.id);
-                                              }
-                                            }}
-                                            onDragLeave={(e) => {
-                                              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                                              if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
-                                              else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
-                                            }}
-                                            onDrop={(e) => {
-                                              if (!isDraggable) return;
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              const sourceId =
-                                                e.dataTransfer.getData('text/plain') ||
-                                                (isBestSection ? draggedBestBookId : draggedBookId);
-                                              if (sourceId && sourceId !== book.id) {
-                                                if (isBestSection)
-                                                  handleBestDropReorder(sourceId, book.id, section.books);
-                                                else if (isWantSection) handleDropReorder(sourceId, book.id);
-                                              }
-                                              setDraggedBookId(null);
-                                              setDragOverBookId(null);
-                                              setDraggedBestBookId(null);
-                                              setDragOverBestBookId(null);
-                                            }}
-                                            onDragEnd={() => {
-                                              setDraggedBookId(null);
-                                              setDragOverBookId(null);
-                                              setDraggedBestBookId(null);
-                                              setDragOverBestBookId(null);
+                                            data-reorder-section={isDraggable && reorderSectionId ? reorderSectionId : undefined}
+                                            data-reorder-book-id={isDraggable ? book.id : undefined}
+                                            onPointerDown={(e) => {
+                                              if (!isDraggable || !reorderSectionId) return;
+                                              startPointerReorder(e, {
+                                                book,
+                                                sectionId: reorderSectionId,
+                                                sectionBooks: section.books,
+                                                rank: bestRank ?? priorityRank,
+                                                spineColor: spine.baseColor,
+                                              });
                                             }}
                                             onClick={handleBookClick}
                                             onKeyDown={(e) => {
@@ -1846,16 +2230,20 @@ export function BookshelfView({
                                                 handleBookClick();
                                               }
                                             }}
-                                            style={{
-                                              touchAction: isDraggable ? 'none' : 'manipulation',
-                                            }}
-                                            className={`group relative flex flex-col items-center shrink-0 mx-0.5 sm:mx-1.5 cursor-pointer transition-transform duration-300 sm:hover:-translate-y-2.5 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
+                                            className={`group relative flex flex-col items-center shrink-0 mx-0.5 sm:mx-1.5 transition-[transform,opacity] duration-200 sm:hover:-translate-y-2.5 active:scale-95 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                                              isDraggable ? 'cursor-grab active:cursor-grabbing touch-pan-y' : 'cursor-pointer'
+                                            } ${isBeingDragged ? 'opacity-25 scale-95 ring-2 ring-amber-400/70 rounded-t-[4px]' : ''
+                                              } ${isPicked
+                                                ? isBestSection
+                                                  ? 'ring-2 ring-amber-400 -translate-y-3 scale-[1.03] rounded-t-[4px]'
+                                                  : 'ring-2 ring-sky-400 -translate-y-3 scale-[1.03] rounded-t-[4px]'
+                                                : ''
                                               } ${isDragOver
                                                 ? isBestSection
-                                                  ? 'ring-2 ring-amber-400 -translate-y-2'
-                                                  : 'ring-2 ring-sky-400 -translate-y-2'
+                                                  ? 'ring-2 ring-amber-400 -translate-y-2.5 scale-[1.03] rounded-t-[4px]'
+                                                  : 'ring-2 ring-sky-400 -translate-y-2.5 scale-[1.03] rounded-t-[4px]'
                                                 : ''
-                                              }`}
+                                              } ${isJustMoved ? 'book-just-moved' : ''}`}
                                             title={
                                               isSelectingFaceOut
                                                 ? `Tocca per girare "${book.title}" di dorso`
@@ -1864,95 +2252,95 @@ export function BookshelfView({
                                           >
                                             {/* Copertina frontale verticale */}
                                             <div className="relative">
-                                            <div
-                                              className={`relative w-[112px] xs:w-[120px] sm:w-[136px] h-[176px] xs:h-[188px] sm:h-[210px] rounded-t-[3px] overflow-hidden shadow-[-4px_4px_12px_rgba(0,0,0,0.65),4px_4px_12px_rgba(0,0,0,0.55)] border ${isSelectingFaceOut
-                                                ? 'border-amber-400 ring-2 ring-amber-400/70'
-                                                : 'border-white/15'
-                                                }`}
-                                            >
-                                              {/* Riflesso rilegatura sui bordi */}
-                                              <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/35 via-white/20 to-transparent z-20 pointer-events-none" />
-                                              <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-l from-black/45 to-transparent z-20 pointer-events-none" />
-                                              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none z-10" />
+                                              <div
+                                                className={`relative w-[112px] xs:w-[120px] sm:w-[136px] h-[176px] xs:h-[188px] sm:h-[210px] rounded-t-[3px] overflow-hidden shadow-[-4px_4px_12px_rgba(0,0,0,0.65),4px_4px_12px_rgba(0,0,0,0.55)] border ${isSelectingFaceOut
+                                                  ? 'border-amber-400 ring-2 ring-amber-400/70'
+                                                  : 'border-white/15'
+                                                  }`}
+                                              >
+                                                {/* Riflesso rilegatura sui bordi */}
+                                                <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/35 via-white/20 to-transparent z-20 pointer-events-none" />
+                                                <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-l from-black/45 to-transparent z-20 pointer-events-none" />
+                                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.06] to-transparent pointer-events-none z-10" />
 
-                                              <CoverImage
-                                                src={book.cover_url}
-                                                alt={book.title}
-                                                className="w-full h-full object-cover"
-                                                loading="lazy"
-                                              />
+                                                <CoverImage
+                                                  src={book.cover_url}
+                                                  alt={book.title}
+                                                  className="w-full h-full object-cover"
+                                                  loading="lazy"
+                                                />
 
-                                              {/* Barra avanzamento pagine in basso se in lettura */}
-                                              {!isDraggable && book.status === 'reading' && book.pages && book.pages > 0 && (
-                                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
+                                                {/* Barra avanzamento pagine in basso se in lettura */}
+                                                {!isDraggable && book.status === 'reading' && book.pages && book.pages > 0 && (
+                                                  <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 backdrop-blur-xs z-30">
+                                                    <div
+                                                      className="h-full bg-amber-400"
+                                                      style={{
+                                                        width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
+                                                      }}
+                                                    />
+                                                  </div>
+                                                )}
+
+                                                {/* Badge classifica (1°, 2°, 3°, 4°...) o priorità (1°, 2°, 3°) coerente con i dorsi */}
+                                                {isBestSection && bestRank !== null && (
+                                                  <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
+                                                    <RankSeal rank={bestRank} kind="best" size="md" />
+                                                  </div>
+                                                )}
+                                                {isWantSection && priorityRank !== null && (
+                                                  <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
+                                                    <RankSeal rank={priorityRank} kind="want" size="md" />
+                                                  </div>
+                                                )}
+
+                                                {/* Frecce rapide ‹ / › per spostare il libro anche da smartphone durante "Modifica classifica / ordine" */}
+                                                {isDraggable && (
                                                   <div
-                                                    className="h-full bg-amber-400"
-                                                    style={{
-                                                      width: `${Math.min(100, ((book.read_pages || 0) / book.pages) * 100)}%`,
-                                                    }}
-                                                  />
-                                                </div>
-                                              )}
-
-                                              {/* Badge classifica (1°, 2°, 3°, 4°...) o priorità (1°, 2°, 3°) coerente con i dorsi */}
-                                              {isBestSection && bestRank !== null && (
-                                                <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
-                                                  <RankSeal rank={bestRank} kind="best" size="md" />
-                                                </div>
-                                              )}
-                                              {isWantSection && priorityRank !== null && (
-                                                <div className="absolute top-1.5 left-2.5 z-30 pointer-events-none">
-                                                  <RankSeal rank={priorityRank} kind="want" size="md" />
-                                                </div>
-                                              )}
-
-                                              {/* Frecce rapide ‹ / › per spostare il libro anche da smartphone durante "Modifica classifica / ordine" */}
-                                              {isDraggable && (
-                                                <div
-                                                  className="absolute inset-x-1 bottom-1.5 z-30 flex items-center justify-between gap-1"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  <button
-                                                    type="button"
-                                                    disabled={globalIdx === 0}
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      if (isBestSection)
-                                                        handleShiftBest(book.id, 'left', section.books);
-                                                      else if (isWantSection) handleShift(book.id, 'left');
-                                                    }}
-                                                    className="w-6 h-6 rounded-full bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-xs font-black disabled:opacity-30 active:scale-90 cursor-pointer shadow-md"
-                                                    title="Sposta prima"
+                                                    className="absolute inset-x-1 bottom-1.5 z-30 flex items-center justify-between gap-1"
+                                                    onClick={(e) => e.stopPropagation()}
                                                   >
-                                                    ‹
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    disabled={globalIdx === section.books.length - 1}
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      if (isBestSection)
-                                                        handleShiftBest(book.id, 'right', section.books);
-                                                      else if (isWantSection) handleShift(book.id, 'right');
-                                                    }}
-                                                    className="w-6 h-6 rounded-full bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-xs font-black disabled:opacity-30 active:scale-90 cursor-pointer shadow-md"
-                                                    title="Sposta dopo"
-                                                  >
-                                                    ›
-                                                  </button>
-                                                </div>
-                                              )}
+                                                    <button
+                                                      type="button"
+                                                      disabled={globalIdx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isBestSection)
+                                                          handleShiftBest(book.id, 'left', section.books);
+                                                        else if (isWantSection) handleShift(book.id, 'left');
+                                                      }}
+                                                      className="w-6 h-6 rounded-full bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-xs font-black disabled:opacity-30 active:scale-90 cursor-pointer shadow-md"
+                                                      title="Sposta prima"
+                                                    >
+                                                      ‹
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={globalIdx === section.books.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isBestSection)
+                                                          handleShiftBest(book.id, 'right', section.books);
+                                                        else if (isWantSection) handleShift(book.id, 'right');
+                                                      }}
+                                                      className="w-6 h-6 rounded-full bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-xs font-black disabled:opacity-30 active:scale-90 cursor-pointer shadow-md"
+                                                      title="Sposta dopo"
+                                                    >
+                                                      ›
+                                                    </button>
+                                                  </div>
+                                                )}
 
-                                              {/* Indicatore interattivo quando si scelgono le copertine da esporre */}
-                                              {isSelectingFaceOut && (
-                                                <div className="absolute inset-x-1 bottom-1.5 z-30 pointer-events-none flex justify-center">
-                                                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-400 text-stone-950 shadow-md flex items-center gap-1">
-                                                    <Eye size={10} />
-                                                    In mostra
-                                                  </span>
-                                                </div>
-                                              )}
-                                            </div>
+                                                {/* Indicatore interattivo quando si scelgono le copertine da esporre */}
+                                                {isSelectingFaceOut && (
+                                                  <div className="absolute inset-x-1 bottom-1.5 z-30 pointer-events-none flex justify-center">
+                                                    <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-400 text-stone-950 shadow-md flex items-center gap-1">
+                                                      <Eye size={10} />
+                                                      In mostra
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
                                             </div>
 
                                             {/* Basetta / supporto in legno su cui poggia la copertina (come nello screenshot) */}
@@ -1965,244 +2353,216 @@ export function BookshelfView({
                                       return (
                                         <div
                                           key={book.id}
-                                          className="group relative shrink-0 transition-transform duration-300 sm:hover:-translate-y-3"
+                                          className={`group relative shrink-0 transition-transform duration-200 sm:hover:-translate-y-3 ${isJustMoved ? 'book-just-moved' : ''}`}
                                         >
-                                        <div
-                                          role="button"
-                                          tabIndex={0}
-                                          draggable={isDraggable}
-                                          onDragStart={(e) => {
-                                            if (!isDraggable) return;
-                                            e.dataTransfer.setData('text/plain', book.id);
-                                            e.dataTransfer.effectAllowed = 'move';
-                                            if (isBestSection) setDraggedBestBookId(book.id);
-                                            else if (isWantSection) setDraggedBookId(book.id);
-                                          }}
-                                          onDragOver={(e) => {
-                                            if (!isDraggable) return;
-                                            e.preventDefault();
-                                            e.dataTransfer.dropEffect = 'move';
-                                            if (isBestSection) {
-                                              if (dragOverBestBookId !== book.id) setDragOverBestBookId(book.id);
-                                            } else if (isWantSection) {
-                                              if (dragOverBookId !== book.id) setDragOverBookId(book.id);
-                                            }
-                                          }}
-                                          onDragLeave={(e) => {
-                                            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                                            if (isBestSection && dragOverBestBookId === book.id) setDragOverBestBookId(null);
-                                            else if (isWantSection && dragOverBookId === book.id) setDragOverBookId(null);
-                                          }}
-                                          onDrop={(e) => {
-                                            if (!isDraggable) return;
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const sourceId =
-                                              e.dataTransfer.getData('text/plain') ||
-                                              (isBestSection ? draggedBestBookId : draggedBookId);
-                                            if (sourceId && sourceId !== book.id) {
-                                              if (isBestSection)
-                                                handleBestDropReorder(sourceId, book.id, section.books);
-                                              else if (isWantSection) handleDropReorder(sourceId, book.id);
-                                            }
-                                            setDraggedBookId(null);
-                                            setDragOverBookId(null);
-                                            setDraggedBestBookId(null);
-                                            setDragOverBestBookId(null);
-                                          }}
-                                          onDragEnd={() => {
-                                            setDraggedBookId(null);
-                                            setDragOverBookId(null);
-                                            setDraggedBestBookId(null);
-                                            setDragOverBestBookId(null);
-                                          }}
-                                          onClick={handleBookClick}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                              e.preventDefault();
-                                              handleBookClick();
-                                            }
-                                          }}
-                                          style={{
-                                            backgroundColor: spine.baseColor,
-                                            touchAction: isDraggable ? 'none' : 'manipulation',
-                                          }}
-                                          className={`relative ${dim.width} ${dim.height} rounded-t-[4px] rounded-b-[1px] shrink-0 flex flex-col justify-between cursor-pointer transition-transform duration-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 book-spine-cylinder select-none overflow-hidden ${isSelectingFaceOut && book.cover_url
-                                            ? 'ring-1 ring-amber-300/60 hover:ring-2 hover:ring-amber-400'
-                                            : ''
-                                            } ${isBeingDragged ? 'opacity-30 scale-95 ring-2 ring-amber-400' : ''
-                                            } ${isDragOver
-                                              ? isBestSection
-                                                ? 'ring-2 ring-amber-400 -translate-y-2'
-                                                : 'ring-2 ring-sky-400 -translate-y-2'
+                                          <div
+                                            role="button"
+                                            tabIndex={0}
+                                            data-reorder-section={isDraggable && reorderSectionId ? reorderSectionId : undefined}
+                                            data-reorder-book-id={isDraggable ? book.id : undefined}
+                                            onPointerDown={(e) => {
+                                              if (!isDraggable || !reorderSectionId) return;
+                                              startPointerReorder(e, {
+                                                book,
+                                                sectionId: reorderSectionId,
+                                                sectionBooks: section.books,
+                                                rank: bestRank ?? priorityRank,
+                                                spineColor: spine.baseColor,
+                                              });
+                                            }}
+                                            onClick={handleBookClick}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleBookClick();
+                                              }
+                                            }}
+                                            style={{
+                                              backgroundColor: spine.baseColor,
+                                            }}
+                                            className={`relative ${dim.width} ${dim.height} rounded-t-[4px] rounded-b-[1px] shrink-0 flex flex-col justify-between transition-[transform,opacity] duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 book-spine-cylinder select-none overflow-hidden ${
+                                              isDraggable ? 'cursor-grab active:cursor-grabbing touch-pan-y' : 'cursor-pointer'
+                                            } ${isSelectingFaceOut && book.cover_url
+                                              ? 'ring-1 ring-amber-300/60 hover:ring-2 hover:ring-amber-400'
                                               : ''
-                                            }`}
-                                          title={
-                                            isSelectingFaceOut
-                                              ? book.cover_url
-                                                ? `Tocca per esporre la copertina di "${book.title}"`
-                                                : `"${book.title}" (nessuna immagine di copertina disponibile)`
-                                              : `${isBestSection
-                                                ? `[👑 ${bestRank}° Top Libro] `
-                                                : isWantSection
-                                                  ? `[Priorità ${priorityRank}°] `
-                                                  : book.status === 'reading'
-                                                    ? `[📖 ${formatReadingDuration(book.started_at || book.created_at, { short: true }) || 'In lettura'}] `
-                                                    : ''
-                                              }${book.title} — ${book.author}`
-                                          }
-                                        >
-                                          {/* Copertina reale sfocata sul dorso 3D (miniatura piccola e caricamento lazy per restare leggeri) */}
-                                          {book.cover_url ? (
-                                            <div
-                                              aria-hidden="true"
-                                              className="absolute inset-0 overflow-hidden pointer-events-none z-0"
-                                            >
-                                              <CoverImage
-                                                src={book.cover_url}
-                                                alt=""
-                                                thumbWidth={90}
-                                                loading="lazy"
-                                                decoding="async"
-                                                className="w-full h-full object-cover object-center scale-[1.28] blur-[3.5px] sm:blur-[2px] saturate-[1.18] brightness-[0.82] contrast-[1.05]"
-                                              />
-                                              {/* Velatura verticale morbida per garantire contrasto al titolo e profondità cilindrica */}
-                                              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/35 to-black/60" />
-                                            </div>
-                                          ) : (
-                                            spine.twoToneCap && (
-                                              <>
-                                                <div
-                                                  className="absolute top-0 inset-x-0 h-[18px] sm:h-[21px] pointer-events-none z-0 opacity-90"
-                                                  style={{ backgroundColor: spine.twoToneCap }}
+                                              } ${isBeingDragged ? 'opacity-25 scale-95 ring-2 ring-amber-400/70' : ''
+                                              } ${isPicked
+                                                ? isBestSection
+                                                  ? 'ring-2 ring-amber-400 -translate-y-3 scale-[1.03]'
+                                                  : 'ring-2 ring-sky-400 -translate-y-3 scale-[1.03]'
+                                                : ''
+                                              } ${isDragOver
+                                                ? isBestSection
+                                                  ? 'ring-2 ring-amber-400 -translate-y-2.5 scale-[1.03]'
+                                                  : 'ring-2 ring-sky-400 -translate-y-2.5 scale-[1.03]'
+                                                : ''
+                                              }`}
+                                            title={
+                                              isSelectingFaceOut
+                                                ? book.cover_url
+                                                  ? `Tocca per esporre la copertina di "${book.title}"`
+                                                  : `"${book.title}" (nessuna immagine di copertina disponibile)`
+                                                : `${isBestSection
+                                                  ? `[👑 ${bestRank}° Top Libro] `
+                                                  : isWantSection
+                                                    ? `[Priorità ${priorityRank}°] `
+                                                    : book.status === 'reading'
+                                                      ? `[📖 ${formatReadingDuration(book.started_at || book.created_at, { short: true }) || 'In lettura'}] `
+                                                      : ''
+                                                }${book.title} — ${book.author}`
+                                            }
+                                          >
+                                            {/* Copertina reale sfocata sul dorso 3D (miniatura piccola e caricamento lazy per restare leggeri) */}
+                                            {book.cover_url ? (
+                                              <div
+                                                aria-hidden="true"
+                                                className="absolute inset-0 overflow-hidden pointer-events-none z-0"
+                                              >
+                                                <CoverImage
+                                                  src={book.cover_url}
+                                                  alt=""
+                                                  thumbWidth={120}
+                                                  loading="lazy"
+                                                  decoding="async"
+                                                  className="w-full h-full object-cover object-center scale-[1.12] blur-[2.75px] sm:blur-[1.5px] saturate-[1.15] brightness-[0.82] contrast-[1.06]"
                                                 />
-                                                <div
-                                                  className="absolute bottom-0 inset-x-0 h-[18px] sm:h-[21px] pointer-events-none z-0 opacity-90"
-                                                  style={{ backgroundColor: spine.twoToneCap }}
-                                                />
-                                              </>
-                                            )
-                                          )}
+                                                {/* Velatura verticale morbida per garantire contrasto al titolo e profondità cilindrica */}
+                                                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/38 to-black/62" />
+                                              </div>
+                                            ) : (
+                                              spine.twoToneCap && (
+                                                <>
+                                                  <div
+                                                    className="absolute top-0 inset-x-0 h-[18px] sm:h-[21px] pointer-events-none z-0 opacity-90"
+                                                    style={{ backgroundColor: spine.twoToneCap }}
+                                                  />
+                                                  <div
+                                                    className="absolute bottom-0 inset-x-0 h-[18px] sm:h-[21px] pointer-events-none z-0 opacity-90"
+                                                    style={{ backgroundColor: spine.twoToneCap }}
+                                                  />
+                                                </>
+                                              )
+                                            )}
 
-                                          {/* TESTA DEL DORSO: Doppia nervatura orizzontale incisa */}
-                                          <div className="w-full pt-[9px] sm:pt-[11px] space-y-[3.5px] z-10 shrink-0">
-                                            <div className="book-spine-ridge" />
-                                            <div className="book-spine-ridge" />
-                                          </div>
-
-                                          {/* Badge classifica (1°, 2°, 3°, 4°...) / priorità di lettura (1°, 2°, 3°) */}
-                                          {showSpineRankBadge ? (
-                                            <div className="z-20 mx-auto mt-1 shrink-0 flex justify-center">
-                                              {isBestSection && bestRank !== null ? (
-                                                <RankSeal rank={bestRank} kind="best" size="sm" />
-                                              ) : isWantSection && priorityRank !== null ? (
-                                                <RankSeal rank={priorityRank} kind="want" size="sm" />
-                                              ) : null}
+                                            {/* TESTA DEL DORSO: Doppia nervatura orizzontale incisa */}
+                                            <div className="w-full pt-[9px] sm:pt-[11px] space-y-[3.5px] z-10 shrink-0">
+                                              <div className="book-spine-ridge" />
+                                              <div className="book-spine-ridge" />
                                             </div>
-                                          ) : null}
 
-                                          {/* Frecce rapide ‹ / › sul dorso quando si modifica la classifica o l'ordine */}
-                                          {isDraggable && (
-                                            <div
-                                              className="z-30 mx-auto mt-0.5 flex items-center justify-center gap-0.5 shrink-0"
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              <button
-                                                type="button"
-                                                disabled={globalIdx === 0}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  if (isBestSection)
-                                                    handleShiftBest(book.id, 'left', section.books);
-                                                  else if (isWantSection) handleShift(book.id, 'left');
-                                                }}
-                                                className="w-4 h-4 rounded bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-[10px] font-black leading-none disabled:opacity-25 active:scale-90 cursor-pointer"
-                                                title="Sposta prima"
+                                            {/* Badge classifica (1°, 2°, 3°, 4°...) / priorità di lettura (1°, 2°, 3°) */}
+                                            {showSpineRankBadge ? (
+                                              <div className="z-20 mx-auto mt-1 shrink-0 flex justify-center">
+                                                {isBestSection && bestRank !== null ? (
+                                                  <RankSeal rank={bestRank} kind="best" size="sm" />
+                                                ) : isWantSection && priorityRank !== null ? (
+                                                  <RankSeal rank={priorityRank} kind="want" size="sm" />
+                                                ) : null}
+                                              </div>
+                                            ) : null}
+
+                                            {/* Frecce rapide ‹ / › sul dorso quando si modifica la classifica o l'ordine */}
+                                            {isDraggable && (
+                                              <div
+                                                className="z-30 mx-auto mt-0.5 flex items-center justify-center gap-0.5 shrink-0"
+                                                onClick={(e) => e.stopPropagation()}
                                               >
-                                                ‹
-                                              </button>
-                                              <button
-                                                type="button"
-                                                disabled={globalIdx === section.books.length - 1}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  if (isBestSection)
-                                                    handleShiftBest(book.id, 'right', section.books);
-                                                  else if (isWantSection) handleShift(book.id, 'right');
-                                                }}
-                                                className="w-4 h-4 rounded bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-[10px] font-black leading-none disabled:opacity-25 active:scale-90 cursor-pointer"
-                                                title="Sposta dopo"
-                                              >
-                                                ›
-                                              </button>
-                                            </div>
-                                          )}
-
-                                          {/* Badge selezione copertina quando la modalità vetrina è attiva */}
-                                          {isSelectingFaceOut && book.cover_url && (
-                                            <div className="z-20 mx-auto mt-0.5 shrink-0">
-                                              <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-black/75 text-amber-300 border border-amber-400/50 block leading-tight">
-                                                +Cop
-                                              </span>
-                                            </div>
-                                          )}
-
-                                          {/* CORPO CENTRALE DEL DORSO: Titolo editoriale verticale dall'alto al basso + Cognome autore in verticale in basso */}
-                                          <div className="flex-1 flex flex-col items-center justify-between py-1.5 sm:py-2 px-0.5 overflow-hidden z-10 min-h-0 gap-1.5">
-                                            {/* Zona centrale: Titolo verticale dall'alto verso il basso con tipografia editoriale adattiva */}
-                                            <div className="flex-1 w-full flex items-center justify-center overflow-hidden min-h-0">
-                                              <span
-                                                style={{
-                                                  color: book.cover_url ? '#ffffff' : spine.textColor,
-                                                  fontSize: `${spineTypo.fontPx}px`,
-                                                  textShadow: book.cover_url
-                                                    ? '0 1px 2px rgba(0,0,0,0.96), 0 0 5px rgba(0,0,0,0.78), 0 0 10px rgba(0,0,0,0.48)'
-                                                    : spine.isLight
-                                                      ? '0 1px 1px rgba(255,255,255,0.5)'
-                                                      : '0 1px 2px rgba(0,0,0,0.75)',
-                                                }}
-                                                className={`writing-vertical-topdown ${spineTypo.fontClass} leading-none select-none whitespace-nowrap max-h-full overflow-hidden`}
-                                              >
-                                                {spineTypo.title}
-                                              </span>
-                                            </div>
-
-                                            {/* Parte inferiore: sottile divisorio + Cognome autore sempre in verticale (corsivo) */}
-                                            {authorSurname && (
-                                              <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
-                                                <span
-                                                  aria-hidden="true"
-                                                  className="w-[12px] h-[1px] rounded-full opacity-60"
-                                                  style={{
-                                                    backgroundColor: book.cover_url ? '#f5efe6' : spine.authorColor,
+                                                <button
+                                                  type="button"
+                                                  disabled={globalIdx === 0}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isBestSection)
+                                                      handleShiftBest(book.id, 'left', section.books);
+                                                    else if (isWantSection) handleShift(book.id, 'left');
                                                   }}
-                                                />
-                                                <span
-                                                  style={{
-                                                    color: book.cover_url ? '#faf6ee' : spine.authorColor,
-                                                    textShadow: book.cover_url
-                                                      ? '0 1px 2px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.75)'
-                                                      : spine.isLight
-                                                        ? '0 1px 1px rgba(255,255,255,0.45)'
-                                                        : '0 1px 2px rgba(0,0,0,0.65)',
-                                                  }}
-                                                  className="writing-vertical-topdown editorial-font-serif italic font-medium text-[10px] tracking-[0.04em] leading-none select-none whitespace-nowrap max-h-[58px] sm:max-h-[62px] overflow-hidden"
+                                                  className="w-4 h-4 rounded bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-[10px] font-black leading-none disabled:opacity-25 active:scale-90 cursor-pointer"
+                                                  title="Sposta prima"
                                                 >
-                                                  {authorSurname}
+                                                  ‹
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={globalIdx === section.books.length - 1}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isBestSection)
+                                                      handleShiftBest(book.id, 'right', section.books);
+                                                    else if (isWantSection) handleShift(book.id, 'right');
+                                                  }}
+                                                  className="w-4 h-4 rounded bg-black/85 text-amber-300 border border-amber-400/50 flex items-center justify-center text-[10px] font-black leading-none disabled:opacity-25 active:scale-90 cursor-pointer"
+                                                  title="Sposta dopo"
+                                                >
+                                                  ›
+                                                </button>
+                                              </div>
+                                            )}
+
+                                            {/* Badge selezione copertina quando la modalità vetrina è attiva */}
+                                            {isSelectingFaceOut && book.cover_url && (
+                                              <div className="z-20 mx-auto mt-0.5 shrink-0">
+                                                <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-black/75 text-amber-300 border border-amber-400/50 block leading-tight">
+                                                  +Cop
                                                 </span>
                                               </div>
                                             )}
-                                          </div>
 
-                                          {/* PIEDE DEL DORSO: Doppia nervatura orizzontale incisa simmetrica */}
-                                          <div className="w-full pb-[9px] sm:pb-[11px] space-y-[3.5px] z-10 shrink-0">
-                                            <div className="book-spine-ridge" />
-                                            <div className="book-spine-ridge" />
+                                            {/* CORPO CENTRALE DEL DORSO: Titolo editoriale verticale dall'alto al basso + Cognome autore in verticale in basso */}
+                                            <div className="flex-1 flex flex-col items-center justify-between py-1.5 sm:py-2 px-0.5 overflow-hidden z-10 min-h-0 gap-1.5">
+                                              {/* Zona centrale: Titolo verticale dall'alto verso il basso con tipografia editoriale adattiva */}
+                                              <div className="flex-1 w-full flex items-center justify-center overflow-hidden min-h-0">
+                                                <span
+                                                  style={{
+                                                    color: book.cover_url ? '#ffffff' : spine.textColor,
+                                                    fontSize: `${spineTypo.fontPx}px`,
+                                                    textShadow: book.cover_url
+                                                      ? '0 1px 2px rgba(0,0,0,0.96), 0 0 5px rgba(0,0,0,0.78), 0 0 10px rgba(0,0,0,0.48)'
+                                                      : spine.isLight
+                                                        ? '0 1px 1px rgba(255,255,255,0.5)'
+                                                        : '0 1px 2px rgba(0,0,0,0.75)',
+                                                  }}
+                                                  className={`writing-vertical-topdown ${spineTypo.fontClass} leading-none select-none whitespace-nowrap max-h-full overflow-hidden`}
+                                                >
+                                                  {spineTypo.title}
+                                                </span>
+                                              </div>
+
+                                              {/* Parte inferiore: sottile divisorio + Cognome autore sempre in verticale (corsivo) */}
+                                              {authorSurname && (
+                                                <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                                                  <span
+                                                    aria-hidden="true"
+                                                    className="w-[12px] h-[1px] rounded-full opacity-60"
+                                                    style={{
+                                                      backgroundColor: book.cover_url ? '#f5efe6' : spine.authorColor,
+                                                    }}
+                                                  />
+                                                  <span
+                                                    style={{
+                                                      color: book.cover_url ? '#faf6ee' : spine.authorColor,
+                                                      textShadow: book.cover_url
+                                                        ? '0 1px 2px rgba(0,0,0,0.95), 0 0 5px rgba(0,0,0,0.75)'
+                                                        : spine.isLight
+                                                          ? '0 1px 1px rgba(255,255,255,0.45)'
+                                                          : '0 1px 2px rgba(0,0,0,0.65)',
+                                                    }}
+                                                    className="writing-vertical-topdown editorial-font-serif italic font-medium text-[10px] tracking-[0.04em] leading-none select-none whitespace-nowrap max-h-[58px] sm:max-h-[62px] overflow-hidden"
+                                                  >
+                                                    {authorSurname}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* PIEDE DEL DORSO: Doppia nervatura orizzontale incisa simmetrica */}
+                                            <div className="w-full pb-[9px] sm:pb-[11px] space-y-[3.5px] z-10 shrink-0">
+                                              <div className="book-spine-ridge" />
+                                              <div className="book-spine-ridge" />
+                                            </div>
                                           </div>
-                                        </div>
-                                        {book.status === 'reading' && (
-                                          <BookmarkRibbon variant="loop" className="right-[7%]" width={10} up={5} down="40%" />
-                                        )}
+                                          {book.status === 'reading' && (
+                                            <BookmarkRibbon variant="loop" className="right-[7%]" width={10} up={5} down="40%" />
+                                          )}
                                         </div>
                                       );
                                     })}
@@ -2211,7 +2571,7 @@ export function BookshelfView({
                                   {/* Decorazione / Gattino che dorme sul lato destro della mensola */}
                                   {row.showPropOnRight && (
                                     <div
-                                      className="shrink-0 self-end ml-auto pl-0.5 xs:pl-1 sm:pl-3 pr-0.5 pb-0.5 scale-[0.88] xs:scale-95 sm:scale-100 origin-bottom-right pointer-events-none drop-shadow-[0_3px_4px_rgba(0,0,0,0.45)]"
+                                      className="shrink-0 self-end ml-auto pl-0.5 xs:pl-1 sm:pl-3 pr-0.5 pb-0.5 scale-[0.88] xs:scale-95 sm:scale-100 origin-bottom-right pointer-events-none"
                                       title="Decorazione sul ripiano"
                                     >
                                       <BookshelfDecoration
@@ -2325,6 +2685,56 @@ export function BookshelfView({
           onChange={handleUpdateCustomization}
           onClose={() => setIsCustomizing(false)}
         />
+      )}
+
+      {/* ANTEPRIMA FLUTTUANTE 60FPS DURANTE IL TRASCINAMENTO (TOUCH E MOUSE) */}
+      {activePointerDrag && (
+        <div
+          ref={dragGhostRef}
+          aria-hidden="true"
+          style={{
+            transform: `translate3d(${activePointerDrag.initialX}px, ${activePointerDrag.initialY}px, 0) translate(-50%, -62%) rotate(-2deg)`,
+          }}
+          className="fixed top-0 left-0 z-[9999] pointer-events-none will-change-transform"
+        >
+          <div
+            className={`flex items-center gap-2.5 pl-1.5 pr-3 py-1.5 rounded-xl border shadow-2xl max-w-[210px] ${
+              activePointerDrag.sectionId === 'want'
+                ? 'bg-stone-900/95 border-sky-400/80 text-stone-100'
+                : 'bg-stone-900/95 border-amber-400/80 text-stone-100'
+            }`}
+          >
+            {activePointerDrag.book.cover_url ? (
+              <div className="w-8 h-11 rounded-md overflow-hidden shrink-0 border border-white/15 bg-stone-800">
+                <CoverImage
+                  src={activePointerDrag.book.cover_url}
+                  alt=""
+                  thumbWidth={80}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div
+                className="w-6 h-11 rounded-sm shrink-0 border border-white/15"
+                style={{ backgroundColor: activePointerDrag.spineColor }}
+              />
+            )}
+            <div className="min-w-0">
+              {activePointerDrag.rank !== null && (
+                <div
+                  className={`text-[10px] font-bold uppercase tracking-wider leading-none mb-0.5 ${
+                    activePointerDrag.sectionId === 'want' ? 'text-sky-300' : 'text-amber-300'
+                  }`}
+                >
+                  #{activePointerDrag.rank} · Sposta
+                </div>
+              )}
+              <div className="font-serif text-xs font-semibold truncate leading-tight">
+                {activePointerDrag.book.title}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -656,66 +656,6 @@
     inset 0 -3px 4px rgba(45, 26, 12, 0.28);
 }
 
-/* Ombra morbida proiettata dalla fila di libri sulla parete dietro la mensola + occlusione alla base */
-.shelf-row-wall-shadow {
-  position: relative;
-  isolation: isolate;
-}
-.shelf-row-wall-shadow::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  right: -12px;
-  top: 12px;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.24) 6%,
-    rgba(0, 0, 0, 0.34) 90%,
-    rgba(0, 0, 0, 0.42) 96%,
-    transparent 100%
-  );
-  filter: blur(8px);
-  pointer-events: none;
-  z-index: -1;
-}
-.shelf-row-wall-shadow::after {
-  content: '';
-  position: absolute;
-  left: -3px;
-  right: -6px;
-  bottom: 0;
-  height: 6px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.52) 100%
-  );
-  filter: blur(2px);
-  pointer-events: none;
-  z-index: -1;
-}
-.light .shelf-row-wall-shadow::before,
-[data-theme='light'] .shelf-row-wall-shadow::before {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(68, 42, 22, 0.12) 6%,
-    rgba(68, 42, 22, 0.18) 90%,
-    rgba(68, 42, 22, 0.24) 96%,
-    transparent 100%
-  );
-}
-.light .shelf-row-wall-shadow::after,
-[data-theme='light'] .shelf-row-wall-shadow::after {
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(52, 30, 14, 0.32) 100%
-  );
-}
-
 .book-spine-cylinder::before {
   content: '';
   position: absolute;
@@ -978,5 +918,21 @@ header {
   .modal-sheet {
     animation: sheet-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+}
+
+/* Assestamento elastico e morbido del libro appena riposizionato sullo scaffale */
+@keyframes book-land-pop {
+  0% {
+    transform: translateY(-10px) scale(1.04);
+  }
+  55% {
+    transform: translateY(2px) scale(0.99);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+.book-just-moved {
+  animation: book-land-pop 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 

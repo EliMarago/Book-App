@@ -193,11 +193,14 @@ export function useBookshelfSettings() {
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pushInFlightRef = useRef<boolean>(false);
   const dirtyPendingRef = useRef<boolean>(false);
+  const queuedWhileInFlightRef = useRef<boolean>(false);
+  const retryCountRef = useRef<number>(0);
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const executePush = useCallback(async () => {
     if (pushInFlightRef.current) {
       dirtyPendingRef.current = true;
+      queuedWhileInFlightRef.current = true;
       return;
     }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -208,11 +211,12 @@ export function useBookshelfSettings() {
 
     pushInFlightRef.current = true;
     dirtyPendingRef.current = false;
+    queuedWhileInFlightRef.current = false;
     setSyncStatus('saving');
 
     const snapshot = settingsRef.current;
+    let failed = false;
     try {
-      // Salviamo anche `faceOutOverrides: null` così eventuali vecchi dati voluminosi nei metadati vengono ripuliti
       const payload = {
         shelfStyle: snapshot.shelfStyle,
         customization: snapshot.customization,
@@ -224,24 +228,36 @@ export function useBookshelfSettings() {
       });
       if (error) throw error;
 
+      retryCountRef.current = 0;
       setSyncStatus('saved');
       if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current);
       savedBadgeTimerRef.current = setTimeout(() => {
         setSyncStatus((cur) => (cur === 'saved' ? 'idle' : cur));
       }, 2400);
     } catch (err) {
+      failed = true;
       console.error('Errore salvataggio impostazioni scaffale su Supabase:', err);
       dirtyPendingRef.current = true;
       setSyncStatus('error');
     } finally {
       pushInFlightRef.current = false;
-      // Se l'utente ha fatto altre modifiche mentre il salvataggio era in volo, invia subito l'ultima versione
-      if (dirtyPendingRef.current && (typeof navigator === 'undefined' || navigator.onLine)) {
+      if (queuedWhileInFlightRef.current && (typeof navigator === 'undefined' || navigator.onLine)) {
+        // L'utente ha fatto altre modifiche mentre il salvataggio era in volo: invia l'ultima versione
+        queuedWhileInFlightRef.current = false;
+        retryCountRef.current = 0;
         if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
         pushTimerRef.current = setTimeout(() => {
           pushTimerRef.current = null;
           void executePush();
-        }, 350);
+        }, 450);
+      } else if (failed && retryCountRef.current < 1 && (typeof navigator === 'undefined' || navigator.onLine)) {
+        // Al massimo 1 solo tentativo automatico dopo 5s in caso di errore transitorio (mai loop infinito)
+        retryCountRef.current += 1;
+        if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+        pushTimerRef.current = setTimeout(() => {
+          pushTimerRef.current = null;
+          void executePush();
+        }, 5000);
       }
     }
   }, []);
@@ -249,6 +265,7 @@ export function useBookshelfSettings() {
   const schedulePush = useCallback(
     (immediate = false) => {
       dirtyPendingRef.current = true;
+      retryCountRef.current = 0;
       if (pushTimerRef.current) {
         clearTimeout(pushTimerRef.current);
         pushTimerRef.current = null;
