@@ -14,7 +14,18 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,400;1,500&family=Oswald:wght@500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,400;1,500&family=Oswald:wght@500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    media="print"
+    onload="this.media='all'"
+  />
+  <noscript>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,400;1,500&family=Oswald:wght@500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    />
+  </noscript>
   <title>Bookshelf - Tracker di lettura</title>
   <meta property="og:image" content="https://bolt.new/static/og_default.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -33,22 +44,134 @@
           document.documentElement.setAttribute('data-theme', 'light');
           if (metaTheme) metaTheme.setAttribute('content', '#fcfbfa');
           if (metaStatus) metaStatus.setAttribute('content', 'default');
-          if (document.body) document.body.style.backgroundColor = '#fcfbfa';
         } else {
           document.documentElement.classList.add('dark');
           document.documentElement.classList.remove('light');
           document.documentElement.setAttribute('data-theme', 'dark');
           if (metaTheme) metaTheme.setAttribute('content', '#1c1917');
-          if (metaStatus) metaStatus.setAttribute('content', 'default');
-          if (document.body) document.body.style.backgroundColor = '#1c1917';
+          if (metaStatus) metaStatus.setAttribute('content', 'black-translucent');
         }
       } catch (e) { }
     })();
   </script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #1c1917;
+      color: #f5f5f4;
+    }
+    html.light, html.light body {
+      background-color: #fcfbfa;
+      color: #1c1917;
+    }
+    .app-boot-splash {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 24px;
+      box-sizing: border-box;
+      background-color: #1c1917;
+      background-image:
+        radial-gradient(620px 380px at 50% 34%, rgba(245, 158, 11, 0.14), transparent 70%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+    html.light .app-boot-splash {
+      background-color: #fcfbfa;
+      background-image:
+        radial-gradient(620px 380px at 50% 34%, rgba(245, 158, 11, 0.18), transparent 70%);
+    }
+    .app-boot-emblem {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: linear-gradient(145deg, #2b2217 0%, #16110c 100%);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      box-shadow:
+        0 14px 32px -10px rgba(0, 0, 0, 0.65),
+        0 0 24px -6px rgba(245, 158, 11, 0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: boot-emblem-breathe 2.2s ease-in-out infinite;
+    }
+    html.light .app-boot-emblem {
+      background: linear-gradient(145deg, #fffbeb 0%, #fef3c7 100%);
+      border-color: rgba(217, 119, 6, 0.35);
+      box-shadow:
+        0 12px 26px -10px rgba(146, 64, 14, 0.25),
+        0 0 20px -6px rgba(245, 158, 11, 0.22);
+    }
+    .app-boot-title {
+      margin: 0;
+      font-family: Georgia, 'Lora', serif;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #f5f5f4;
+    }
+    html.light .app-boot-title {
+      color: #1c1917;
+    }
+    .app-boot-sub {
+      margin: -10px 0 0;
+      font-size: 13px;
+      color: #a8a29e;
+    }
+    html.light .app-boot-sub {
+      color: #78716c;
+    }
+    .app-boot-bar {
+      width: 148px;
+      height: 3.5px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      position: relative;
+      margin-top: 4px;
+    }
+    html.light .app-boot-bar {
+      background: rgba(120, 113, 108, 0.16);
+    }
+    .app-boot-bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: 46%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, transparent, #f59e0b, #fbbf24, transparent);
+      animation: boot-bar-slide 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes boot-bar-slide {
+      0% { transform: translateX(-110%); }
+      100% { transform: translateX(240%); }
+    }
+    @keyframes boot-emblem-breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-2px) scale(1.02); }
+    }
+  </style>
 </head>
 
-<body style="background-color: #1c1917;">
-  <div id="root"></div>
+<body>
+  <div id="root">
+    <!-- Schermata di caricamento immediata (0ms, prima del caricamento JS) -->
+    <div class="app-boot-splash" role="status" aria-live="polite" aria-label="Caricamento Bookshelf">
+      <div class="app-boot-emblem" aria-hidden="true">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 7v14" />
+          <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+        </svg>
+      </div>
+      <p class="app-boot-title">Bookshelf</p>
+      <p class="app-boot-sub">Apro la tua libreria…</p>
+      <div class="app-boot-bar" aria-hidden="true"></div>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
