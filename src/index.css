@@ -581,34 +581,50 @@
   box-shadow: inset 0 0 40px rgba(150, 130, 110, 0.08), 0 15px 30px -8px rgba(90, 70, 50, 0.12);
 }
 
-/* Effetto libro fisico 3D (vista Copertine) con blocco pagine e cerniera rilegatura */
+/* Effetto libro fisico 3D realistico (vista Copertine) appoggiato direttamente sulla mensola in legno */
 .book-3d-cover {
   position: relative;
   box-shadow:
-    -3px 6px 12px rgba(0, 0, 0, 0.65),
-    4px 8px 18px rgba(0, 0, 0, 0.55),
-    0 2px 4px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 1px 0 0 rgba(255, 255, 255, 0.16),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.24),
+    -3px 4px 10px rgba(0, 0, 0, 0.55),
+    7px 5px 14px -2px rgba(0, 0, 0, 0.58),
+    0 5px 5px -2px rgba(0, 0, 0, 0.78);
 }
 
 .light .book-3d-cover,
 [data-theme='light'] .book-3d-cover {
   box-shadow:
-    -2px 5px 10px rgba(60, 35, 15, 0.28),
-    4px 7px 14px rgba(60, 35, 15, 0.22),
-    0 2px 4px rgba(60, 35, 15, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    inset 1px 0 0 rgba(255, 255, 255, 0.24),
+    inset 0 -3px 5px rgba(45, 25, 10, 0.16),
+    -2px 4px 9px rgba(52, 30, 14, 0.24),
+    6px 5px 12px -2px rgba(52, 30, 14, 0.28),
+    0 4px 5px -2px rgba(42, 24, 10, 0.52);
 }
 
-/* Blocco fogli carta sul lato destro del libro */
+/* Blocco fogli carta avorio sporgente sul lato destro del volume cartonato */
 .book-pages-right {
   background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.22) 0%,
+      transparent 10%,
+      transparent 88%,
+      rgba(0, 0, 0, 0.34) 100%
+    ),
     repeating-linear-gradient(
       90deg,
-      #f3ead8 0px,
-      #dfd3be 1px,
-      #f7f0e2 2px,
-      #cfc1a9 3px
+      #efe5d2 0px,
+      #d8cab2 1px,
+      #f8f1e4 2px,
+      #cbbba1 3px
     );
-  box-shadow: inset 1px 0 2px rgba(0, 0, 0, 0.28), inset 0 -4px 6px rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 1.5px 0 2px rgba(0, 0, 0, 0.32),
+    inset -1px 0 1px rgba(0, 0, 0, 0.18),
+    2px 3px 6px rgba(0, 0, 0, 0.36);
 }
 
 

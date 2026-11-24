@@ -233,6 +233,75 @@ export async function safeRefreshSession(forceRefresh = false): Promise<{
   return inFlightRefresh;
 }
 
+/**
+ * Legge in modo sincrono (0ms) la sessione salvata localmente (sia dal backup sia dalle chiavi sb-*-auth-token)
+ * per aprire immediatamente la Dashboard con i libri in cache senza attendere la rete.
+ */
+export function getInitialStoredSession(): Session | null {
+  try {
+    const parseCandidate = (raw: string | null): Session | null => {
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const candidate = parsed?.currentSession ?? parsed;
+      if (candidate && candidate.access_token && candidate.refresh_token && candidate.user) {
+        return candidate as Session;
+      }
+      return null;
+    };
+
+    if (isRememberMeEnabled()) {
+      const fromBackup = parseCandidate(localStorage.getItem(SESSION_BACKUP_KEY));
+      if (fromBackup) return fromBackup;
+    }
+
+    const storages = isRememberMeEnabled() ? [localStorage, sessionStorage] : [sessionStorage, localStorage];
+    for (const st of storages) {
+      for (let i = 0; i < st.length; i++) {
+        const k = st.key(i);
+        if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+          const found = parseCandidate(st.getItem(k));
+          if (found) return found;
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+let inFlightGetUser: Promise< Awaited<ReturnType<typeof supabase.auth.getUser>> > | null = null;
+let cachedGetUserResult: {
+  at: number;
+  res: Awaited<ReturnType<typeof supabase.auth.getUser>>;
+} | null = null;
+
+/**
+ * Deduplica chiamate concorrenti a `supabase.auth.getUser()` (es. impostazioni scaffale,
+ * priorità libri e obiettivi di lettura all'avvio), evitando 3 richieste HTTP identiche simultanee.
+ */
+export async function getFreshUserDeduped(force = false) {
+  const maxAgeMs = force ? 2000 : 10000;
+  if (cachedGetUserResult && Date.now() - cachedGetUserResult.at < maxAgeMs) {
+    return cachedGetUserResult.res;
+  }
+  if (inFlightGetUser) {
+    return inFlightGetUser;
+  }
+  inFlightGetUser = supabase.auth
+    .getUser()
+    .then((res) => {
+      if (!res.error && res.data.user) {
+        cachedGetUserResult = { at: Date.now(), res };
+      }
+      return res;
+    })
+    .finally(() => {
+      inFlightGetUser = null;
+    });
+  return inFlightGetUser;
+}
+
 export type Book = {
   id: string;
   user_id: string;

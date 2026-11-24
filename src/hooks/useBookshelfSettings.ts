@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshUserDeduped } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEFAULT_BOOKSHELF_CUSTOMIZATION,
@@ -334,7 +334,7 @@ export function useBookshelfSettings() {
       }
       lastRefreshRef.current = Date.now();
       try {
-        const { data, error } = await supabase.auth.getUser();
+        const { data, error } = await getFreshUserDeduped(force);
         if (error || !data.user) return;
         const remote = normalizeRemoteSettings(data.user.user_metadata?.bookshelf_settings);
         applyRemoteIfNewer(remote);

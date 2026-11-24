@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import {
   BookOpen,
   Plus,
@@ -50,16 +50,23 @@ import { checkForAppUpdate } from '@/lib/pwaUpdater';
 import { BookCard } from './BookCard';
 import { EmptyReadingShelf } from './EmptyReadingShelf';
 import { BookshelfView } from './BookshelfView';
-import { BookDetailModal } from './BookDetailModal';
-import { AddBookModal } from './AddBookModal';
 import { ReadBooksByYear } from './ReadBooksByYear';
 import { ReadingChallenge } from './ReadingChallenge';
-import { BackupManager } from './BackupManager';
 import {
   ProfileSettingsModal,
   READER_AVATARS,
   getStoredProfileAvatar,
 } from './ProfileSettingsModal';
+
+const BookDetailModal = lazy(() =>
+  import('./BookDetailModal').then((m) => ({ default: m.BookDetailModal }))
+);
+const AddBookModal = lazy(() =>
+  import('./AddBookModal').then((m) => ({ default: m.AddBookModal }))
+);
+const BackupManager = lazy(() =>
+  import('./BackupManager').then((m) => ({ default: m.BackupManager }))
+);
 import { useReadingGoals } from '@/hooks/useReadingGoals';
 import { useBookPriority } from '@/hooks/useBookPriority';
 import { orderWantBooks } from '@/lib/bookPriority';
@@ -135,7 +142,7 @@ export function Dashboard() {
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const pendingDeletes = useRef<Map<string, { book: Book; timer: ReturnType<typeof setTimeout> }>>(new Map());
   const [sortBy, setSortBy] = useState<SortKey>(() => getStoredSort());
-  const [loading, setLoading] = useState<boolean>(() => getCachedBooks(userId).length === 0);
+  const [loading, setLoading] = useState<boolean>(() => rawBooks.length === 0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -264,9 +271,10 @@ export function Dashboard() {
   const lastSyncTimestampRef = useRef<number>(0);
 
   const loadBooks = useCallback(
-    async (showFullLoader = false, options?: { silent?: boolean; force?: boolean }) => {
+    async (showFullLoader = false, options?: { silent?: boolean; force?: boolean; manual?: boolean }) => {
       const silent = options?.silent ?? false;
       const force = options?.force ?? false;
+      const manual = options?.manual ?? false;
 
       if (!authReady || !userId) {
         return;
@@ -289,11 +297,9 @@ export function Dashboard() {
       }
 
       try {
-        // Controlla anche se ci sono nuove versioni dell'app distribuite sul server (solo su richiesta o avvio)
-        if (showFullLoader || force) {
+        // Controlla nuove versioni dell'app solo quando richiesto manualmente (il SW verifica già in autonomia)
+        if (manual) {
           checkForAppUpdate().catch(() => {});
-        }
-        if (force) {
           window.dispatchEvent(new CustomEvent('bookapp:sync-now'));
           void refreshPriority(true);
           void refreshGoals(true);
@@ -437,19 +443,32 @@ export function Dashboard() {
     }
 
     // Se abbiamo già i libri in cache locale, mostriamo subito la libreria in 0ms
-    // e sincronizziamo silenziosamente in background senza mostrare lo skeleton
-    const cached = getCachedBooks(userId);
-    if (cached.length > 0 && rawBooksRef.current.length === 0) {
-      setBooks(cached);
-      setLoading(false);
+    // e rimandiamo di pochi istanti la sincronizzazione cloud e il canale WebSocket così
+    // il primo disegno e le miniature delle copertine sono istantanei e fluidi
+    let initialSyncTimer: ReturnType<typeof setTimeout> | null = null;
+    let channelTimer: ReturnType<typeof setTimeout> | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    let hasCached = rawBooksRef.current.length > 0;
+    if (!hasCached) {
+      const cached = getCachedBooks(userId);
+      if (cached.length > 0) {
+        hasCached = true;
+        setBooks(cached);
+        setLoading(false);
+      }
     }
-    const hasCached = cached.length > 0 || rawBooksRef.current.length > 0;
-    loadBooks(!hasCached, { silent: hasCached, force: true });
+
+    if (hasCached) {
+      initialSyncTimer = setTimeout(() => {
+        loadBooks(false, { silent: true, force: true });
+      }, 350);
+    } else {
+      loadBooks(true, { silent: false, force: true });
+    }
 
     let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
     const scheduleSilentRealtimeSync = () => {
-      // Se l'evento Realtime proviene da una modifica appena fatta su questo dispositivo,
-      // lo stato locale è già aggiornato: evitiamo di riscaricare tutta la libreria e le note.
       if (isRecentLocalMutation(5000)) {
         return;
       }
@@ -461,42 +480,69 @@ export function Dashboard() {
       }, 1500);
     };
 
-    // 1. Sincronizzazione Realtime via Supabase (silenziosa in background)
-    const channel = supabase
-      .channel('books-realtime-sync')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'books' },
-        scheduleSilentRealtimeSync
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notes' },
-        scheduleSilentRealtimeSync
-      )
-      .subscribe();
+    const connectRealtime = () => {
+      if (channel || document.visibilityState === 'hidden' || !navigator.onLine) return;
+      channel = supabase
+        .channel('books-realtime-sync')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'books' },
+          scheduleSilentRealtimeSync
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'notes' },
+          scheduleSilentRealtimeSync
+        )
+        .subscribe();
+    };
 
-    // 2. Ricarica silenziosamente in background quando si riapre l'app, ma solo se sono passati almeno 5 minuti
+    const disconnectRealtime = () => {
+      if (channelTimer) {
+        clearTimeout(channelTimer);
+        channelTimer = null;
+      }
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
+
+    // 1. Connessione Realtime attiva solo quando l'app è visibile (zero consumo in background)
+    channelTimer = setTimeout(connectRealtime, hasCached ? 1500 : 600);
+
+    // 2. Sospende il WebSocket quando l'app va in background e sincronizza silenziosamente al risveglio
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'hidden') {
+        disconnectRealtime();
+      } else if (document.visibilityState === 'visible') {
+        connectRealtime();
         loadBooks(false, { silent: true });
       }
     };
 
     const handleOnline = () => {
       if (document.visibilityState === 'visible') {
+        connectRealtime();
         loadBooks(false, { silent: true, force: true });
       }
     };
 
+    const handleOffline = () => {
+      disconnectRealtime();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     return () => {
+      if (initialSyncTimer) clearTimeout(initialSyncTimer);
       if (realtimeTimer) clearTimeout(realtimeTimer);
-      supabase.removeChannel(channel);
+      disconnectRealtime();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, [authReady, userId, loadBooks]);
 
@@ -714,7 +760,7 @@ export function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => loadBooks(false, { force: true })}
+              onClick={() => loadBooks(false, { force: true, manual: true })}
               disabled={isSyncing}
               className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-stone-200 light:text-stone-750 hover:text-white light:hover:text-stone-950 bg-stone-800 light:bg-stone-100 hover:bg-stone-750 light:hover:bg-stone-200 border border-stone-700 light:border-stone-300 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-60 shadow-xs active:scale-95"
               title={
@@ -1327,10 +1373,10 @@ export function Dashboard() {
                           <CheckCircle2 size={18} />
                         </div>
                         <div className="min-w-0">
-                          <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900 truncate">
+                          <h2 className="font-serif text-xl font-bold text-stone-100 light:text-stone-900">
                             Letti
                           </h2>
-                          <p className="text-xs text-stone-400 light:text-stone-500 truncate">
+                          <p className="text-xs text-stone-400 light:text-stone-500 leading-snug">
                             I libri che hai terminato di leggere
                           </p>
                         </div>
@@ -1340,33 +1386,29 @@ export function Dashboard() {
                       </span>
                     </div>
 
-                    {/* Banner Interattivo Elegante per accedere all'Archivio per Anno */}
+                    {/* Banner Compatto per accedere all'Archivio per Anno */}
                     <button
                       onClick={() => handleSelectTab('completed', true)}
-                      className="w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-stone-850/80 to-stone-850/60 light:from-emerald-50/90 light:via-stone-50 light:to-white border border-emerald-500/25 light:border-emerald-200/90 hover:border-emerald-500/45 light:hover:border-emerald-400 transition-all text-left shadow-xs hover:shadow-md hover:shadow-emerald-500/5 active:scale-[0.99] cursor-pointer group"
+                      className="w-full flex items-center justify-between gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-950/40 via-stone-850/80 to-stone-850/60 light:from-emerald-50/90 light:via-stone-50 light:to-white border border-emerald-500/25 light:border-emerald-200/90 hover:border-emerald-500/45 light:hover:border-emerald-400 transition-all text-left shadow-xs active:scale-[0.99] cursor-pointer group"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0 group-hover:scale-105 transition-transform">
-                          <Calendar size={18} />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/15 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 flex items-center justify-center text-emerald-400 light:text-emerald-700 shrink-0 group-hover:scale-105 transition-transform">
+                          <Calendar size={15} className="sm:w-4 sm:h-4" />
                         </div>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-serif font-bold text-sm sm:text-base text-stone-100 light:text-stone-900">
-                              Archivio Storico per Anno
-                            </span>
-                            <span className="hidden sm:inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 light:bg-emerald-100 text-emerald-300 light:text-emerald-800 border border-emerald-500/30">
-                              Cronologia
-                            </span>
+                          <div className="font-serif font-bold text-xs sm:text-sm text-stone-100 light:text-stone-900 leading-tight">
+                            Archivio per Anno
                           </div>
-                          <p className="text-xs text-stone-400 light:text-stone-500 mt-0.5 truncate">
-                            Consulta tutti i libri suddivisi per anno di lettura e statistiche
+                          <p className="text-[11px] sm:text-xs text-stone-400 light:text-stone-500 leading-tight mt-0.5">
+                            Libri per anno e statistiche
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-100/90 px-3 py-1.5 rounded-xl border border-emerald-500/20 light:border-emerald-300/60 shrink-0 group-hover:bg-emerald-500/20 transition-all">
-                        <span className="whitespace-nowrap">Apri archivio</span>
-                        <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                      <div className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-emerald-400 light:text-emerald-700 bg-emerald-500/10 light:bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-500/20 light:border-emerald-300/60 shrink-0 group-hover:bg-emerald-500/20 transition-all">
+                        <span className="whitespace-nowrap sm:hidden">Apri</span>
+                        <span className="whitespace-nowrap hidden sm:inline">Apri archivio</span>
+                        <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </button>
 
@@ -1495,48 +1537,52 @@ export function Dashboard() {
 
       {/* Scheda Libro Completa (aperta dalla vista a schede) */}
       {inspectingBook && (
-        <BookDetailModal
-          book={inspectingBook}
-          onClose={() => setInspectingBook(null)}
-          onUpdateBook={(updated) => {
-            handleUpdateBook(updated);
-            setInspectingBook(updated);
-          }}
-          onEditBook={(book) => {
-            setInspectingBook(null);
-            handleOpenEditBook(book);
-          }}
-          onDeleteBook={(id) => {
-            setInspectingBook(null);
-            handleDeleteBook(id);
-          }}
-          priorityRank={inspectingWantRank}
-          totalWantCount={wantBooks.length}
-          onShiftPriority={
-            inspectingBook.status === 'want'
-              ? (direction) => {
-                  shiftBook(wantBooks, inspectingBook.id, direction);
-                  if (sortBy !== 'priority') {
-                    setSortBy('priority');
-                    storeSort('priority');
+        <Suspense fallback={null}>
+          <BookDetailModal
+            book={inspectingBook}
+            onClose={() => setInspectingBook(null)}
+            onUpdateBook={(updated) => {
+              handleUpdateBook(updated);
+              setInspectingBook(updated);
+            }}
+            onEditBook={(book) => {
+              setInspectingBook(null);
+              handleOpenEditBook(book);
+            }}
+            onDeleteBook={(id) => {
+              setInspectingBook(null);
+              handleDeleteBook(id);
+            }}
+            priorityRank={inspectingWantRank}
+            totalWantCount={wantBooks.length}
+            onShiftPriority={
+              inspectingBook.status === 'want'
+                ? (direction) => {
+                    shiftBook(wantBooks, inspectingBook.id, direction);
+                    if (sortBy !== 'priority') {
+                      setSortBy('priority');
+                      storeSort('priority');
+                    }
                   }
-                }
-              : undefined
-          }
-        />
+                : undefined
+            }
+          />
+        </Suspense>
       )}
 
       {/* Modale Aggiungi / Modifica Libro */}
       {showAddModal && (
-        <AddBookModal
-          book={editingBook}
-          onClose={() => {
-            setShowAddModal(false);
-            setEditingBook(null);
-          }}
-          onAdd={handleAddBook}
-          onUpdate={handleUpdateBook}
-        />
+        <Suspense fallback={null}>
+          <AddBookModal
+            book={editingBook}
+            onClose={() => {
+              setShowAddModal(false);
+              setEditingBook(null);
+            }}
+            onAdd={handleAddBook}
+            onUpdate={handleUpdateBook}
+          />
+        </Suspense>
       )}
 
       {/* Conferma uscita dall'account */}
@@ -1597,7 +1643,7 @@ export function Dashboard() {
           onViewModeChange={handleViewModeChange}
           isSyncing={isSyncing}
           lastSyncedAt={lastSyncedAt}
-          onSyncNow={() => loadBooks(false, { force: true })}
+          onSyncNow={() => loadBooks(false, { force: true, manual: true })}
           onOpenBackup={() => setShowBackupModal(true)}
           onProfileUpdated={(avatar) => {
             setProfileAvatar(avatar);
@@ -1646,16 +1692,18 @@ export function Dashboard() {
               </button>
             </div>
             <div className="p-4 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] sm:pb-6 overflow-y-auto flex-1">
-              <BackupManager
-                books={books}
-                goals={goals}
-                onRestoreCompleted={() => {
-                  loadBooks(true, { force: true });
-                  refreshGoals();
-                  setShowBackupModal(false);
-                  toast({ message: 'Backup ripristinato con successo! Libreria aggiornata. 📚', type: 'success' });
-                }}
-              />
+              <Suspense fallback={null}>
+                <BackupManager
+                  books={books}
+                  goals={goals}
+                  onRestoreCompleted={() => {
+                    loadBooks(true, { force: true, manual: true });
+                    refreshGoals();
+                    setShowBackupModal(false);
+                    toast({ message: 'Backup ripristinato con successo! Libreria aggiornata. 📚', type: 'success' });
+                  }}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

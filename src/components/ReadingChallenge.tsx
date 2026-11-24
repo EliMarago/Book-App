@@ -61,7 +61,7 @@ function MetricCard({
         <span className="shrink-0">{icon}</span>
         <span className="truncate">{label}</span>
       </div>
-      <div className="mt-0.5 flex items-baseline gap-1 min-w-0">{children}</div>
+      <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1 gap-y-0 min-w-0">{children}</div>
     </div>
   );
 }
@@ -292,10 +292,10 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="font-serif text-base font-bold text-stone-100 light:text-stone-900 truncate">
+          <div className="font-serif text-base font-bold text-stone-100 light:text-stone-900 leading-snug">
             Sfida di Lettura {year}
           </div>
-          <div className="text-xs text-stone-400 light:text-stone-600 truncate mt-0.5">
+          <div className="text-xs text-stone-400 light:text-stone-600 leading-snug mt-0.5">
             {goal > 0 ? (
               completed ? (
                 <span className="text-orange-400 light:text-orange-700 font-semibold">
@@ -523,8 +523,8 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                   <span className="text-xs font-bold font-serif text-stone-100 light:text-stone-900 tabular-nums">
                     {daysLeft}
                   </span>
-                  <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium truncate">
-                    {daysLeft === 1 ? 'g.' : 'giorni'}
+                  <span className="text-[10.5px] text-stone-400 light:text-stone-500 font-medium">
+                    {daysLeft === 1 ? 'giorno' : 'gg'}
                   </span>
                 </MetricCard>
 
@@ -534,7 +534,7 @@ export function ReadingChallenge({ books, goals, onSetGoal }: ReadingChallengePr
                   <span className="text-xs font-bold font-serif text-stone-100 light:text-stone-900 tabular-nums">
                     {mediaPerMonth}
                   </span>
-                  <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium truncate">
+                  <span className="text-[10.5px] text-stone-400 light:text-stone-500 font-medium">
                     <span className="sm:hidden">/mese</span>
                     <span className="hidden sm:inline">libri/mese</span>
                   </span>

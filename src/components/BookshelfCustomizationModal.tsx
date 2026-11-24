@@ -302,10 +302,10 @@ export function BookshelfCustomizationModal({
                       {isSelected && <Check size={14} className="stroke-[3]" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
+                      <div className="text-xs font-bold text-stone-200 light:text-stone-900 leading-tight">
                         {w.label}
                       </div>
-                      <div className="text-[11px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="text-[11px] text-stone-400 light:text-stone-500 leading-tight mt-0.5">
                         {w.desc}
                       </div>
                     </div>
@@ -340,10 +340,10 @@ export function BookshelfCustomizationModal({
                       {isSelected && <Check size={14} className="stroke-[3]" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
+                      <div className="text-xs font-bold text-stone-200 light:text-stone-900 leading-tight">
                         {bg.label}
                       </div>
-                      <div className="text-[11px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="text-[11px] text-stone-400 light:text-stone-500 leading-tight mt-0.5">
                         {bg.desc}
                       </div>
                     </div>
@@ -374,10 +374,10 @@ export function BookshelfCustomizationModal({
                   >
                     <span className="text-xl leading-none">{h.icon}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-stone-200 light:text-stone-900 truncate">
+                      <div className="text-xs font-bold text-stone-200 light:text-stone-900 leading-tight">
                         {h.label}
                       </div>
-                      <div className="hidden sm:block text-[11px] text-stone-400 light:text-stone-500 truncate">
+                      <div className="hidden sm:block text-[11px] text-stone-400 light:text-stone-500 leading-tight mt-0.5">
                         {h.desc}
                       </div>
                     </div>

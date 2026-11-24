@@ -8,6 +8,7 @@ import {
   clearAuthBackup,
   clearUserLocalCaches,
   safeRefreshSession,
+  getInitialStoredSession,
   SESSION_BACKUP_KEY,
 } from '@/lib/supabase';
 
@@ -36,18 +37,7 @@ function isSessionExpired(session: Session | null, bufferSeconds = 45): boolean 
 }
 
 function getBackupSessionObject(): Session | null {
-  try {
-    if (!isRememberMeEnabled()) return null;
-    const raw = localStorage.getItem(SESSION_BACKUP_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.access_token && parsed.refresh_token && parsed.user) {
-      return parsed as Session;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  return getInitialStoredSession();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

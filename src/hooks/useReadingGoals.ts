@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshUserDeduped } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
 export type ReadingGoals = Record<string, number>;
@@ -41,7 +41,7 @@ export function useReadingGoals() {
       return;
     }
     try {
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await getFreshUserDeduped(force);
       if (error || !data.user) return;
       lastRefreshRef.current = Date.now();
       const remote = data.user.user_metadata?.reading_goals as ReadingGoals | undefined;

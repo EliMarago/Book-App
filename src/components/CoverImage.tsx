@@ -29,10 +29,11 @@ export function CoverImage({ src, thumbWidth = 300, className = '', onLoad, onEr
       {!settled && (
         <span
           aria-hidden="true"
-          className="absolute inset-0 animate-pulse bg-gradient-to-br from-stone-800 via-stone-700/70 to-stone-800 light:from-stone-200 light:via-stone-100 light:to-stone-200"
+          className="absolute inset-0 bg-gradient-to-br from-stone-800 via-stone-700/70 to-stone-800 light:from-stone-200 light:via-stone-100 light:to-stone-200"
         />
       )}
       <img
+        decoding="async"
         {...props}
         src={currentSrc}
         ref={(el) => {

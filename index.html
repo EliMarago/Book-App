@@ -97,7 +97,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: boot-emblem-breathe 2.2s ease-in-out infinite;
     }
     html.light .app-boot-emblem {
       background: linear-gradient(145deg, #fffbeb 0%, #fef3c7 100%);
@@ -149,10 +148,6 @@
     @keyframes boot-bar-slide {
       0% { transform: translateX(-110%); }
       100% { transform: translateX(240%); }
-    }
-    @keyframes boot-emblem-breathe {
-      0%, 100% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-2px) scale(1.02); }
     }
   </style>
 </head>

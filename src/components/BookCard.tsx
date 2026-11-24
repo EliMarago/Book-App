@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
 import {
   Trash2,
   Loader2,
@@ -28,8 +28,11 @@ import { StarRating } from './StarRating';
 import { CoverImage } from './CoverImage';
 import { FinishBookDialog } from './FinishBookDialog';
 import { useToast } from './Toast';
-import { BookNotesModal } from './BookNotesModal';
 import { BookmarkRibbon } from './BookmarkRibbon';
+
+const BookNotesModal = lazy(() =>
+  import('./BookNotesModal').then((m) => ({ default: m.BookNotesModal }))
+);
 
 function BookCardComponent({
   book,
@@ -610,7 +613,7 @@ function BookCardComponent({
               {(highlight || book.status === 'reading') && (
                 <div className="flex items-center gap-1.5 text-[11px] sm:text-[11px] font-bold text-amber-300 light:text-amber-700 tracking-wider uppercase mb-0.5 sm:mb-1 flex-wrap">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 light:bg-amber-500 animate-pulse inline-block shrink-0" />
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 light:bg-amber-500 inline-block shrink-0" />
                     <span>In lettura</span>
                   </div>
                   {readingDurationShort && (
@@ -720,7 +723,7 @@ function BookCardComponent({
         {/* Se è da leggere: barra inferiore dedicata compatta con tasto rapido per iniziare la lettura */}
         {book.status === 'want' && (
           <div className="mt-2.5 pt-2 border-t border-stone-800/70 light:border-stone-200/80 flex items-center justify-between gap-2">
-            <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium truncate">
+            <span className="text-[11px] text-stone-400 light:text-stone-500 font-medium leading-tight">
               {priorityRank === 1 ? 'Prossimo libro in programma' : 'Vuoi iniziare questo libro?'}
             </span>
             <button
@@ -773,17 +776,19 @@ function BookCardComponent({
 
       {/* Modale spaziosa e funzionale per gestione note del libro */}
       {showNotesModal && (
-        <BookNotesModal
-          book={book}
-          onClose={() => setShowNotesModal(false)}
-          onUpdateBook={(updated) => {
-            onUpdate(updated);
-            if (updated.notes_count !== undefined) {
-              setNotesCount(updated.notes_count);
-            }
-          }}
-          initialNotes={notes}
-        />
+        <Suspense fallback={null}>
+          <BookNotesModal
+            book={book}
+            onClose={() => setShowNotesModal(false)}
+            onUpdateBook={(updated) => {
+              onUpdate(updated);
+              if (updated.notes_count !== undefined) {
+                setNotesCount(updated.notes_count);
+              }
+            }}
+            initialNotes={notes}
+          />
+        </Suspense>
       )}
     </div>
   );

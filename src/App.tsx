@@ -1,14 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ThemeProvider } from '@/hooks/useTheme';
+import { Dashboard } from '@/components/Dashboard';
 import { PwaUpdateBanner } from '@/components/PwaUpdateBanner';
 import { ToastProvider } from '@/components/Toast';
 
 const AuthScreen = lazy(() =>
   import('@/components/AuthScreen').then((m) => ({ default: m.AuthScreen }))
-);
-const Dashboard = lazy(() =>
-  import('@/components/Dashboard').then((m) => ({ default: m.Dashboard }))
 );
 
 function AppSplash() {
@@ -58,10 +56,16 @@ function AppContent() {
   }
 
   return (
-    <Suspense fallback={<AppSplash />}>
-      {session ? <Dashboard /> : <AuthScreen />}
+    <>
+      {session ? (
+        <Dashboard />
+      ) : (
+        <Suspense fallback={<AppSplash />}>
+          <AuthScreen />
+        </Suspense>
+      )}
       <PwaUpdateBanner />
-    </Suspense>
+    </>
   );
 }
 

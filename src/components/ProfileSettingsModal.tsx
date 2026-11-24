@@ -397,7 +397,7 @@ export function ProfileSettingsModal({
                 <div className="text-xs font-semibold text-stone-200 light:text-stone-800">
                   Sincronizzazione Cloud
                 </div>
-                <div className="text-[11px] text-stone-400 light:text-stone-500 truncate mt-0.5">
+                <div className="text-[11px] text-stone-400 light:text-stone-500 leading-snug mt-0.5">
                   {lastSyncedAt
                     ? `Ultimo sync: ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
                     : 'Dati sincronizzati con Supabase'}
@@ -420,7 +420,7 @@ export function ProfileSettingsModal({
                 <div className="text-xs font-semibold text-stone-200 light:text-stone-800">
                   Backup e Ripristino JSON
                 </div>
-                <div className="text-[11px] text-stone-400 light:text-stone-500 truncate mt-0.5">
+                <div className="text-[11px] text-stone-400 light:text-stone-500 leading-snug mt-0.5">
                   Esporta o importa copia di sicurezza ({stats.total} {stats.total === 1 ? 'libro' : 'libri'})
                 </div>
               </div>

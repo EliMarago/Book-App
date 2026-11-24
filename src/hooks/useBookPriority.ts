@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase, type Book } from '@/lib/supabase';
+import { getFreshUserDeduped, type Book } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getStoredWantPriority,
@@ -104,7 +104,7 @@ export function useBookPriority() {
       return;
     }
     try {
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await getFreshUserDeduped(force);
       if (error || !data.user) return;
       lastRefreshRef.current = Date.now();
       const remoteWant = data.user.user_metadata?.want_priority;

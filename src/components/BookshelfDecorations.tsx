@@ -68,7 +68,7 @@ export function getAutoHoliday(date = new Date()): Exclude<BookshelfHoliday, 'au
 /**
  * LUCINE FESTIVE DI NATALE (FESTONE APPESO ALLA MENSOLA IN STILE BOOKTOK TUTTE COLORATE)
  */
-export function ChristmasShelfLights({ animated = true }: { animated?: boolean }) {
+export function ChristmasShelfLights({ animated: _animated = false }: { animated?: boolean }) {
   const bulbs = [
     { x: '7.5%', color: '#ff4757', core: '#ffe0e3', halo: 'rgba(255, 71, 87, 0.85)', softHalo: 'rgba(255, 71, 87, 0.35)', delay: '0s' },
     { x: '19.5%', color: '#facc15', core: '#fef9c3', halo: 'rgba(250, 204, 21, 0.85)', softHalo: 'rgba(250, 204, 21, 0.35)', delay: '0.4s' },
@@ -114,16 +114,12 @@ export function ChristmasShelfLights({ animated = true }: { animated?: boolean }
         >
           {/* Portalampada */}
           <div className="w-[5px] h-[3.5px] bg-stone-500 border border-stone-700 rounded-t-[1px] z-10" />
-          {/* Bulbo LED con bagliore morbido diffuso */}
+          {/* Bulbo LED con bagliore morbido diffuso (statico a zero consumo CPU) */}
           <div
-            className={`w-[9px] h-[11px] sm:w-[10px] sm:h-[12px] rounded-full -mt-[0.5px] ${
-              animated ? 'animate-pulse' : ''
-            }`}
+            className="w-[9px] h-[11px] sm:w-[10px] sm:h-[12px] rounded-full -mt-[0.5px]"
             style={{
               background: `radial-gradient(circle at 38% 35%, ${b.core} 0%, ${b.color} 55%, ${b.color} 100%)`,
               boxShadow: `0 2px 10px 3px ${b.halo}, 0 4px 20px 7px ${b.softHalo}`,
-              animationDuration: '2.6s',
-              animationDelay: b.delay,
             }}
           />
         </div>
@@ -279,10 +275,10 @@ function ChristmasTreeProp() {
         <circle cx="81.6" cy="86.6" r="1.1" fill="rgba(255,255,255,0.8)" />
 
         {/* Micro-LED colorati luminosi sull'albero */}
-        <circle cx="53" cy="36" r="2.2" fill="#60a5fa" className="animate-pulse" />
-        <circle cx="46" cy="64" r="2.2" fill="#4ade80" className="animate-pulse" />
-        <circle cx="63" cy="78" r="2.2" fill="#f472b6" className="animate-pulse" />
-        <circle cx="38" cy="85" r="2.2" fill="#facc15" className="animate-pulse" />
+        <circle cx="53" cy="36" r="2.2" fill="#60a5fa" />
+        <circle cx="46" cy="64" r="2.2" fill="#4ade80" />
+        <circle cx="63" cy="78" r="2.2" fill="#f472b6" />
+        <circle cx="38" cy="85" r="2.2" fill="#facc15" />
 
         {/* Puntale a Stella Dorata 3D in cima */}
         <circle cx="55" cy="12" r="9" fill="rgba(250, 204, 21, 0.3)" />
@@ -694,7 +690,6 @@ function ChristmasLanternProp() {
         <path
           d="M46 41 C41 48, 41 54, 46 55 C51 54, 51 48, 46 41 Z"
           fill="#f59e0b"
-          className="animate-pulse"
         />
         <path d="M46 45 C43.5 49, 43.5 53, 46 54 C48.5 53, 48.5 49, 46 45 Z" fill="#fef08a" />
 
@@ -1097,7 +1092,7 @@ function AutumnCandleAndAcornProp() {
         <ellipse cx="48" cy="97" rx="32" ry="4.5" fill="rgba(0,0,0,0.6)" />
 
         {/* Fiamma calda */}
-        <path d="M44 26 C39 34, 39 40, 44 42 C49 40, 49 34, 44 26 Z" fill="#f59e0b" className="animate-pulse" />
+        <path d="M44 26 C39 34, 39 40, 44 42 C49 40, 49 34, 44 26 Z" fill="#f59e0b" />
         <path d="M44 30 C41.5 35, 41.5 39, 44 40 C46.5 39, 46.5 35, 44 30 Z" fill="#fef08a" />
         <line x1="44" y1="41" x2="44" y2="46" stroke="#292524" strokeWidth="1.4" />
 
@@ -1179,7 +1174,7 @@ function HalloweenPotionAndCandlesProp() {
         <circle cx="43" cy="74" r="23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.6)" strokeWidth="1.4" />
         {/* Liquido magico viola */}
         <path d="M22 72 Q43 67 64 72 A 21 21 0 0 1 22 72 Z" fill="url(#potionPurple)" />
-        <circle cx="36" cy="80" r="2.2" fill="#f0abfc" className="animate-pulse" />
+        <circle cx="36" cy="80" r="2.2" fill="#f0abfc" />
         <circle cx="48" cy="84" r="1.6" fill="#f0abfc" />
         <circle cx="43" cy="74" r="1.8" fill="#f0abfc" />
         <path d="M27 65 A 17 17 0 0 1 36 56" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.2" strokeLinecap="round" />
@@ -1187,7 +1182,7 @@ function HalloweenPotionAndCandlesProp() {
         {/* Candela nera gocciolante accanto */}
         <rect x="70" y="56" width="12" height="41" rx="2" fill="#1c1917" stroke="#44403c" strokeWidth="0.8" />
         <path d="M70 58 Q74 66 75 60 Q79 68 82 59" fill="none" stroke="#57534e" strokeWidth="2" strokeLinecap="round" />
-        <path d="M76 42 C72 48, 72 53, 76 55 C80 53, 80 48, 76 42 Z" fill="#f59e0b" className="animate-pulse" />
+        <path d="M76 42 C72 48, 72 53, 76 55 C80 53, 80 48, 76 42 Z" fill="#f59e0b" />
         <path d="M76 46 C74 50, 74 52, 76 53 C78 52, 78 50, 76 46 Z" fill="#fef08a" />
       </svg>
     </div>
