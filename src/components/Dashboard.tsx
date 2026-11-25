@@ -411,8 +411,14 @@ export function Dashboard() {
         });
 
         setSyncError(null);
-        setBooks(booksWithDatesAndPages);
-        saveCachedBooks(booksWithDatesAndPages, userId);
+        // Evita re-render e "scatti" inutili se i libri sul cloud sono identici a quelli già mostrati in cache
+        if (
+          rawBooksRef.current.length === 0 ||
+          JSON.stringify(booksWithDatesAndPages) !== JSON.stringify(rawBooksRef.current)
+        ) {
+          setBooks(booksWithDatesAndPages);
+          saveCachedBooks(booksWithDatesAndPages, userId);
+        }
         const now = new Date();
         lastSyncTimestampRef.current = now.getTime();
         setLastSyncedAt(now);

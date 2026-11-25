@@ -14,7 +14,7 @@ import {
   shiftBookPosition,
 } from '@/lib/bookPriority';
 
-const PRIORITY_SYNC_COOLDOWN_MS = 30 * 1000;
+const PRIORITY_SYNC_COOLDOWN_MS = 2 * 60 * 1000;
 const PUSH_DEBOUNCE_MS = 600;
 
 export function useBookPriority() {

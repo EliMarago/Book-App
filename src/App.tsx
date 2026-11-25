@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { Dashboard } from '@/components/Dashboard';
@@ -9,10 +9,10 @@ const AuthScreen = lazy(() =>
   import('@/components/AuthScreen').then((m) => ({ default: m.AuthScreen }))
 );
 
-function AppSplash() {
+function AppSplash({ fading = false }: { fading?: boolean }) {
   return (
     <div
-      className="app-boot-splash"
+      className={`app-boot-splash${fading ? ' is-fading' : ''}`}
       role="status"
       aria-live="polite"
       aria-label="Caricamento Bookshelf"
@@ -41,30 +41,67 @@ function AppSplash() {
 
 function AppContent() {
   const { session, loading, isPasswordRecovery } = useAuth();
+  const [bootFading, setBootFading] = useState(false);
+  const [bootRemoved, setBootRemoved] = useState(false);
 
-  if (loading) {
-    return <AppSplash />;
-  }
+  // Mantiene la splash screen coordinata sopra l'app per ~520ms (attende font + layout stabilizzato,
+  // poi dissolve dolcemente e si smonta completamente dal DOM a consumo zero)
+  useEffect(() => {
+    if (loading || bootRemoved) return;
+    let cancelled = false;
+    let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+    let removeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  if (isPasswordRecovery) {
-    return (
-      <Suspense fallback={<AppSplash />}>
-        <AuthScreen initialMode="update-password" />
-        <PwaUpdateBanner />
-      </Suspense>
-    );
-  }
+    const minDelay = new Promise<void>((res) => {
+      fadeTimer = setTimeout(res, 520);
+    });
+    const fontsReady =
+      typeof document !== 'undefined' && document.fonts?.ready
+        ? Promise.race([
+            document.fonts.ready.then(() => undefined),
+            new Promise<void>((res) => setTimeout(res, 680)),
+          ])
+        : Promise.resolve();
+
+    Promise.all([minDelay, fontsReady]).then(() => {
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setBootFading(true);
+        removeTimer = setTimeout(() => {
+          if (!cancelled) setBootRemoved(true);
+        }, 230);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (fadeTimer) clearTimeout(fadeTimer);
+      if (removeTimer) clearTimeout(removeTimer);
+    };
+  }, [loading, bootRemoved]);
+
+  const mainView = loading ? null : isPasswordRecovery ? (
+    <Suspense fallback={null}>
+      <AuthScreen initialMode="update-password" />
+      <PwaUpdateBanner />
+    </Suspense>
+  ) : session ? (
+    <>
+      <Dashboard />
+      <PwaUpdateBanner />
+    </>
+  ) : (
+    <Suspense fallback={null}>
+      <AuthScreen />
+      <PwaUpdateBanner />
+    </Suspense>
+  );
 
   return (
     <>
-      {session ? (
-        <Dashboard />
-      ) : (
-        <Suspense fallback={<AppSplash />}>
-          <AuthScreen />
-        </Suspense>
-      )}
-      <PwaUpdateBanner />
+      {mainView}
+      {!bootRemoved && <AppSplash fading={bootFading} />}
     </>
   );
 }

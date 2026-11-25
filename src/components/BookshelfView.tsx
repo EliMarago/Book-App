@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import {
   Library,
   BookOpen,
@@ -478,13 +478,13 @@ export function BookshelfView({
   // e andare a capo su più piani da Mobile solo quando il ripiano è effettivamente pieno
   const bookcaseRef = useRef<HTMLDivElement>(null);
   const [bookcaseWidth, setBookcaseWidth] = useState<number>(() =>
-    typeof window !== 'undefined' ? Math.min(window.innerWidth - 24, 1280) : 1024
+    typeof window !== 'undefined' ? Math.min(window.innerWidth - 32, 1120) : 1024
   );
   const [viewportWidth, setViewportWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1024
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = bookcaseRef.current;
     const updateWidth = () => {
       if (typeof window !== 'undefined') {
@@ -493,7 +493,7 @@ export function BookshelfView({
       if (el && el.clientWidth > 0) {
         setBookcaseWidth(el.clientWidth);
       } else if (typeof window !== 'undefined') {
-        setBookcaseWidth(Math.min(window.innerWidth - 24, 1280));
+        setBookcaseWidth(Math.min(window.innerWidth - 32, 1120));
       }
     };
     updateWidth();

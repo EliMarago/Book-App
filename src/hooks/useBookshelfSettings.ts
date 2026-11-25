@@ -28,7 +28,7 @@ const HOLIDAY_KEY = 'bookapp_bookshelf_holiday';
 const FACEOUT_SECTIONS_KEY = 'bookapp_faceout_sections_v3';
 const LEGACY_FACEOUT_KEY = 'bookapp_faceout_overrides_v2';
 const UPDATED_AT_KEY = 'bookapp_bookshelf_settings_updated_at';
-const SYNC_COOLDOWN_MS = 15 * 1000;
+const SYNC_COOLDOWN_MS = 2 * 60 * 1000;
 const PUSH_DEBOUNCE_MS = 450;
 
 /** Converte il vecchio formato verboso ("sectionId::bookId": boolean) nel nuovo formato compatto */

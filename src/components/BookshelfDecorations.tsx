@@ -68,7 +68,7 @@ export function getAutoHoliday(date = new Date()): Exclude<BookshelfHoliday, 'au
 /**
  * LUCINE FESTIVE DI NATALE (FESTONE APPESO ALLA MENSOLA IN STILE BOOKTOK TUTTE COLORATE)
  */
-export function ChristmasShelfLights({ animated: _animated = false }: { animated?: boolean }) {
+export function ChristmasShelfLights() {
   const bulbs = [
     { x: '7.5%', color: '#ff4757', core: '#ffe0e3', halo: 'rgba(255, 71, 87, 0.85)', softHalo: 'rgba(255, 71, 87, 0.35)', delay: '0s' },
     { x: '19.5%', color: '#facc15', core: '#fef9c3', halo: 'rgba(250, 204, 21, 0.85)', softHalo: 'rgba(250, 204, 21, 0.35)', delay: '0.4s' },

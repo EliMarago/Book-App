@@ -35,6 +35,7 @@ export const READER_AVATARS = [
   { id: 'initial', label: 'Iniziale', emoji: '' },
   { id: 'books', label: 'Libri', emoji: '📚' },
   { id: 'coffee', label: 'Caffè', emoji: '☕' },
+  { id: 'honey', label: 'Miele', emoji: '🍯' },
   { id: 'moon', label: 'Notturno', emoji: '🌙' },
   { id: 'quill', label: 'Penna', emoji: '🪶' },
   { id: 'sparkles', label: 'Magia', emoji: '✨' },
@@ -267,7 +268,7 @@ export function ProfileSettingsModal({
               <span className="block text-[11px] font-semibold uppercase tracking-wider text-stone-400 light:text-stone-500 mb-2">
                 Icona profilo
               </span>
-              <div className="grid grid-cols-8 gap-1.5">
+              <div className="grid grid-cols-9 gap-1 sm:gap-1.5">
                 {READER_AVATARS.map((av) => {
                   const isSelected = avatarId === av.id;
                   return (

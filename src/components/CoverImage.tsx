@@ -21,6 +21,7 @@ export function CoverImage({ src, thumbWidth = 300, className = '', onLoad, onEr
 
   const [settledSrc, setSettledSrc] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [instant, setInstant] = useState(false);
   const settled = settledSrc === currentSrc;
   const visible = settled && loaded;
 
@@ -37,8 +38,9 @@ export function CoverImage({ src, thumbWidth = 300, className = '', onLoad, onEr
         {...props}
         src={currentSrc}
         ref={(el) => {
-          // Immagini già in cache: possono risultare complete prima dell'evento onLoad
+          // Immagini già in cache: mostrate subito senza animazione di dissolvenza
           if (el?.complete && el.naturalWidth > 0 && !settled) {
+            setInstant(true);
             setSettledSrc(currentSrc);
             setLoaded(true);
           }
@@ -51,6 +53,7 @@ export function CoverImage({ src, thumbWidth = 300, className = '', onLoad, onEr
         onError={(e) => {
           // La miniatura non esiste: riprova con l'URL originale prima di arrendersi
           if (currentSrc !== src) {
+            setInstant(false);
             setUseOriginalFor(src);
             return;
           }
@@ -58,7 +61,7 @@ export function CoverImage({ src, thumbWidth = 300, className = '', onLoad, onEr
           setLoaded(false);
           onError?.(e);
         }}
-        className={`${className} transition-[opacity,transform] duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}
+        className={`${className} ${instant ? '' : 'transition-opacity duration-200'} ${visible ? 'opacity-100' : 'opacity-0'}`}
       />
     </>
   );
