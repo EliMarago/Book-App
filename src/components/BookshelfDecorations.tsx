@@ -8,43 +8,43 @@ export const HOLIDAY_OPTIONS: {
   icon: string;
   desc: string;
 }[] = [
-  {
-    id: 'auto',
-    label: 'Auto',
-    icon: '✨',
-    desc: 'Rileva automaticamente la stagione',
-  },
-  {
-    id: 'none',
-    label: 'Piante & Oggetti',
-    icon: '🪴',
-    desc: 'Monstera, bonsai, clessidra e globo',
-  },
-  {
-    id: 'christmas',
-    label: 'Natale',
-    icon: '🎄',
-    desc: 'Albero, gattino, pupazzo di neve e globo',
-  },
-  {
-    id: 'halloween',
-    label: 'Halloween',
-    icon: '🎃',
-    desc: 'Zucche intagliate, pozioni e candele',
-  },
-  {
-    id: 'easter',
-    label: 'Pasqua',
-    icon: '🌷',
-    desc: 'Tulipani in vaso, uova dipinte e nido',
-  },
-  {
-    id: 'autumn',
-    label: 'Autunno',
-    icon: '🍁',
-    desc: 'Zucca in velluto, infuso caldo e lanterne',
-  },
-];
+    {
+      id: 'auto',
+      label: 'Auto',
+      icon: '✨',
+      desc: 'Rileva automaticamente la stagione',
+    },
+    {
+      id: 'none',
+      label: 'Piante & Oggetti',
+      icon: '🪴',
+      desc: 'Monstera, bonsai, clessidra e globo',
+    },
+    {
+      id: 'christmas',
+      label: 'Natale',
+      icon: '🎄',
+      desc: 'Albero, gattino, pupazzo di neve e globo',
+    },
+    {
+      id: 'halloween',
+      label: 'Halloween',
+      icon: '🎃',
+      desc: 'Zucche intagliate, pozioni e candele',
+    },
+    {
+      id: 'easter',
+      label: 'Pasqua',
+      icon: '🌷',
+      desc: 'Tulipani in vaso, uova dipinte e nido',
+    },
+    {
+      id: 'autumn',
+      label: 'Autunno',
+      icon: '🍁',
+      desc: 'Zucca in velluto, infuso caldo e lanterne',
+    },
+  ];
 
 export function getAutoHoliday(date = new Date()): Exclude<BookshelfHoliday, 'auto'> {
   const month = date.getMonth() + 1; // 1..12

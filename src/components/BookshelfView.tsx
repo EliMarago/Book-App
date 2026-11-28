@@ -46,6 +46,7 @@ import {
 import { BookshelfCustomizationModal } from './BookshelfCustomizationModal';
 import { useBookshelfSettings } from '@/hooks/useBookshelfSettings';
 import { BookmarkRibbon } from './BookmarkRibbon';
+import { ReadingShelfProgressStrip } from './ReadingShelfProgressStrip';
 
 // Palette curata in stile BookTok 3D opaco/vellutato (fedele allo screenshot di riferimento)
 export interface SpinePaletteItem {
@@ -1843,6 +1844,9 @@ export function BookshelfView({
                                       >
                                         {/* Volume fisico 3D: copertina pulita + blocco fogli sporgente + quarta di copertina */}
                                         <div className="relative w-full transition-transform duration-300 group-hover:scale-[1.03]">
+                                          {book.status === 'reading' && (
+                                            <BookmarkRibbon className="right-[14%]" width={9} up={6} down={22} />
+                                          )}
                                           {/* Quarta di copertina (bordo cartonato posteriore) */}
                                           <div
                                             aria-hidden="true"
@@ -2298,6 +2302,9 @@ export function BookshelfView({
                                           >
                                             {/* Copertina frontale verticale */}
                                             <div className="relative">
+                                              {!isDraggable && book.status === 'reading' && (
+                                                <BookmarkRibbon className="right-[14%]" width={9} up={6} down={22} />
+                                              )}
                                               <div
                                                 className={`relative w-[112px] xs:w-[120px] sm:w-[136px] h-[176px] xs:h-[188px] sm:h-[210px] rounded-t-[3px] overflow-hidden shadow-[-4px_4px_12px_rgba(0,0,0,0.65),4px_4px_12px_rgba(0,0,0,0.55)] border ${isSelectingFaceOut
                                                   ? 'border-amber-400 ring-2 ring-amber-400/70'
@@ -2606,9 +2613,22 @@ export function BookshelfView({
                                               <div className="book-spine-ridge" />
                                             </div>
                                           </div>
-                                          {book.status === 'reading' && (
-                                            <BookmarkRibbon variant="loop" className="right-[7%]" width={10} up={5} down="40%" />
-                                          )}
+                                          {book.status === 'reading' && (() => {
+                                            const ratio =
+                                              book.pages && book.pages > 0
+                                                ? Math.min(1, Math.max(0, (book.read_pages || 0) / book.pages))
+                                                : 0.25;
+                                            const ribbonDownPct = Math.round(22 + ratio * 54);
+                                            return (
+                                              <BookmarkRibbon
+                                                variant="loop"
+                                                className="right-[7%] transition-[height] duration-300 ease-out"
+                                                width={10}
+                                                up={5}
+                                                down={`${ribbonDownPct}%`}
+                                              />
+                                            );
+                                          })()}
                                         </div>
                                       );
                                     })}
@@ -2662,6 +2682,17 @@ export function BookshelfView({
                         </div>
                       );
                     })()
+                  )}
+
+                  {/* Barra compatta di avanzamento lettura sotto il ripiano "In Lettura" */}
+                  {section.id === 'reading' && section.books.length > 0 && (
+                    <ReadingShelfProgressStrip
+                      books={section.books}
+                      isAlwaysDarkWall={isAlwaysDarkWall}
+                      hasHangingLights={showLights}
+                      shelfStyle={shelfStyle}
+                      onUpdateBook={onUpdateBook}
+                    />
                   )}
                 </div>
               );
